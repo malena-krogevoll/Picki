@@ -59,6 +59,107 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          preferences: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          preferences?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          preferences?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shopping_list_items: {
+        Row: {
+          created_at: string
+          ean: number | null
+          id: string
+          is_completed: boolean | null
+          notes: string | null
+          product_name: string
+          quantity: number | null
+          shopping_list_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ean?: number | null
+          id?: string
+          is_completed?: boolean | null
+          notes?: string | null
+          product_name: string
+          quantity?: number | null
+          shopping_list_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ean?: number | null
+          id?: string
+          is_completed?: boolean | null
+          notes?: string | null
+          product_name?: string
+          quantity?: number | null
+          shopping_list_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_list_items_shopping_list_id_fkey"
+            columns: ["shopping_list_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_lists: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          store_code: string | null
+          store_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          store_code?: string | null
+          store_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          store_code?: string | null
+          store_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
