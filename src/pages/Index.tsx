@@ -1,14 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShoppingCart, User, LogOut } from 'lucide-react';
 import ShoppingLists from '@/components/ShoppingLists';
+import Onboarding from '@/components/Onboarding';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -16,7 +20,35 @@ const Index = () => {
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
+  useEffect(() => {
+    const checkProfile = async () => {
+      if (!user) return;
+      
+      setProfileLoading(true);
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('preferences')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error || !profile || !profile.preferences) {
+          setShowOnboarding(true);
+        }
+      } catch (error) {
+        console.error('Error checking profile:', error);
+        setShowOnboarding(true);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    if (user && !loading) {
+      checkProfile();
+    }
+  }, [user, loading]);
+
+  if (loading || profileLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -29,6 +61,10 @@ const Index = () => {
 
   if (!user) {
     return null;
+  }
+
+  if (showOnboarding) {
+    return <Onboarding onComplete={() => setShowOnboarding(false)} />;
   }
 
   const handleSignOut = async () => {
