@@ -3,15 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShoppingCart, User, LogOut } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import ShoppingLists from '@/components/ShoppingLists';
 import Onboarding from '@/components/Onboarding';
+import Settings from '@/components/Settings';
 import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
@@ -67,6 +69,10 @@ const Index = () => {
     return <Onboarding onComplete={() => setShowOnboarding(false)} />;
   }
 
+  if (showSettings) {
+    return <Settings onBack={() => setShowSettings(false)} />;
+  }
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
@@ -86,6 +92,10 @@ const Index = () => {
                 <User className="h-4 w-4" />
                 {user.email}
               </div>
+              <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
+                <SettingsIcon className="h-4 w-4 mr-2" />
+                Innstillinger
+              </Button>
               <Button variant="outline" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logg ut
