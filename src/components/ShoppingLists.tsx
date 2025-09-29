@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, ShoppingCart, Store } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ShoppingCart, Store } from 'lucide-react';
 import TextInputShoppingList from '@/components/TextInputShoppingList';
+import ShoppingListView from '@/components/ShoppingListView';
 
 interface ShoppingList {
   id: string;
@@ -28,9 +25,7 @@ const ShoppingLists = () => {
   const { toast } = useToast();
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
-  const [newListName, setNewListName] = useState('');
-  const [selectedStore, setSelectedStore] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -78,47 +73,14 @@ const ShoppingLists = () => {
     }
   };
 
-  const createShoppingList = async () => {
-    if (!newListName.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Vennligst skriv inn et navn på handlelista"
-      });
-      return;
-    }
-
-    setLoading(true);
-    
-    const selectedStoreData = stores.find(store => store.StoreCode === selectedStore);
-    
-    const { error } = await supabase
-      .from('shopping_lists')
-      .insert({
-        name: newListName.trim(),
-        store_code: selectedStore || null,
-        store_name: selectedStoreData?.Kjede || null,
-        user_id: user?.id
-      });
-
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Kunne ikke opprette handleliste"
-      });
-    } else {
-      toast({
-        title: "Suksess",
-        description: "Handleliste opprettet!"
-      });
-      setNewListName('');
-      setSelectedStore('');
-      fetchShoppingLists();
-    }
-    
-    setLoading(false);
-  };
+  if (selectedListId) {
+    return (
+      <ShoppingListView 
+        listId={selectedListId} 
+        onBack={() => setSelectedListId(null)} 
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -126,46 +88,6 @@ const ShoppingLists = () => {
         stores={stores} 
         onListCreated={fetchShoppingLists}
       />
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Ny tom handleliste
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="list-name">Navn på handleliste</Label>
-            <Input
-              id="list-name"
-              value={newListName}
-              onChange={(e) => setNewListName(e.target.value)}
-              placeholder="F.eks. Ukeshandel, Middag i kveld..."
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="store-select">Velg butikk (valgfritt)</Label>
-            <Select value={selectedStore} onValueChange={setSelectedStore}>
-              <SelectTrigger>
-                <SelectValue placeholder="Velg butikk" />
-              </SelectTrigger>
-              <SelectContent>
-                {stores.map((store) => (
-                  <SelectItem key={store.StoreCode} value={store.StoreCode}>
-                    {store.Kjede}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <Button onClick={createShoppingList} disabled={loading} className="w-full">
-            {loading ? 'Oppretter...' : 'Opprett tom liste'}
-          </Button>
-        </CardContent>
-      </Card>
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Dine handlelister</h2>
@@ -179,7 +101,11 @@ const ShoppingLists = () => {
           </Card>
         ) : (
           lists.map((list) => (
-            <Card key={list.id} className="cursor-pointer hover:shadow-md transition-shadow">
+            <Card 
+              key={list.id} 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setSelectedListId(list.id)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
