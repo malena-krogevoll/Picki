@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, ShoppingCart, Store } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import TextInputShoppingList from '@/components/TextInputShoppingList';
 
 interface ShoppingList {
   id: string;
@@ -121,11 +122,16 @@ const ShoppingLists = () => {
 
   return (
     <div className="space-y-6">
+      <TextInputShoppingList 
+        stores={stores} 
+        onListCreated={fetchShoppingLists}
+      />
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            Ny handleliste
+            Ny tom handleliste
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -156,7 +162,7 @@ const ShoppingLists = () => {
           </div>
           
           <Button onClick={createShoppingList} disabled={loading} className="w-full">
-            {loading ? 'Oppretter...' : 'Opprett handleliste'}
+            {loading ? 'Oppretter...' : 'Opprett tom liste'}
           </Button>
         </CardContent>
       </Card>
