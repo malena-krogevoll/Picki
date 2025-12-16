@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShoppingCart, User, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import ShoppingLists from '@/components/ShoppingLists';
 import Onboarding from '@/components/Onboarding';
@@ -31,8 +30,8 @@ const Index = () => {
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('preferences')
-          .eq('user_id', user.id)
-          .single();
+          .eq('id', user.id)
+          .maybeSingle();
 
         if (error || !profile || !profile.preferences) {
           setShowOnboarding(true);

@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/AuthProvider';
@@ -12,22 +11,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseShoppingListText, formatParsedItem, ParsedItem } from '@/lib/textParser';
 import { FileText, Plus, X } from 'lucide-react';
 
-interface Store {
-  StoreCode: string;
-  Kjede: string;
-}
-
 interface Props {
-  stores: Store[];
   onListCreated: () => void;
 }
 
-const TextInputShoppingList = ({ stores, onListCreated }: Props) => {
+const TextInputShoppingList = ({ onListCreated }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [textInput, setTextInput] = useState('');
   const [listName, setListName] = useState('');
-  const [selectedStore, setSelectedStore] = useState('');
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -75,31 +67,36 @@ const TextInputShoppingList = ({ stores, onListCreated }: Props) => {
       return;
     }
 
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Feil",
+        description: "Du må være logget inn"
+      });
+      return;
+    }
+
     setLoading(true);
     
     try {
-      const selectedStoreData = stores.find(store => store.StoreCode === selectedStore);
-      
       // Create the shopping list
       const { data: listData, error: listError } = await supabase
         .from('shopping_lists')
         .insert({
           name: listName.trim(),
-          store_code: selectedStore || null,
-          store_name: selectedStoreData?.Kjede || null,
-          user_id: user?.id
+          user_id: user.id
         })
         .select()
         .single();
 
       if (listError) throw listError;
 
-      // Add items to the list
+      // Add items to the list - format item name with quantity if > 1
       const itemsToInsert = parsedItems.map(item => ({
-        shopping_list_id: listData.id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        notes: item.notes || null
+        list_id: listData.id,
+        name: item.quantity > 1 
+          ? `${item.quantity}x ${item.product_name}${item.notes ? ` (${item.notes})` : ''}`
+          : `${item.product_name}${item.notes ? ` (${item.notes})` : ''}`
       }));
 
       const { error: itemsError } = await supabase
@@ -116,7 +113,6 @@ const TextInputShoppingList = ({ stores, onListCreated }: Props) => {
       // Reset form
       setTextInput('');
       setListName('');
-      setSelectedStore('');
       setParsedItems([]);
       onListCreated();
 
@@ -149,22 +145,6 @@ const TextInputShoppingList = ({ stores, onListCreated }: Props) => {
             onChange={(e) => setListName(e.target.value)}
             placeholder="F.eks. Ukeshandel, Middag i kveld..."
           />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="store-select-text">Velg butikk (valgfritt)</Label>
-          <Select value={selectedStore} onValueChange={setSelectedStore}>
-            <SelectTrigger>
-              <SelectValue placeholder="Velg butikk" />
-            </SelectTrigger>
-            <SelectContent>
-              {stores.map((store) => (
-                <SelectItem key={store.StoreCode} value={store.StoreCode}>
-                  {store.Kjede}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="space-y-2">
