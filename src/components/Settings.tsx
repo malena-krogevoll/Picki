@@ -47,14 +47,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         const { data: profile } = await supabase
           .from('profiles')
           .select('preferences')
-          .eq('user_id', user.id)
-          .single();
+          .eq('id', user.id)
+          .maybeSingle();
 
         if (profile?.preferences && typeof profile.preferences === 'object') {
-          const prefs = profile.preferences as any;
-          setSelectedAllergies(prefs.allergies || []);
-          setSelectedDiets(prefs.diets || []);
-          setRenvareOnly(prefs.renvare_only || false);
+          const prefs = profile.preferences as Record<string, unknown>;
+          setSelectedAllergies((prefs.allergies as string[]) || []);
+          setSelectedDiets((prefs.diets as string[]) || []);
+          setRenvareOnly((prefs.renvare_only as boolean) || false);
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -98,7 +98,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
       const { error } = await supabase
         .from('profiles')
         .update({ preferences })
-        .eq('user_id', user.id);
+        .eq('id', user.id);
 
       if (error) throw error;
 

@@ -67,12 +67,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         priority_order: ["renvare", "økologisk", "lavest_pris", "dyrevelfred"]
       };
 
+      // Use upsert with id (which is the user's id from auth)
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          user_id: user.id,
-          preferences,
-          display_name: user.email?.split('@')[0] || 'Bruker'
+          id: user.id,
+          preferences
         });
 
       if (error) throw error;

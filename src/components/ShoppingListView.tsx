@@ -10,19 +10,23 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 interface ShoppingListItem {
   id: string;
-  product_name: string;
-  quantity: number;
-  is_completed: boolean;
-  notes: string | null;
-  ean: number | null;
+  name: string;
+  in_cart: boolean;
+  selected_product_ean: string | null;
+  list_id: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface ShoppingList {
   id: string;
   name: string;
-  store_code: string | null;
-  store_name: string | null;
-  created_at: string;
+  store_id: string | null;
+  user_id: string;
+  status: string;
+  created_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
 }
 
 interface ShoppingListViewProps {
@@ -66,7 +70,7 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
     const { data: itemsData, error: itemsError } = await supabase
       .from('shopping_list_items')
       .select('*')
-      .eq('shopping_list_id', listId)
+      .eq('list_id', listId)
       .order('created_at', { ascending: false });
 
     if (itemsError) {
@@ -89,9 +93,8 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
     const { error } = await supabase
       .from('shopping_list_items')
       .insert({
-        shopping_list_id: listId,
-        product_name: newItemName.trim(),
-        quantity: 1
+        list_id: listId,
+        name: newItemName.trim()
       });
 
     if (error) {
@@ -106,10 +109,10 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
     }
   };
 
-  const toggleItemCompleted = async (itemId: string, completed: boolean) => {
+  const toggleItemCompleted = async (itemId: string, inCart: boolean) => {
     const { error } = await supabase
       .from('shopping_list_items')
-      .update({ is_completed: completed })
+      .update({ in_cart: inCart })
       .eq('id', itemId);
 
     if (error) {
@@ -120,7 +123,7 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
       });
     } else {
       setItems(items.map(item => 
-        item.id === itemId ? { ...item, is_completed: completed } : item
+        item.id === itemId ? { ...item, in_cart: inCart } : item
       ));
     }
   };
@@ -157,8 +160,8 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
     return null;
   }
 
-  const completedItems = items.filter(item => item.is_completed);
-  const pendingItems = items.filter(item => !item.is_completed);
+  const completedItems = items.filter(item => item.in_cart);
+  const pendingItems = items.filter(item => !item.in_cart);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-accent/5">
@@ -171,10 +174,10 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
             </Button>
             <div>
               <h1 className="text-2xl font-bold">{list.name}</h1>
-              {list.store_name && (
+              {list.store_id && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <Store className="h-4 w-4" />
-                  {list.store_name}
+                  Butikk: {list.store_id}
                 </p>
               )}
             </div>
@@ -216,17 +219,11 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
               {pendingItems.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 p-2 border rounded">
                   <Checkbox
-                    checked={item.is_completed}
+                    checked={item.in_cart}
                     onCheckedChange={(checked) => toggleItemCompleted(item.id, !!checked)}
                   />
                   <div className="flex-1">
-                    <span className="font-medium">{item.product_name}</span>
-                    {item.quantity > 1 && (
-                      <span className="text-sm text-muted-foreground ml-2">({item.quantity} stk)</span>
-                    )}
-                    {item.notes && (
-                      <p className="text-sm text-muted-foreground">{item.notes}</p>
-                    )}
+                    <span className="font-medium">{item.name}</span>
                   </div>
                   <Button
                     variant="outline"
@@ -247,21 +244,18 @@ const ShoppingListView = ({ listId, onBack }: ShoppingListViewProps) => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Check className="h-5 w-5" />
-                Fullført ({completedItems.length} elementer)
+                I handlekurven ({completedItems.length} elementer)
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {completedItems.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 p-2 border rounded opacity-60">
                   <Checkbox
-                    checked={item.is_completed}
+                    checked={item.in_cart}
                     onCheckedChange={(checked) => toggleItemCompleted(item.id, !!checked)}
                   />
                   <div className="flex-1">
-                    <span className="font-medium line-through">{item.product_name}</span>
-                    {item.quantity > 1 && (
-                      <span className="text-sm text-muted-foreground ml-2">({item.quantity} stk)</span>
-                    )}
+                    <span className="font-medium line-through">{item.name}</span>
                   </div>
                   <Button
                     variant="outline"

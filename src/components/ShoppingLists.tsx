@@ -10,27 +10,23 @@ import ShoppingListView from '@/components/ShoppingListView';
 interface ShoppingList {
   id: string;
   name: string;
-  store_code: string | null;
-  store_name: string | null;
-  created_at: string;
-}
-
-interface Store {
-  StoreCode: string;
-  Kjede: string;
+  store_id: string | null;
+  user_id: string;
+  status: string;
+  created_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
 }
 
 const ShoppingLists = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [lists, setLists] = useState<ShoppingList[]>([]);
-  const [stores, setStores] = useState<Store[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchShoppingLists();
-      fetchStores();
     }
   }, [user]);
 
@@ -51,28 +47,6 @@ const ShoppingLists = () => {
     }
   };
 
-  const fetchStores = async () => {
-    const { data, error } = await supabase
-      .from('Produktdatabase')
-      .select('StoreCode, Kjede')
-      .not('StoreCode', 'is', null)
-      .not('Kjede', 'is', null);
-
-    if (error) {
-      console.error('Error fetching stores:', error);
-    } else {
-      // Remove duplicates
-      const uniqueStores = data?.reduce((acc: Store[], current) => {
-        const existing = acc.find(item => item.StoreCode === current.StoreCode);
-        if (!existing) {
-          acc.push(current);
-        }
-        return acc;
-      }, []) || [];
-      setStores(uniqueStores);
-    }
-  };
-
   if (selectedListId) {
     return (
       <ShoppingListView 
@@ -85,7 +59,6 @@ const ShoppingLists = () => {
   return (
     <div className="space-y-6">
       <TextInputShoppingList 
-        stores={stores} 
         onListCreated={fetchShoppingLists}
       />
 
@@ -110,15 +83,15 @@ const ShoppingLists = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">{list.name}</h3>
-                    {list.store_name && (
+                    {list.store_id && (
                       <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                         <Store className="h-4 w-4" />
-                        {list.store_name}
+                        Butikk: {list.store_id}
                       </p>
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {new Date(list.created_at).toLocaleDateString('no-NO')}
+                    {list.created_at && new Date(list.created_at).toLocaleDateString('no-NO')}
                   </div>
                 </div>
               </CardContent>
