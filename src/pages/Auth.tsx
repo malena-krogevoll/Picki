@@ -59,7 +59,7 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img src={pickiLogo} alt="Picki" className="h-24" />
+            <img src={pickiLogo} alt="Picki" className="h-32" />
           </div>
           <p className="text-muted-foreground">Ærlig mat. Enkle valg. Mindre stress.</p>
         </CardHeader>
