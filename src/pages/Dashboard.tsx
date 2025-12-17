@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SwipeableCard } from "@/components/SwipeableCard";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { Plus, ShoppingCart, Clock, Copy, ChevronRight, Package, UtensilsCrossed, Trash2 } from "lucide-react";
@@ -53,7 +54,7 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <main className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
           <div className="text-center">Laster...</div>
         </main>
       </div>
@@ -63,36 +64,42 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="space-y-8">
+      <main className="container mx-auto px-3 py-4 md:px-4 md:py-8 max-w-4xl">
+        <div className="space-y-6 md:space-y-8">
           {/* Header */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold">Mine handlelister</h1>
-            <p className="text-muted-foreground">Administrer dine handlelister og gjenbruk tidligere lister</p>
+          <div className="text-center space-y-1 md:space-y-2">
+            <h1 className="text-2xl md:text-3xl font-bold">Mine handlelister</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Administrer dine handlelister</p>
           </div>
 
-          {/* Quick actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="border-2 border-dashed border-primary/30 bg-primary/5 hover:border-primary/50 transition-colors cursor-pointer" onClick={handleCreateNewList}>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center space-y-2">
-                  <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Plus className="h-8 w-8 text-primary" />
+          {/* Quick actions - compact on mobile */}
+          <div className="grid grid-cols-2 gap-3 md:gap-4">
+            <Card 
+              className="border-2 border-dashed border-primary/30 bg-primary/5 hover:border-primary/50 transition-colors cursor-pointer" 
+              onClick={handleCreateNewList}
+            >
+              <CardContent className="flex items-center justify-center py-6 md:py-12 px-2 md:px-6">
+                <div className="text-center space-y-1 md:space-y-2">
+                  <div className="bg-primary/10 w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-2 md:mb-4">
+                    <Plus className="h-5 w-5 md:h-8 md:w-8 text-primary" />
                   </div>
-                  <h3 className="text-xl font-semibold">Opprett ny handleliste</h3>
-                  <p className="text-sm text-muted-foreground">Start en ny liste for din neste handletur</p>
+                  <h3 className="text-sm md:text-xl font-semibold">Ny liste</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground hidden md:block">Start en ny liste</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" onClick={() => navigate("/dinner-explorer")}>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center space-y-2">
-                  <div className="bg-secondary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <UtensilsCrossed className="h-8 w-8 text-secondary-foreground" />
+            <Card 
+              className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" 
+              onClick={() => navigate("/dinner-explorer")}
+            >
+              <CardContent className="flex items-center justify-center py-6 md:py-12 px-2 md:px-6">
+                <div className="text-center space-y-1 md:space-y-2">
+                  <div className="bg-secondary/10 w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-2 md:mb-4">
+                    <UtensilsCrossed className="h-5 w-5 md:h-8 md:w-8 text-secondary-foreground" />
                   </div>
-                  <h3 className="text-xl font-semibold">Middag-explorer</h3>
-                  <p className="text-sm text-muted-foreground">Oppskrifter med renvarer</p>
+                  <h3 className="text-sm md:text-xl font-semibold">Middager</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground hidden md:block">Oppskrifter med renvarer</p>
                 </div>
               </CardContent>
             </Card>
@@ -100,72 +107,74 @@ const Dashboard = () => {
 
           {/* Aktive handlelister */}
           {lists.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <ShoppingCart className="h-6 w-6 text-primary" />
+            <div className="space-y-3 md:space-y-4">
+              <h2 className="text-lg md:text-2xl font-semibold flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 md:h-6 md:w-6 text-primary" />
                 Aktive lister
               </h2>
-              <div className="grid gap-4">
+              <p className="text-xs text-muted-foreground md:hidden">Sveip til venstre for å slette</p>
+              <div className="grid gap-3 md:gap-4">
                 {lists.map((list) => (
-                  <Card
-                    key={list.id}
-                    className="border-2 border-border hover:border-primary/50 transition-all cursor-pointer group"
-                    onClick={() => handleEditList(list.id)}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl group-hover:text-primary transition-colors">
-                            {list.name}
-                          </CardTitle>
-                          <CardDescription className="mt-2 flex items-center gap-2 text-sm">
-                            <Clock className="h-4 w-4" />
-                            Opprettet {format(new Date(list.created_at), "d. MMMM yyyy", { locale: nb })}
-                          </CardDescription>
+                  <SwipeableCard key={list.id} onDelete={() => handleDeleteList(list.id)}>
+                    <Card
+                      className="border-2 border-border hover:border-primary/50 transition-all cursor-pointer group"
+                      onClick={() => handleEditList(list.id)}
+                    >
+                      <CardHeader className="p-4 md:p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-base md:text-xl group-hover:text-primary transition-colors truncate">
+                              {list.name}
+                            </CardTitle>
+                            <CardDescription className="mt-1 md:mt-2 flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                              <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                              <span className="truncate">{format(new Date(list.created_at), "d. MMM", { locale: nb })}</span>
+                            </CardDescription>
+                          </div>
+                          <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
                         </div>
-                        <ChevronRight className="h-6 w-6 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <Badge variant="secondary" className="rounded-full">
-                            <Package className="h-3 w-3 mr-1" />
-                            {list.items?.length || 0} varer
-                          </Badge>
-                          {list.store_id && (
-                            <Badge variant="outline" className="rounded-full">
-                              {list.store_id.toUpperCase()}
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 md:gap-4">
+                            <Badge variant="secondary" className="rounded-full text-xs">
+                              <Package className="h-3 w-3 mr-1" />
+                              {list.items?.length || 0}
                             </Badge>
-                          )}
+                            {list.store_id && (
+                              <Badge variant="outline" className="rounded-full text-xs">
+                                {list.store_id.toUpperCase()}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="hidden md:flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDuplicateList(list.id);
+                              }}
+                              className="rounded-full"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteList(list.id);
+                              }}
+                              className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDuplicateList(list.id);
-                            }}
-                            className="rounded-full"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteList(list.id);
-                            }}
-                            className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </SwipeableCard>
                 ))}
               </div>
             </div>
@@ -173,72 +182,75 @@ const Dashboard = () => {
 
           {/* Fullførte handlelister */}
           {completedLists.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <Clock className="h-6 w-6 text-primary" />
-                Nylig fullførte lister
+            <div className="space-y-3 md:space-y-4">
+              <h2 className="text-lg md:text-2xl font-semibold flex items-center gap-2">
+                <Clock className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+                Fullførte lister
               </h2>
-              <p className="text-sm text-muted-foreground">Gjenbruk tidligere lister som mal</p>
-              <div className="grid gap-4">
+              <p className="text-xs md:text-sm text-muted-foreground">Gjenbruk som mal</p>
+              <div className="grid gap-3 md:gap-4">
                 {completedLists.map((list) => (
-                  <Card
-                    key={list.id}
-                    className="border-2 border-border hover:border-primary/30 transition-all opacity-80 hover:opacity-100"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl text-muted-foreground">
-                            {list.name}
-                          </CardTitle>
-                          <CardDescription className="mt-2 flex items-center gap-2 text-sm">
-                            <Clock className="h-4 w-4" />
-                            Fullført {list.completed_at && format(new Date(list.completed_at), "d. MMMM yyyy", { locale: nb })}
-                          </CardDescription>
-                        </div>
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 rounded-full">
-                          Fullført
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <Badge variant="secondary" className="rounded-full">
-                            <Package className="h-3 w-3 mr-1" />
-                            {list.items?.length || 0} varer
+                  <SwipeableCard key={list.id} onDelete={() => handleDeleteList(list.id)}>
+                    <Card
+                      className="border-2 border-border hover:border-primary/30 transition-all opacity-80 hover:opacity-100"
+                    >
+                      <CardHeader className="p-4 md:p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-base md:text-xl text-muted-foreground truncate">
+                              {list.name}
+                            </CardTitle>
+                            <CardDescription className="mt-1 md:mt-2 flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                              <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                              <span className="truncate">
+                                {list.completed_at && format(new Date(list.completed_at), "d. MMM", { locale: nb })}
+                              </span>
+                            </CardDescription>
+                          </div>
+                          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 rounded-full text-xs flex-shrink-0">
+                            Fullført
                           </Badge>
-                          {list.store_id && (
-                            <Badge variant="outline" className="rounded-full">
-                              {list.store_id.toUpperCase()}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 md:gap-4">
+                            <Badge variant="secondary" className="rounded-full text-xs">
+                              <Package className="h-3 w-3 mr-1" />
+                              {list.items?.length || 0}
                             </Badge>
-                          )}
+                            {list.store_id && (
+                              <Badge variant="outline" className="rounded-full text-xs">
+                                {list.store_id.toUpperCase()}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDuplicateList(list.id)}
+                              className="rounded-full text-xs md:text-sm h-8 md:h-9 px-2 md:px-4"
+                            >
+                              <Copy className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+                              <span className="hidden md:inline">Gjenbruk</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteList(list.id);
+                              }}
+                              className="hidden md:flex rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDuplicateList(list.id)}
-                            className="rounded-full"
-                          >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Gjenbruk som mal
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteList(list.id);
-                            }}
-                            className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </SwipeableCard>
                 ))}
               </div>
             </div>
@@ -246,10 +258,10 @@ const Dashboard = () => {
 
           {lists.length === 0 && completedLists.length === 0 && (
             <Card className="border-2 border-border">
-              <CardContent className="py-12 text-center">
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Du har ingen handlelister ennå</p>
-                <p className="text-sm text-muted-foreground mt-2">Opprett din første handleliste for å komme i gang</p>
+              <CardContent className="py-8 md:py-12 text-center">
+                <Package className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground text-sm md:text-base">Du har ingen handlelister ennå</p>
+                <p className="text-xs md:text-sm text-muted-foreground mt-2">Opprett din første handleliste</p>
               </CardContent>
             </Card>
           )}
