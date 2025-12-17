@@ -46,6 +46,12 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 142 76% 20%;
     --sidebar-border: 142 20% 91%;
     --sidebar-ring: 142 76% 36%;
+
+    /* Safe area insets for notch devices */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
   }
 
   .dark {
@@ -95,5 +101,41 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  /* Better touch scrolling */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+@layer utilities {
+  /* Minimum touch target size (44x44px recommended by Apple) */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Safe area padding utilities */
+  .safe-top {
+    padding-top: var(--safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: var(--safe-area-inset-left);
+  }
+  .safe-right {
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  /* Remove hover effects on touch devices */
+  @media (hover: none) {
+    .no-touch-hover:hover {
+      background-color: inherit;
+    }
   }
 }

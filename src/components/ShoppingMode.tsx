@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Leaf, AlertCircle, Sparkles, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useProfile } from "@/hooks/useProfile";
@@ -61,15 +61,12 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       setLoading(true);
 
       try {
-        // Fetch all products in parallel with timeout
         const productPromises = items.map(async (item) => {
           try {
-            // Create a timeout promise
             const timeoutPromise = new Promise((_, reject) => {
               setTimeout(() => reject(new Error('Request timeout')), 8000);
             });
 
-            // Race between the actual fetch and timeout
             const fetchPromise = supabase.functions.invoke('search-products', {
               body: {
                 query: item.name,
@@ -158,7 +155,6 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
   const allItemsInCart = items.length > 0 && items.every(item => item.in_cart);
 
-  // Calculate total price
   const totalPrice = items.reduce((sum, item) => {
     const suggestions = productData[item.id] || [];
     const selectedIndex = selectedProducts[item.id] ?? 0;
@@ -168,21 +164,26 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
   if (loading) {
     return (
-      <div className="space-y-6 max-w-2xl mx-auto">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack} className="rounded-2xl h-12">
-            ← Tilbake
-          </Button>
-          <Badge variant="outline" className="text-base px-4 py-2 rounded-full">
-            {storeId.toUpperCase()}
-          </Badge>
+      <div className="flex flex-col min-h-[calc(100vh-60px)] md:min-h-0">
+        {/* Sticky header */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 md:px-0 md:py-0 md:border-0 md:bg-transparent md:backdrop-blur-none md:static">
+          <div className="flex items-center justify-between max-w-2xl mx-auto">
+            <Button variant="outline" onClick={onBack} className="rounded-2xl h-11 touch-target">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Tilbake
+            </Button>
+            <Badge variant="outline" className="text-base px-4 py-2 rounded-full">
+              {storeId.toUpperCase()}
+            </Badge>
+          </div>
         </div>
-        <div className="space-y-4">
+        
+        <div className="flex-1 px-4 py-4 md:px-0 space-y-4 max-w-2xl mx-auto w-full">
           {items.map((item) => (
-            <div key={item.id} className="bg-card border-2 border-border rounded-2xl p-5">
+            <div key={item.id} className="bg-card border-2 border-border rounded-2xl p-4 md:p-5">
               <Skeleton className="h-6 w-32 mb-3" />
-              <Skeleton className="h-32 w-full mb-3" />
-              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-24 md:h-32 w-full mb-3" />
+              <Skeleton className="h-16 md:h-20 w-full" />
             </div>
           ))}
         </div>
@@ -191,205 +192,216 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack} className="rounded-2xl h-12">
-          ← Tilbake
-        </Button>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-base px-4 py-2 rounded-full">
-            {storeId.toUpperCase()}
-          </Badge>
-          {allItemsInCart && (
-            <Button onClick={handleCompleteList} className="bg-primary hover:bg-primary/90 rounded-2xl h-12">
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Fullfør
-            </Button>
+    <div className="flex flex-col min-h-[calc(100vh-60px)] md:min-h-0">
+      {/* Sticky header for mobile */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 md:px-0 md:py-0 md:border-0 md:bg-transparent md:backdrop-blur-none md:static">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
+          <Button variant="outline" onClick={onBack} className="rounded-2xl h-11 touch-target">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Tilbake</span>
+          </Button>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-sm md:text-base px-3 md:px-4 py-2 rounded-full">
+              {storeId.toUpperCase()}
+            </Badge>
+            {allItemsInCart && (
+              <Button onClick={handleCompleteList} className="bg-primary hover:bg-primary/90 rounded-2xl h-11 touch-target hidden sm:flex">
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Fullfør
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main content - scrollable */}
+      <div className="flex-1 px-4 py-4 md:px-0 overflow-y-auto touch-scroll">
+        <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto pb-32 md:pb-6">
+          {items.map((item) => {
+            const suggestions = productData[item.id] || [];
+            const selectedIndex = selectedProducts[item.id] ?? 0;
+            const selectedProduct = suggestions[selectedIndex];
+            const alternatives = suggestions.filter((_, idx) => idx !== selectedIndex);
+            const isExpanded = expandedItems.has(item.id);
+
+            return (
+              <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
+                <div className="p-4 md:p-5">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={item.in_cart}
+                      onCheckedChange={() => handleToggleCart(item.id, item.in_cart)}
+                      className="mt-1 h-6 w-6 md:h-5 md:w-5 rounded-md touch-target"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-muted-foreground mb-1">Du søkte etter:</p>
+                          <h3 className={`text-base md:text-lg font-semibold truncate ${item.in_cart ? "line-through text-muted-foreground" : ""}`}>
+                            {item.name}
+                          </h3>
+                          {item.in_cart && (
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 rounded-full mt-1 text-xs">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              I handlekurv
+                            </Badge>
+                          )}
+                        </div>
+                        {selectedProduct && (
+                          <Badge className={`${getNovaColor(selectedProduct.novaScore)} rounded-full px-2 md:px-3 py-1 text-xs flex-shrink-0`}>
+                            NOVA {selectedProduct.novaScore}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedProduct ? (
+                  <div className="px-4 pb-4 md:px-5 md:pb-5 space-y-3">
+                    {selectedProduct.novaScore > 2 && (
+                      <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl">
+                        <div className="flex items-center gap-2 text-destructive">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <p className="text-xs font-medium">
+                            Sterkt bearbeidet produkt (NOVA {selectedProduct.novaScore})
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div
+                      onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                      className={`${selectedProduct.novaScore <= 2 ? 'bg-primary/5 border-primary/20' : 'bg-secondary border-border'} border-2 p-3 md:p-4 rounded-xl cursor-pointer active:scale-[0.98] transition-all`}
+                    >
+                      <div className="flex gap-3">
+                        <div className="bg-white p-2 rounded-lg border border-border flex-shrink-0">
+                          <img
+                            src={selectedProduct.image || '/placeholder.svg'}
+                            alt={selectedProduct.name}
+                            className="w-14 h-14 md:w-16 md:h-16 object-contain"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            {selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
+                            <span className="text-xs font-medium text-muted-foreground truncate">
+                              {getNovaLabel(selectedProduct.novaScore)}
+                            </span>
+                          </div>
+                          <p className="font-semibold text-foreground mb-1 truncate">{selectedProduct.brand}</p>
+                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-base font-bold text-primary">
+                              {selectedProduct.price !== null ? `${selectedProduct.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
+                            </p>
+                            <Badge variant="outline" className="rounded-full text-xs flex-shrink-0">
+                              Detaljer →
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {alternatives.length > 0 && (
+                      <div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleExpanded(item.id)}
+                          className="w-full justify-between rounded-xl hover:bg-secondary h-11 touch-target"
+                        >
+                          <span className="text-sm">
+                            {alternatives.length} {alternatives.length === 1 ? 'alternativ' : 'alternativer'}
+                          </span>
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-2">
+                            {alternatives.map((suggestion) => {
+                              const originalIndex = suggestions.findIndex(s => s.ean === suggestion.ean);
+                              return (
+                                <div
+                                  key={suggestion.ean}
+                                  onClick={() => handleSelectProduct(item.id, originalIndex)}
+                                  className="bg-secondary border border-border p-3 rounded-xl flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all touch-target"
+                                >
+                                  <div className="bg-white p-1 rounded-lg border border-border flex-shrink-0">
+                                    <img
+                                      src={suggestion.image || '/placeholder.svg'}
+                                      alt={suggestion.name}
+                                      className="w-10 h-10 md:w-12 md:h-12 object-contain"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold truncate">{suggestion.brand}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>
+                                    <p className="text-sm font-bold text-primary mt-1">{suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}</p>
+                                  </div>
+                                  <Badge className={`${getNovaColor(suggestion.novaScore)} rounded-full flex-shrink-0`}>
+                                    {suggestion.novaScore}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="px-4 pb-4 md:px-5 md:pb-5">
+                    <div className="bg-secondary/50 p-4 rounded-xl border border-border">
+                      <p className="text-sm text-muted-foreground">
+                        Ingen produkter funnet for "{item.name}"
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {items.length === 0 && (
+            <div className="bg-card border-2 border-border rounded-2xl p-8 text-center">
+              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground">Ingen varer i handlelisten</p>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="space-y-6">
-        {items.map((item) => {
-          const suggestions = productData[item.id] || [];
-          const selectedIndex = selectedProducts[item.id] ?? 0;
-          const selectedProduct = suggestions[selectedIndex];
-          const alternatives = suggestions.filter((_, idx) => idx !== selectedIndex);
-          const isExpanded = expandedItems.has(item.id);
-
-          return (
-            <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
-              <div className="p-5">
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={item.in_cart}
-                    onCheckedChange={() => handleToggleCart(item.id, item.in_cart)}
-                    className="mt-1 h-5 w-5 rounded-md"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Du søkte etter:</p>
-                          <h3 className={`text-lg font-semibold ${item.in_cart ? "line-through text-muted-foreground" : ""}`}>
-                            {item.name}
-                          </h3>
-                        </div>
-                        {item.in_cart && (
-                          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 rounded-full">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            I handlekurv
-                          </Badge>
-                        )}
-                      </div>
-                      {selectedProduct && (
-                        <Badge className={`${getNovaColor(selectedProduct.novaScore)} rounded-full px-3 py-1`}>
-                          NOVA {selectedProduct.novaScore}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {selectedProduct ? (
-                <div className="px-5 pb-5 space-y-3">
-                  {selectedProduct.novaScore > 2 && (
-                    <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl">
-                      <div className="flex items-center gap-2 text-destructive">
-                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                        <p className="text-xs font-medium">
-                          Sterkt bearbeidet produkt (NOVA {selectedProduct.novaScore})
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div
-                    onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
-                    className={`${selectedProduct.novaScore <= 2 ? 'bg-primary/5 border-primary/20' : 'bg-secondary border-border'} border-2 p-4 rounded-xl cursor-pointer hover:border-primary transition-colors`}
-                  >
-                    <div className="flex gap-3">
-                      <div className="bg-white p-2 rounded-lg border border-border">
-                        <img
-                          src={selectedProduct.image || '/placeholder.svg'}
-                          alt={selectedProduct.name}
-                          className="w-16 h-16 object-contain"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary" />}
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {getNovaLabel(selectedProduct.novaScore)}
-                          </span>
-                        </div>
-                        <p className="font-semibold text-foreground mb-1">{selectedProduct.brand}</p>
-                        <p className="text-sm text-muted-foreground mb-2">{selectedProduct.name}</p>
-                        <div className="flex items-center justify-between">
-                          <p className="text-base font-bold text-primary">
-                            {selectedProduct.price !== null ? `${selectedProduct.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
-                          </p>
-                          <Badge variant="outline" className="rounded-full text-xs">
-                            Se detaljer →
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {alternatives.length > 0 && (
-                    <div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleExpanded(item.id)}
-                        className="w-full justify-between rounded-xl hover:bg-secondary"
-                      >
-                        <span className="text-sm">
-                          {alternatives.length} {alternatives.length === 1 ? 'alternativ' : 'alternativer'}
-                        </span>
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </Button>
-
-                      {isExpanded && (
-                        <div className="mt-2 space-y-2">
-                          {alternatives.map((suggestion) => {
-                            const originalIndex = suggestions.findIndex(s => s.ean === suggestion.ean);
-                            return (
-                              <div
-                                key={suggestion.ean}
-                                onClick={() => handleSelectProduct(item.id, originalIndex)}
-                                className="bg-secondary border border-border p-3 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary transition-colors"
-                              >
-                                <div className="bg-white p-1 rounded-lg border border-border">
-                                  <img
-                                    src={suggestion.image || '/placeholder.svg'}
-                                    alt={suggestion.name}
-                                    className="w-12 h-12 object-contain"
-                                  />
-                                </div>
-                                <div className="flex-1">
-                                  <p className="text-sm font-semibold">{suggestion.brand}</p>
-                                  <p className="text-xs text-muted-foreground">{suggestion.name}</p>
-                                  <p className="text-sm font-bold text-primary mt-1">{suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}</p>
-                                </div>
-                                <Badge className={`${getNovaColor(suggestion.novaScore)} rounded-full`}>
-                                  {suggestion.novaScore}
-                                </Badge>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="px-5 pb-5">
-                  <div className="bg-secondary/50 p-4 rounded-xl border border-border">
-                    <p className="text-sm text-muted-foreground">
-                      Ingen produkter funnet for "{item.name}"
+      {/* Sticky footer for mobile */}
+      {items.length > 0 && (
+        <div className="sticky bottom-0 z-10 bg-background/95 backdrop-blur-sm border-t border-border safe-bottom md:relative md:bg-transparent md:backdrop-blur-none md:border-0">
+          <div className="max-w-2xl mx-auto p-4 md:p-0 md:mt-6">
+            <Card className="border-2 border-primary/30 bg-card shadow-lg">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-xs md:text-sm text-muted-foreground mb-1">Beregnet totalsum</p>
+                    <p className="text-2xl md:text-3xl font-bold text-primary">{totalPrice.toFixed(2)} kr</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {items.filter(i => i.in_cart).length} av {items.length} varer i kurv
                     </p>
                   </div>
+                  {allItemsInCart && (
+                    <Button
+                      onClick={handleCompleteList}
+                      size="lg"
+                      className="h-12 md:h-14 px-4 md:px-8 text-sm md:text-base rounded-2xl bg-primary hover:bg-primary/90 touch-target flex-shrink-0"
+                    >
+                      <CheckCircle2 className="mr-2 h-5 w-5" />
+                      <span className="hidden sm:inline">Fullfør handleliste</span>
+                      <span className="sm:hidden">Fullfør</span>
+                    </Button>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {!loading && items.length === 0 && (
-        <div className="bg-card border-2 border-border rounded-2xl p-8 text-center">
-          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-          <p className="text-muted-foreground">Ingen varer i handlelisten</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      )}
-
-      {items.length > 0 && (
-        <Card className="border-2 border-primary/30 bg-card shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Beregnet totalsum</p>
-                <p className="text-3xl font-bold text-primary">{totalPrice.toFixed(2)} kr</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {items.filter(i => i.in_cart).length} av {items.length} varer i kurv
-                </p>
-              </div>
-              {allItemsInCart && (
-                <Button
-                  onClick={handleCompleteList}
-                  size="lg"
-                  className="h-14 px-8 text-base rounded-2xl bg-primary hover:bg-primary/90"
-                >
-                  <CheckCircle2 className="mr-2 h-5 w-5" />
-                  Fullfør handleliste
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       )}
     </div>
   );
