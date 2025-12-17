@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingCart } from 'lucide-react';
+import pickiLogo from '@/assets/picki-logo-auth.png';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -59,10 +59,9 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <ShoppingCart className="h-12 w-12 text-primary" />
+            <img src={pickiLogo} alt="Picki" className="h-16" />
           </div>
-          <CardTitle className="text-2xl">Ren Handel</CardTitle>
-          <p className="text-muted-foreground">Din smarte handleliste-app</p>
+          <p className="text-muted-foreground">Ærlig mat. Enkle valg. Mindre stress.</p>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="space-y-4">
