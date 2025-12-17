@@ -18,16 +18,16 @@ serve(async (req) => {
       return new Response(JSON.stringify({ suggestions: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
 
     console.log('Getting suggestions for:', query);
 
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: 'Du er en ekspert på norske matvarer. Din jobb er å gi generiske vareforslag UTEN merkenavn. Gi alltid 3-5 enkle, generiske forslag. Svar BARE med en kommaseparert liste, ingen annen tekst.' },
           { role: 'user', content: `Bruker søker etter: "${query}". Gi 3-5 generiske vareforslag UTEN merkenavn. For eksempel, hvis brukeren skriver "melk", foreslå "helmelk", "lettmelk", "skummet melk". Hvis de skriver "kylling", foreslå "kyllingfilet", "kyllingvinger", "kyllinglår". ALDRI inkluder merkenavn som Tine, Q, Rørosmeiriet, osv. BARE generiske varenavn, kommaseparert, ingen annen tekst.` }
@@ -36,7 +36,7 @@ serve(async (req) => {
     });
 
     if (!aiResponse.ok) {
-      console.error('OpenAI error:', aiResponse.status);
+      console.error('Lovable AI error:', aiResponse.status, await aiResponse.text());
       return new Response(JSON.stringify({ suggestions: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
