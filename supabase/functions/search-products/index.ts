@@ -66,56 +66,28 @@ serve(async (req) => {
       );
     }
 
-    // First, search in our local database
-    let dbQuery = supabase
-      .from('Produktdatabase')
-      .select('*')
-      .ilike('Produktnavn', `%${query.trim()}%`);
-
-    // Filter by store if specified
-    if (storeCode) {
-      dbQuery = dbQuery.eq('StoreCode', storeCode);
-    }
-
-    const { data: localProducts, error: dbError } = await dbQuery.limit(50);
-
-    if (dbError) {
-      console.error('Database error:', dbError);
-      return new Response(
-        JSON.stringify({ error: 'Database search failed' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Found ${localProducts?.length || 0} products in local database`);
-
-    // Process and score products
+    // Search using Kassalapp API (primary data source)
     const candidates: ProductCandidate[] = [];
 
-    if (localProducts && localProducts.length > 0) {
-      for (const product of localProducts) {
+    try {
+      const kassalappProducts = await searchKassalappAPI(query, storeCode, kassalappApiKey);
+      console.log(`Found ${kassalappProducts.length} products from Kassalapp API`);
+      
+      for (const product of kassalappProducts) {
         const candidate = processProduct(product, query, userPreferences);
         if (candidate.score > 0) {
           candidates.push(candidate);
         }
       }
-    }
-
-    // If we have few results, try to fetch from Kassalapp API as backup
-    if (candidates.length < 5) {
-      try {
-        const kassalappProducts = await searchKassalappAPI(query, storeCode, kassalappApiKey);
-        console.log(`Found ${kassalappProducts.length} additional products from Kassalapp`);
-        
-        for (const product of kassalappProducts) {
-          const candidate = processProduct(product, query, userPreferences);
-          if (candidate.score > 0) {
-            candidates.push(candidate);
-          }
-        }
-      } catch (apiError) {
-        console.warn('Kassalapp API failed, using local results only:', apiError);
-      }
+    } catch (apiError) {
+      console.error('Kassalapp API failed:', apiError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Product search failed',
+          details: apiError instanceof Error ? apiError.message : 'Unknown error'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Sort by score (higher is better)
