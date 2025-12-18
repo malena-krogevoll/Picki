@@ -318,26 +318,39 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
     return [];
   }
 
-  // Map frontend store codes to Kassalapp store names for filtering
-  const storeNameMapping: Record<string, string[]> = {
-    'MENY_NO': ['meny'],
-    'KIWI': ['kiwi'],
-    'REMA_1000': ['rema 1000', 'rema'],
-    'COOP_MEGA': ['coop mega'],
-    'COOP_EXTRA': ['coop extra'],
-    'COOP_PRIX': ['coop prix'],
-    'COOP_OBS': ['coop obs', 'obs'],
-    'SPAR_NO': ['spar', 'eurospar'],
-    'JOKER_NO': ['joker'],
-    'ODA_NO': ['oda'],
-    'BUNNPRIS': ['bunnpris'],
+  // Map frontend store codes to Kassalapp store identifiers for filtering.
+  // Kassalapp's `store.name` can be generic (e.g. "Coop"), so we support matching on BOTH:
+  // - store.code (preferred when available)
+  // - store.name (fallback)
+  const storeFilterMapping: Record<
+    string,
+    {
+      names: string[]; // substrings to match against store.name (lowercased)
+      codes?: string[]; // substrings to match against store.code (lowercased)
+    }
+  > = {
+    MENY_NO: { names: ["meny"], codes: ["meny"] },
+    KIWI: { names: ["kiwi"], codes: ["kiwi"] },
+    REMA_1000: { names: ["rema 1000", "rema"], codes: ["rema", "rema_1000"] },
+
+    // Coop stores: Kassalapp often returns store.name as just "Coop".
+    // We still keep the selection within Coop, but cannot reliably distinguish Mega/Extra/Prix/Obs if the API doesn't provide it.
+    COOP_MEGA: { names: ["coop mega", "coop"], codes: ["coop", "mega"] },
+    COOP_EXTRA: { names: ["coop extra", "coop"], codes: ["coop", "extra"] },
+    COOP_PRIX: { names: ["coop prix", "coop"], codes: ["coop", "prix"] },
+    COOP_OBS: { names: ["coop obs", "obs", "coop"], codes: ["coop", "obs"] },
+
+    SPAR_NO: { names: ["spar", "eurospar"], codes: ["spar"] },
+    JOKER_NO: { names: ["joker"], codes: ["joker"] },
+    ODA_NO: { names: ["oda"], codes: ["oda"] },
+    BUNNPRIS: { names: ["bunnpris"], codes: ["bunnpris"] },
   };
 
-  const allowedNames = storeCode ? storeNameMapping[storeCode] : null;
+  const allowed = storeCode ? storeFilterMapping[storeCode] : null;
 
   // Strict: if a store is selected but we don't recognize it, return 0 results
   // (never leak suggestions from other stores)
-  if (storeCode && !allowedNames) {
+  if (storeCode && !allowed) {
     console.warn(`Unknown storeCode "${storeCode}" (no mapping). Returning 0 results.`);
     return [];
   }
@@ -362,7 +375,9 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
       if (response.status === 429) {
         const retryAfterHeader = response.headers.get("retry-after");
         const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 600 * attempt;
-        console.warn(`Kassalapp rate-limited (429) on page ${page} (attempt ${attempt}). Waiting ${retryAfterMs}ms...`);
+        console.warn(
+          `Kassalapp rate-limited (429) on page ${page} (attempt ${attempt}). Waiting ${retryAfterMs}ms...`,
+        );
         await sleep(retryAfterMs);
         continue;
       }
@@ -381,7 +396,7 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
   };
 
   try {
-    console.log(`Searching Kassalapp API for "${query}"${storeCode ? ` (filtering for ${storeCode})` : ''}`);
+    console.log(`Searching Kassalapp API for "${query}"${storeCode ? ` (filtering for ${storeCode})` : ""}`);
 
     // NOTE: We intentionally avoid fetching all pages in parallel here because Kassalapp rate-limits (429)
     // when many requests are fired at once (especially when the client searches many list items).
@@ -403,24 +418,37 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
 
     console.log(`Total fetched: ${allItems.length} products from up to ${maxPages} pages`);
 
-    // Filter by store name if storeCode is provided
+    // Filter by store if storeCode is provided
     let filteredItems = allItems;
-    if (storeCode && allowedNames) {
+    if (storeCode && allowed) {
       filteredItems = allItems.filter((item) => {
-        const storeName = item?.store?.name?.toLowerCase() || '';
-        return allowedNames.some(name => storeName.includes(name));
+        const storeName = (item?.store?.name ?? "").toLowerCase();
+        const storeCodeFromApi = (item?.store?.code ?? "").toLowerCase();
+
+        // Prefer code match if possible
+        if (storeCodeFromApi) {
+          if (storeCodeFromApi === storeCode.toLowerCase()) return true;
+          if (allowed.codes?.some((c) => storeCodeFromApi.includes(c))) return true;
+        }
+
+        // Fallback to name matching
+        return allowed.names.some((n) => storeName.includes(n));
       });
     }
 
-    console.log(
-      `Total: ${allItems.length} products fetched` +
-        (storeCode ? `, ${filteredItems.length} match ${storeCode}` : ""),
-    );
+    console.log(`Total: ${allItems.length} products fetched` + (storeCode ? `, ${filteredItems.length} match ${storeCode}` : ""));
 
-    // Log available store names for debugging if no matches
+    // Log available store identifiers for debugging if no matches
     if (allItems.length > 0 && filteredItems.length === 0) {
-      const storeNames = [...new Set(allItems.slice(0, 20).map((i: any) => i?.store?.name))];
-      console.log("Available store names in results:", storeNames);
+      const storeIdentifiers = [
+        ...new Set(
+          allItems
+            .slice(0, 50)
+            .map((i: any) => `${i?.store?.name ?? ""} (${i?.store?.code ?? ""})`)
+            .filter(Boolean),
+        ),
+      ];
+      console.log("Available store identifiers in results:", storeIdentifiers);
     }
 
     return filteredItems.map((item: any) => ({
