@@ -316,46 +316,74 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
   };
 
   const allowedNames = storeCode ? storeNameMapping[storeCode] : null;
+
+  // Strict: if a store is selected but we don't recognize it, return 0 results
+  // (never leak suggestions from other stores)
+  if (storeCode && !allowedNames) {
+    console.warn(`Unknown storeCode "${storeCode}" (no mapping). Returning 0 results.`);
+    return [];
+  }
+
   const allItems: any[] = [];
   const maxPages = 5; // Fetch up to 5 pages (500 products max)
   const pageSize = 100; // Maximum allowed by API
 
-  try {
-    console.log(`Searching Kassalapp API for "${query}"${storeCode ? ` (filtering for ${storeCode})` : ''}`);
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    // Fetch all pages in parallel for speed
-    const pagePromises = Array.from({ length: maxPages }, (_, i) => {
-      const page = i + 1;
-      const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
-      
-      return fetch(url, {
+  const fetchPage = async (page: number): Promise<any[]> => {
+    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-      })
-        .then(async (response) => {
-          if (!response.ok) {
-            console.error(`Kassalapp API error on page ${page}: ${response.status}`);
-            return [];
-          }
-          const data = await response.json();
-          return Array.isArray(data?.data) ? data.data : [];
-        })
-        .catch((err) => {
-          console.error(`Kassalapp API fetch failed for page ${page}:`, err);
-          return [];
-        });
-    });
+      });
 
-    const pageResults = await Promise.all(pagePromises);
-    pageResults.forEach((items, i) => {
-      if (items.length > 0) {
-        allItems.push(...items);
-        console.log(`Page ${i + 1}: Got ${items.length} products`);
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get("retry-after");
+        const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 600 * attempt;
+        console.warn(`Kassalapp rate-limited (429) on page ${page} (attempt ${attempt}). Waiting ${retryAfterMs}ms...`);
+        await sleep(retryAfterMs);
+        continue;
       }
-    });
-    console.log(`Total fetched: ${allItems.length} products from ${maxPages} parallel requests`);
+
+      if (!response.ok) {
+        console.error(`Kassalapp API error on page ${page}: ${response.status}`);
+        return [];
+      }
+
+      const data = await response.json();
+      return Array.isArray(data?.data) ? data.data : [];
+    }
+
+    console.error(`Kassalapp API still rate-limited after retries for page ${page}`);
+    return [];
+  };
+
+  try {
+    console.log(`Searching Kassalapp API for "${query}"${storeCode ? ` (filtering for ${storeCode})` : ''}`);
+
+    // NOTE: We intentionally avoid fetching all pages in parallel here because Kassalapp rate-limits (429)
+    // when many requests are fired at once (especially when the client searches many list items).
+    for (let page = 1; page <= maxPages; page++) {
+      const items = await fetchPage(page);
+
+      if (items.length === 0) {
+        break;
+      }
+
+      allItems.push(...items);
+      console.log(`Page ${page}: Got ${items.length} products (total: ${allItems.length})`);
+
+      // If we got fewer than pageSize, this is likely the last page
+      if (items.length < pageSize) {
+        break;
+      }
+    }
+
+    console.log(`Total fetched: ${allItems.length} products from up to ${maxPages} pages`);
 
     // Filter by store name if storeCode is provided
     let filteredItems = allItems;
