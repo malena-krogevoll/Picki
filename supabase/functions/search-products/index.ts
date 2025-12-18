@@ -9,12 +9,16 @@ const corsHeaders = {
 
 interface SearchRequest {
   query: string;
+  // Frontend currently sends storeId (e.g. "MENY_NO")
+  storeId?: string;
+  // Some callers may send storeCode
   storeCode?: string;
   userPreferences?: {
-    allergies: string[];
-    diets: string[];
-    renvare_only: boolean;
-    priority_order: string[];
+    allergies?: string[];
+    diets?: string[];
+    renvare_only?: boolean;
+    priority_order?: string[];
+    other_preferences?: Record<string, unknown>;
   };
 }
 
@@ -25,6 +29,7 @@ interface Product {
   Kjede?: string;
   StoreCode?: string;
   Kategori?: string;
+  Merke?: string;
   "Allergener/Kosthold"?: string;
   Tilleggsfiltre?: string;
   Produktbilde_URL?: string;
@@ -55,9 +60,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { query, storeCode, userPreferences }: SearchRequest = await req.json();
+    const { query, storeCode, storeId, userPreferences }: SearchRequest = await req.json();
 
-    console.log("Search request:", { query, storeCode, userPreferences });
+    const effectiveStoreCode = storeCode ?? storeId;
+
+    console.log("Search request:", { query, storeCode: effectiveStoreCode, userPreferences });
 
     if (!query || query.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Query is required" }), {
@@ -70,12 +77,13 @@ serve(async (req) => {
     const candidates: ProductCandidate[] = [];
 
     try {
-      const kassalappProducts = await searchKassalappAPI(query, storeCode, kassalappApiKey);
+      const kassalappProducts = await searchKassalappAPI(query, effectiveStoreCode, kassalappApiKey);
       console.log(`Found ${kassalappProducts.length} products from Kassalapp API`);
 
       for (const product of kassalappProducts) {
         const candidate = processProduct(product, query, userPreferences);
-        if (candidate.score > 0) {
+        // Avoid weak matches like "brød" -> "knekkebrød"
+        if (candidate.score >= 50) {
           candidates.push(candidate);
         }
       }
@@ -278,28 +286,8 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
   }
 
   try {
-    // Build URL with store filter if provided
-    let url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}`;
-    
-    // Map our store codes to Kassalapp vendor filter
-    if (storeCode) {
-      const storeMapping: Record<string, string> = {
-        'MENY_NO': 'Meny',
-        'KIWI_NO': 'Kiwi', 
-        'REMA_NO': 'REMA 1000',
-        'COOP_NO': 'Coop',
-        'SPAR_NO': 'Spar',
-        'JOKER_NO': 'Joker',
-        'ODA_NO': 'Oda',
-        'BUNNPRIS_NO': 'Bunnpris',
-      };
-      const vendorName = storeMapping[storeCode];
-      if (vendorName) {
-        url += `&vendor=${encodeURIComponent(vendorName)}`;
-      }
-    }
-    
-    console.log("Calling Kassalapp API:", url);
+    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}`;
+    console.log("Calling Kassalapp API:", url, storeCode ? `(filter storeCode=${storeCode})` : "");
 
     const response = await fetch(url, {
       headers: {
@@ -315,27 +303,32 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
     }
 
     const data = await response.json();
-    console.log(`Kassalapp API returned ${data.data?.length || 0} products`);
+    const items: any[] = Array.isArray(data?.data) ? data.data : [];
 
-    // Transform Kassalapp response to our Product format
-    // Kassalapp returns data in data.data array
-    return (
-      data.data?.map((item: any) => ({
-        EAN: item.ean,
-        Produktnavn: item.name,
-        Pris: item.current_price?.price?.toString() || "0",
-        Kjede: item.store?.name,
-        StoreCode: storeCode || item.store?.code,
-        Kategori: item.category?.at(-1)?.name || "",
-        Merke: item.brand || "", // Add brand field
-        "Allergener/Kosthold": item.allergens?.join(", ") || "",
-        Tilleggsfiltre: item.nutrition?.map((n: any) => n.display_name)?.join(", ") || "",
-        Produktbilde_URL: item.image,
-        Ingrediensliste: item.ingredients || "",
-        Region: "NO",
-        Tilgjengelighet: "available",
-      })) || []
+    const filteredItems = storeCode
+      ? items.filter((item) => item?.store?.code === storeCode)
+      : items;
+
+    console.log(
+      `Kassalapp API returned ${items.length} products` +
+        (storeCode ? `, ${filteredItems.length} after store filter` : ""),
     );
+
+    return filteredItems.map((item: any) => ({
+      EAN: item.ean,
+      Produktnavn: item.name,
+      Pris: item.current_price?.price?.toString() || "0",
+      Kjede: item.store?.name,
+      StoreCode: item.store?.code,
+      Kategori: item.category?.at(-1)?.name || "",
+      Merke: item.brand || "",
+      "Allergener/Kosthold": item.allergens?.join(", ") || "",
+      Tilleggsfiltre: item.nutrition?.map((n: any) => n.display_name)?.join(", ") || "",
+      Produktbilde_URL: item.image,
+      Ingrediensliste: item.ingredients || "",
+      Region: "NO",
+      Tilgjengelighet: "available",
+    }));
   } catch (error) {
     console.error("Kassalapp API search failed:", error);
     throw error;
