@@ -75,21 +75,12 @@ serve(async (req) => {
 
     // Search using Kassalapp API (primary data source)
     let candidates: ProductCandidate[] = [];
-    let allCandidates: ProductCandidate[] = []; // Keep all for fallback
-    let storeFilteredOut = false;
+    const allCandidates: ProductCandidate[] = []; // Keep all for fallback
 
     try {
-      // First search WITH store filter
-      let kassalappProducts = await searchKassalappAPI(query, effectiveStoreCode, kassalappApiKey);
+      // Strict: ONLY search within the selected store
+      const kassalappProducts = await searchKassalappAPI(query, effectiveStoreCode, kassalappApiKey);
       console.log(`Found ${kassalappProducts.length} products from Kassalapp API for store ${effectiveStoreCode}`);
-
-      // If no products found with store filter, search WITHOUT filter and mark as fallback
-      if (kassalappProducts.length === 0 && effectiveStoreCode) {
-        console.log("No products found in selected store, searching all stores...");
-        kassalappProducts = await searchKassalappAPI(query, undefined, kassalappApiKey);
-        storeFilteredOut = kassalappProducts.length > 0;
-        console.log(`Found ${kassalappProducts.length} products from all stores (fallback)`);
-      }
 
       for (const product of kassalappProducts) {
         const candidate = processProduct(product, query, userPreferences);
@@ -100,9 +91,9 @@ serve(async (req) => {
         }
       }
 
-      // Fallback: if no good matches, include all products sorted by relevance
+      // Fallback: if no good matches, include all store products sorted by relevance
       if (candidates.length === 0 && allCandidates.length > 0) {
-        console.log("No strong matches found, falling back to all products");
+        console.log("No strong matches found in store, falling back to all store products");
         candidates = allCandidates;
       }
     } catch (apiError) {
@@ -118,12 +109,8 @@ serve(async (req) => {
 
     // Sort by: 1) renvareScore (higher = cleaner), 2) relevance score
     candidates.sort((a, b) => {
-      // First prioritize renvare products (higher renvareScore)
       const renvareDiff = b.renvareScore - a.renvareScore;
-      if (Math.abs(renvareDiff) > 20) {
-        return renvareDiff; // Significant renvare difference, prioritize cleaner
-      }
-      // Otherwise sort by relevance score
+      if (Math.abs(renvareDiff) > 20) return renvareDiff;
       return b.score - a.score;
     });
 
@@ -138,7 +125,6 @@ serve(async (req) => {
         results: topResults,
         totalFound: candidates.length,
         source: "hybrid",
-        storeNotAvailable: storeFilteredOut, // Flag to show user that store doesn't have this product
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
