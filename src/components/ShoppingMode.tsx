@@ -80,8 +80,20 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
             if (error) {
               console.error('Error fetching products for', item.name, error);
               return { itemId: item.id, products: [] };
-            } else if (data?.products && data.products.length > 0) {
-              return { itemId: item.id, products: data.products };
+            } else if (data?.results && data.results.length > 0) {
+              // Transform API response to ProductSuggestion format
+              const products: ProductSuggestion[] = data.results
+                .filter((r: any) => r.product)
+                .map((r: any) => ({
+                  ean: r.product.EAN || '',
+                  brand: r.product.Kjede || '',
+                  name: r.product.Produktnavn || '',
+                  image: r.product.Produktbilde_URL || '',
+                  price: parseFloat(r.product.Pris) || null,
+                  store: r.product.StoreCode || storeId,
+                  novaScore: r.renvareScore ? (r.renvareScore >= 80 ? 1 : r.renvareScore >= 50 ? 2 : r.renvareScore >= 30 ? 3 : 4) : 2
+                }));
+              return { itemId: item.id, products };
             } else {
               return { itemId: item.id, products: [] };
             }
