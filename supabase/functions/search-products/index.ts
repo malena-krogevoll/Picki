@@ -51,7 +51,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const kassalappApiKey = Deno.env.get("N64uEsyc02TKG21FuMyhgP3fPXATeDg0NCXbaeCx")!;
+    const kassalappApiKey = Deno.env.get("KASSALAPP_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -261,9 +261,8 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
   }
 
   try {
-    // This is a placeholder for the actual Kassalapp API integration
-    // Replace with actual Kassalapp API endpoint and authentication
-    const url = `https://kassal.app/api/v1/products/search?q=${encodeURIComponent(query)}`;
+    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}`;
+    console.log("Calling Kassalapp API:", url);
 
     const response = await fetch(url, {
       headers: {
@@ -273,31 +272,34 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
     });
 
     if (!response.ok) {
-      throw new Error(`Kassalapp API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Kassalapp API error: ${response.status}`, errorText);
+      throw new Error(`Kassalapp API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log(`Kassalapp API returned ${data.data?.length || 0} products`);
 
     // Transform Kassalapp response to our Product format
-    // This transformation depends on the actual Kassalapp API response structure
+    // Kassalapp returns data in data.data array
     return (
-      data.products?.map((item: any) => ({
+      data.data?.map((item: any) => ({
         EAN: item.ean,
         Produktnavn: item.name,
-        Pris: item.price?.toString(),
+        Pris: item.current_price?.price?.toString() || "0",
         Kjede: item.store?.name,
         StoreCode: storeCode || item.store?.code,
-        Kategori: item.category,
-        "Allergener/Kosthold": item.allergens?.join(", "),
-        Tilleggsfiltre: item.labels?.join(", "),
+        Kategori: item.category?.at(-1)?.name || "",
+        "Allergener/Kosthold": item.allergens?.join(", ") || "",
+        Tilleggsfiltre: item.nutrition?.map((n: any) => n.display_name)?.join(", ") || "",
         Produktbilde_URL: item.image,
-        Ingrediensliste: item.ingredients,
+        Ingrediensliste: item.ingredients || "",
         Region: "NO",
         Tilgjengelighet: "available",
       })) || []
     );
   } catch (error) {
     console.error("Kassalapp API search failed:", error);
-    return [];
+    throw error;
   }
 }
