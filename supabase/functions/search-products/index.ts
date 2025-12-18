@@ -1,6 +1,5 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,19 +53,19 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const kassalappApiKey = Deno.env.get("KASSALAPP_API_KEY")!;
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY"); // optional: used for spelling correction fallback
 
     const { query, storeCode, storeId, userPreferences }: SearchRequest = await req.json();
 
     const effectiveStoreCode = storeCode ?? storeId;
 
-    console.log("Search request:", { query, storeCode: effectiveStoreCode, userPreferences });
+    const originalQuery = (query ?? "").toString().trim();
+    let effectiveQuery = originalQuery;
 
-    if (!query || query.trim().length === 0) {
+    console.log("Search request:", { query: originalQuery, storeCode: effectiveStoreCode, userPreferences });
+
+    if (!originalQuery) {
       return new Response(JSON.stringify({ error: "Query is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -79,11 +78,29 @@ serve(async (req) => {
 
     try {
       // Strict: ONLY search within the selected store
-      const kassalappProducts = await searchKassalappAPI(query, effectiveStoreCode, kassalappApiKey);
+      let kassalappProducts = await searchKassalappAPI(effectiveQuery, effectiveStoreCode, kassalappApiKey);
+
+      // If no hits, retry once with a corrected query (handles typos like "mekrell" -> "makrell")
+      if (kassalappProducts.length === 0 && lovableApiKey) {
+        const corrected = await correctSearchQuery(originalQuery, lovableApiKey);
+        if (corrected && corrected.toLowerCase() !== originalQuery.toLowerCase()) {
+          const retryProducts = await searchKassalappAPI(corrected, effectiveStoreCode, kassalappApiKey);
+          if (retryProducts.length > 0) {
+            console.log(
+              `No products for "${originalQuery}". Retrying with corrected query "${corrected}" yielded ${retryProducts.length} products.`,
+            );
+            effectiveQuery = corrected;
+            kassalappProducts = retryProducts;
+          } else {
+            console.log(`No products for "${originalQuery}" and corrected "${corrected}".`);
+          }
+        }
+      }
+
       console.log(`Found ${kassalappProducts.length} products from Kassalapp API for store ${effectiveStoreCode}`);
 
       for (const product of kassalappProducts) {
-        const candidate = processProduct(product, query, userPreferences);
+        const candidate = processProduct(product, effectiveQuery, userPreferences);
         allCandidates.push(candidate);
         // Prefer good matches (score >= 50)
         if (candidate.score >= 50) {
@@ -121,7 +138,8 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        query,
+        query: originalQuery,
+        effectiveQuery,
         results: topResults,
         totalFound: candidates.length,
         source: "hybrid",
@@ -139,6 +157,53 @@ serve(async (req) => {
     );
   }
 });
+
+async function correctSearchQuery(query: string, lovableApiKey: string): Promise<string | null> {
+  const input = query.trim();
+  if (input.length < 3) return null;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Du er en norsk stavekontroll for handleliste-søk. Returner kun den korrigerte søkestrengen, uten forklaring. Behold samme mening. Hvis input allerede er korrekt, returner den uendret.",
+          },
+          { role: "user", content: input },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn("Query correction failed:", res.status, await res.text());
+      return null;
+    }
+
+    const data = await res.json();
+    const text = (data?.choices?.[0]?.message?.content ?? "").toString().trim();
+    if (!text) return null;
+
+    const corrected = text
+      .replace(/^[\"“”']+/, "")
+      .replace(/[\"“”']+$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!corrected || corrected.length > 80) return null;
+    return corrected;
+  } catch (err) {
+    console.warn("Query correction error:", err);
+    return null;
+  }
+}
 
 function processProduct(product: Product, query: string, userPreferences?: any): ProductCandidate {
   const productName = product.Produktnavn || "";
