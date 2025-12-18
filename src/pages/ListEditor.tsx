@@ -109,6 +109,7 @@ const ListEditor = () => {
           <div className="max-w-2xl mx-auto">
             <h1 className="text-2xl font-bold text-center mb-8">Handlemodus</h1>
             <ShoppingMode
+              key={selectedStore} // Force remount when store changes
               storeId={selectedStore}
               listId={currentList.id}
               onBack={() => setStep("store")}
