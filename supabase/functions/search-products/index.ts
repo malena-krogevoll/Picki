@@ -74,7 +74,8 @@ serve(async (req) => {
     }
 
     // Search using Kassalapp API (primary data source)
-    const candidates: ProductCandidate[] = [];
+    let candidates: ProductCandidate[] = [];
+    let allCandidates: ProductCandidate[] = []; // Keep all for fallback
 
     try {
       const kassalappProducts = await searchKassalappAPI(query, effectiveStoreCode, kassalappApiKey);
@@ -82,10 +83,17 @@ serve(async (req) => {
 
       for (const product of kassalappProducts) {
         const candidate = processProduct(product, query, userPreferences);
-        // Avoid weak matches like "brød" -> "knekkebrød"
+        allCandidates.push(candidate);
+        // Prefer good matches (score >= 50)
         if (candidate.score >= 50) {
           candidates.push(candidate);
         }
+      }
+
+      // Fallback: if no good matches, include all products sorted by relevance
+      if (candidates.length === 0 && allCandidates.length > 0) {
+        console.log("No strong matches found, falling back to all products");
+        candidates = allCandidates;
       }
     } catch (apiError) {
       console.error("Kassalapp API failed:", apiError);
@@ -98,11 +106,21 @@ serve(async (req) => {
       );
     }
 
-    // Sort by score (higher is better)
-    candidates.sort((a, b) => b.score - a.score);
+    // Sort by: 1) renvareScore (higher = cleaner), 2) relevance score
+    candidates.sort((a, b) => {
+      // First prioritize renvare products (higher renvareScore)
+      const renvareDiff = b.renvareScore - a.renvareScore;
+      if (Math.abs(renvareDiff) > 20) {
+        return renvareDiff; // Significant renvare difference, prioritize cleaner
+      }
+      // Otherwise sort by relevance score
+      return b.score - a.score;
+    });
 
     // Return top results
     const topResults = candidates.slice(0, 20);
+
+    console.log(`Returning ${topResults.length} results, best renvareScore: ${topResults[0]?.renvareScore ?? 0}`);
 
     return new Response(
       JSON.stringify({
