@@ -312,57 +312,84 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
     'BUNNPRIS_NO': ['bunnpris'],
   };
 
+  const allowedNames = storeCode ? storeNameMapping[storeCode] : null;
+  const allItems: any[] = [];
+  const maxPages = 5; // Fetch up to 5 pages (500 products max)
+  const pageSize = 100; // Maximum allowed by API
+
   try {
-    // Request more products to have better filtering options
-    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=50`;
-    console.log("Calling Kassalapp API:", url, storeCode ? `(will filter for ${storeCode})` : "");
+    console.log(`Searching Kassalapp API for "${query}"${storeCode ? ` (filtering for ${storeCode})` : ''}`);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // Fetch multiple pages to find products in the selected store
+    for (let page = 1; page <= maxPages; page++) {
+      const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Kassalapp API error: ${response.status}`, errorText);
-      throw new Error(`Kassalapp API error: ${response.status} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Kassalapp API error on page ${page}: ${response.status}`, errorText);
+        break; // Stop pagination on error but don't fail completely
+      }
+
+      const data = await response.json();
+      const items: any[] = Array.isArray(data?.data) ? data.data : [];
+      
+      if (items.length === 0) {
+        console.log(`Page ${page}: No more results`);
+        break; // No more results
+      }
+
+      allItems.push(...items);
+      console.log(`Page ${page}: Got ${items.length} products (total: ${allItems.length})`);
+
+      // If we already have enough products from the target store, stop early
+      if (storeCode && allowedNames) {
+        const storeMatches = allItems.filter((item) => {
+          const storeName = item?.store?.name?.toLowerCase() || '';
+          return allowedNames.some(name => storeName.includes(name));
+        });
+        if (storeMatches.length >= 10) {
+          console.log(`Found ${storeMatches.length} products for ${storeCode}, stopping pagination`);
+          break;
+        }
+      }
     }
 
-    const data = await response.json();
-    const items: any[] = Array.isArray(data?.data) ? data.data : [];
-
     // Filter by store name if storeCode is provided
-    let filteredItems = items;
-    if (storeCode && storeNameMapping[storeCode]) {
-      const allowedNames = storeNameMapping[storeCode];
-      filteredItems = items.filter((item) => {
+    let filteredItems = allItems;
+    if (storeCode && allowedNames) {
+      filteredItems = allItems.filter((item) => {
         const storeName = item?.store?.name?.toLowerCase() || '';
         return allowedNames.some(name => storeName.includes(name));
       });
     }
 
     console.log(
-      `Kassalapp API returned ${items.length} products` +
-        (storeCode ? `, ${filteredItems.length} after store filter (${storeCode})` : ""),
+      `Total: ${allItems.length} products fetched` +
+        (storeCode ? `, ${filteredItems.length} match ${storeCode}` : ""),
     );
 
-    // Log first few store names for debugging
-    if (items.length > 0 && filteredItems.length === 0) {
-      const storeNames = [...new Set(items.slice(0, 10).map((i: any) => i?.store?.name))];
+    // Log available store names for debugging if no matches
+    if (allItems.length > 0 && filteredItems.length === 0) {
+      const storeNames = [...new Set(allItems.slice(0, 20).map((i: any) => i?.store?.name))];
       console.log("Available store names in results:", storeNames);
     }
 
     return filteredItems.map((item: any) => ({
       EAN: item.ean,
       Produktnavn: item.name,
-      Pris: item.current_price?.price?.toString() || "0",
+      Pris: item.current_price?.price?.toString() || item.current_price?.toString() || "0",
       Kjede: item.store?.name,
       StoreCode: storeCode || item.store?.code,
       Kategori: item.category?.at(-1)?.name || "",
       Merke: item.brand || "",
-      "Allergener/Kosthold": item.allergens?.join(", ") || "",
+      "Allergener/Kosthold": item.allergens?.map((a: any) => a.display_name).join(", ") || "",
       Tilleggsfiltre: item.nutrition?.map((n: any) => n.display_name)?.join(", ") || "",
       Produktbilde_URL: item.image,
       Ingrediensliste: item.ingredients || "",
