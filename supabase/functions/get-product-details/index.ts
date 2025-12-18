@@ -20,9 +20,9 @@ serve(async (req) => {
       });
     }
 
-    const KASSAL_API_KEY = Deno.env.get("N64uEsyc02TKG21FuMyhgP3fPXATeDg0NCXbaeCx");
+    const KASSAL_API_KEY = Deno.env.get("KASSALAPP_API_KEY");
     if (!KASSAL_API_KEY) {
-      throw new Error("KASSAL_API_KEY not configured");
+      throw new Error("KASSALAPP_API_KEY not configured");
     }
 
     const response = await fetch(`https://kassal.app/api/v1/products/ean/${ean}`, {
