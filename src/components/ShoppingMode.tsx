@@ -86,7 +86,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                 .filter((r: any) => r.product)
                 .map((r: any) => ({
                   ean: r.product.EAN || '',
-                  brand: r.product.Kjede || '',
+                  brand: r.product.Merke || '', // Use actual brand, not store name
                   name: r.product.Produktnavn || '',
                   image: r.product.Produktbilde_URL || '',
                   price: parseFloat(r.product.Pris) || null,

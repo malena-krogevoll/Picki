@@ -123,27 +123,44 @@ function processProduct(product: Product, query: string, userPreferences?: any):
   const ingredients = product.Ingrediensliste || "";
   const filters = product.Tilleggsfiltre || "";
   const price = product.Pris || "0";
+  const category = product.Kategori || "";
 
   // Calculate base relevance score
   let score = 0;
-  const queryLower = query.toLowerCase();
+  const queryLower = query.toLowerCase().trim();
   const nameLower = productName.toLowerCase();
+  const categoryLower = category.toLowerCase();
 
+  // Check if query is a substring match that could be misleading
+  // e.g., "brød" matching "knekkebrød" when they're different products
+  const queryWords = queryLower.split(/\s+/);
+  const nameWords = nameLower.split(/\s+/);
+  
   // Exact match gets highest score
   if (nameLower === queryLower) {
     score += 100;
-  } else if (nameLower.includes(queryLower)) {
+  } else if (nameWords.includes(queryLower) || categoryLower === queryLower) {
+    // Query is a complete word in the product name or matches category
+    score += 90;
+  } else if (nameLower.startsWith(queryLower + " ") || nameLower.startsWith(queryLower + ",")) {
+    // Product name starts with the query word
+    score += 85;
+  } else if (nameWords.some(word => word === queryLower)) {
+    // Exact word match
     score += 80;
-  } else if (nameLower.split(" ").some((word) => word.includes(queryLower))) {
-    score += 60;
-  } else {
-    // Fuzzy matching
-    const words = queryLower.split(" ");
-    const nameWords = nameLower.split(" ");
-    const matches = words.filter((word) =>
-      nameWords.some((nameWord) => nameWord.includes(word) || word.includes(nameWord)),
+  } else if (nameLower.includes(queryLower)) {
+    // Query is a substring - could be partial match (e.g., "brød" in "knekkebrød")
+    // Check if it's a compound word (penalize) vs separate word (reward)
+    const isCompoundWord = nameWords.some(word => 
+      word.includes(queryLower) && word !== queryLower && word.length > queryLower.length + 2
     );
-    score += (matches.length / words.length) * 40;
+    score += isCompoundWord ? 30 : 70; // Penalize compound words like knekkebrød
+  } else {
+    // Fuzzy matching - all query words should be present
+    const matches = queryWords.filter((word) =>
+      nameWords.some((nameWord) => nameWord === word || nameWord.startsWith(word)),
+    );
+    score += (matches.length / queryWords.length) * 40;
   }
 
   // Apply user preference filters
@@ -261,7 +278,27 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
   }
 
   try {
-    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}`;
+    // Build URL with store filter if provided
+    let url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}`;
+    
+    // Map our store codes to Kassalapp vendor filter
+    if (storeCode) {
+      const storeMapping: Record<string, string> = {
+        'MENY_NO': 'Meny',
+        'KIWI_NO': 'Kiwi', 
+        'REMA_NO': 'REMA 1000',
+        'COOP_NO': 'Coop',
+        'SPAR_NO': 'Spar',
+        'JOKER_NO': 'Joker',
+        'ODA_NO': 'Oda',
+        'BUNNPRIS_NO': 'Bunnpris',
+      };
+      const vendorName = storeMapping[storeCode];
+      if (vendorName) {
+        url += `&vendor=${encodeURIComponent(vendorName)}`;
+      }
+    }
+    
     console.log("Calling Kassalapp API:", url);
 
     const response = await fetch(url, {
@@ -290,6 +327,7 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
         Kjede: item.store?.name,
         StoreCode: storeCode || item.store?.code,
         Kategori: item.category?.at(-1)?.name || "",
+        Merke: item.brand || "", // Add brand field
         "Allergener/Kosthold": item.allergens?.join(", ") || "",
         Tilleggsfiltre: item.nutrition?.map((n: any) => n.display_name)?.join(", ") || "",
         Produktbilde_URL: item.image,
