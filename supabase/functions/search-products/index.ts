@@ -76,10 +76,20 @@ serve(async (req) => {
     // Search using Kassalapp API (primary data source)
     let candidates: ProductCandidate[] = [];
     let allCandidates: ProductCandidate[] = []; // Keep all for fallback
+    let storeFilteredOut = false;
 
     try {
-      const kassalappProducts = await searchKassalappAPI(query, effectiveStoreCode, kassalappApiKey);
-      console.log(`Found ${kassalappProducts.length} products from Kassalapp API`);
+      // First search WITH store filter
+      let kassalappProducts = await searchKassalappAPI(query, effectiveStoreCode, kassalappApiKey);
+      console.log(`Found ${kassalappProducts.length} products from Kassalapp API for store ${effectiveStoreCode}`);
+
+      // If no products found with store filter, search WITHOUT filter and mark as fallback
+      if (kassalappProducts.length === 0 && effectiveStoreCode) {
+        console.log("No products found in selected store, searching all stores...");
+        kassalappProducts = await searchKassalappAPI(query, undefined, kassalappApiKey);
+        storeFilteredOut = kassalappProducts.length > 0;
+        console.log(`Found ${kassalappProducts.length} products from all stores (fallback)`);
+      }
 
       for (const product of kassalappProducts) {
         const candidate = processProduct(product, query, userPreferences);
@@ -128,6 +138,7 @@ serve(async (req) => {
         results: topResults,
         totalFound: candidates.length,
         source: "hybrid",
+        storeNotAvailable: storeFilteredOut, // Flag to show user that store doesn't have this product
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
@@ -303,9 +314,22 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
     return [];
   }
 
+  // Map our store codes to Kassalapp store names for filtering
+  const storeNameMapping: Record<string, string[]> = {
+    'MENY_NO': ['meny'],
+    'KIWI_NO': ['kiwi'],
+    'REMA_NO': ['rema 1000', 'rema'],
+    'COOP_NO': ['coop', 'coop prix', 'coop extra', 'coop mega', 'coop obs', 'obs'],
+    'SPAR_NO': ['spar', 'eurospar'],
+    'JOKER_NO': ['joker'],
+    'ODA_NO': ['oda'],
+    'BUNNPRIS_NO': ['bunnpris'],
+  };
+
   try {
-    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}`;
-    console.log("Calling Kassalapp API:", url, storeCode ? `(filter storeCode=${storeCode})` : "");
+    // Request more products to have better filtering options
+    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=50`;
+    console.log("Calling Kassalapp API:", url, storeCode ? `(will filter for ${storeCode})` : "");
 
     const response = await fetch(url, {
       headers: {
@@ -323,21 +347,33 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
     const data = await response.json();
     const items: any[] = Array.isArray(data?.data) ? data.data : [];
 
-    const filteredItems = storeCode
-      ? items.filter((item) => item?.store?.code === storeCode)
-      : items;
+    // Filter by store name if storeCode is provided
+    let filteredItems = items;
+    if (storeCode && storeNameMapping[storeCode]) {
+      const allowedNames = storeNameMapping[storeCode];
+      filteredItems = items.filter((item) => {
+        const storeName = item?.store?.name?.toLowerCase() || '';
+        return allowedNames.some(name => storeName.includes(name));
+      });
+    }
 
     console.log(
       `Kassalapp API returned ${items.length} products` +
-        (storeCode ? `, ${filteredItems.length} after store filter` : ""),
+        (storeCode ? `, ${filteredItems.length} after store filter (${storeCode})` : ""),
     );
+
+    // Log first few store names for debugging
+    if (items.length > 0 && filteredItems.length === 0) {
+      const storeNames = [...new Set(items.slice(0, 10).map((i: any) => i?.store?.name))];
+      console.log("Available store names in results:", storeNames);
+    }
 
     return filteredItems.map((item: any) => ({
       EAN: item.ean,
       Produktnavn: item.name,
       Pris: item.current_price?.price?.toString() || "0",
       Kjede: item.store?.name,
-      StoreCode: item.store?.code,
+      StoreCode: storeCode || item.store?.code,
       Kategori: item.category?.at(-1)?.name || "",
       Merke: item.brand || "",
       "Allergener/Kosthold": item.allergens?.join(", ") || "",
