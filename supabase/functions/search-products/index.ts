@@ -300,16 +300,19 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
     return [];
   }
 
-  // Map our store codes to Kassalapp store names for filtering
+  // Map frontend store codes to Kassalapp store names for filtering
   const storeNameMapping: Record<string, string[]> = {
     'MENY_NO': ['meny'],
-    'KIWI_NO': ['kiwi'],
-    'REMA_NO': ['rema 1000', 'rema'],
-    'COOP_NO': ['coop', 'coop prix', 'coop extra', 'coop mega', 'coop obs', 'obs'],
+    'KIWI': ['kiwi'],
+    'REMA_1000': ['rema 1000', 'rema'],
+    'COOP_MEGA': ['coop mega'],
+    'COOP_EXTRA': ['coop extra'],
+    'COOP_PRIX': ['coop prix'],
+    'COOP_OBS': ['coop obs', 'obs'],
     'SPAR_NO': ['spar', 'eurospar'],
     'JOKER_NO': ['joker'],
     'ODA_NO': ['oda'],
-    'BUNNPRIS_NO': ['bunnpris'],
+    'BUNNPRIS': ['bunnpris'],
   };
 
   const allowedNames = storeCode ? storeNameMapping[storeCode] : null;
