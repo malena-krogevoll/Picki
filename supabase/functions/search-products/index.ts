@@ -320,46 +320,39 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
   try {
     console.log(`Searching Kassalapp API for "${query}"${storeCode ? ` (filtering for ${storeCode})` : ''}`);
 
-    // Fetch multiple pages to find products in the selected store
-    for (let page = 1; page <= maxPages; page++) {
+    // Fetch all pages in parallel for speed
+    const pagePromises = Array.from({ length: maxPages }, (_, i) => {
+      const page = i + 1;
       const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
       
-      const response = await fetch(url, {
+      return fetch(url, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Kassalapp API error on page ${page}: ${response.status}`, errorText);
-        break; // Stop pagination on error but don't fail completely
-      }
-
-      const data = await response.json();
-      const items: any[] = Array.isArray(data?.data) ? data.data : [];
-      
-      if (items.length === 0) {
-        console.log(`Page ${page}: No more results`);
-        break; // No more results
-      }
-
-      allItems.push(...items);
-      console.log(`Page ${page}: Got ${items.length} products (total: ${allItems.length})`);
-
-      // If we already have enough products from the target store, stop early
-      if (storeCode && allowedNames) {
-        const storeMatches = allItems.filter((item) => {
-          const storeName = item?.store?.name?.toLowerCase() || '';
-          return allowedNames.some(name => storeName.includes(name));
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            console.error(`Kassalapp API error on page ${page}: ${response.status}`);
+            return [];
+          }
+          const data = await response.json();
+          return Array.isArray(data?.data) ? data.data : [];
+        })
+        .catch((err) => {
+          console.error(`Kassalapp API fetch failed for page ${page}:`, err);
+          return [];
         });
-        if (storeMatches.length >= 10) {
-          console.log(`Found ${storeMatches.length} products for ${storeCode}, stopping pagination`);
-          break;
-        }
+    });
+
+    const pageResults = await Promise.all(pagePromises);
+    pageResults.forEach((items, i) => {
+      if (items.length > 0) {
+        allItems.push(...items);
+        console.log(`Page ${i + 1}: Got ${items.length} products`);
       }
-    }
+    });
+    console.log(`Total fetched: ${allItems.length} products from ${maxPages} parallel requests`);
 
     // Filter by store name if storeCode is provided
     let filteredItems = allItems;
