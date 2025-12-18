@@ -154,10 +154,23 @@ function processProduct(product: Product, query: string, userPreferences?: any):
   const nameLower = productName.toLowerCase();
   const categoryLower = category.toLowerCase();
 
-  // Check if query is a substring match that could be misleading
-  // e.g., "brød" matching "knekkebrød" when they're different products
-  const queryWords = queryLower.split(/\s+/);
-  const nameWords = nameLower.split(/\s+/);
+  // Tokenize query and product name
+  // Split on spaces, hyphens, and other delimiters for better matching
+  // e.g., "Stabbur-makrell i tomat" → ["stabbur", "makrell", "i", "tomat"]
+  const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+  const nameTokens = nameLower.split(/[\s\-\/\(\)]+/).filter(w => w.length > 0);
+  const nameWords = nameLower.split(/\s+/); // Keep original word splits for some checks
+  
+  // Check if ALL query words are found in the product name tokens
+  const allQueryWordsFound = queryWords.every(qw => 
+    nameTokens.some(nt => nt === qw || nt.includes(qw) || qw.includes(nt))
+  );
+  
+  // Count how many query words match exactly or as part of tokens
+  const exactTokenMatches = queryWords.filter(qw => nameTokens.includes(qw)).length;
+  const partialTokenMatches = queryWords.filter(qw => 
+    nameTokens.some(nt => (nt.includes(qw) || qw.includes(nt)) && nt !== qw)
+  ).length;
   
   // Exact match gets highest score
   if (nameLower === queryLower) {
@@ -168,9 +181,14 @@ function processProduct(product: Product, query: string, userPreferences?: any):
   } else if (nameLower.startsWith(queryLower + " ") || nameLower.startsWith(queryLower + ",")) {
     // Product name starts with the query word
     score += 85;
-  } else if (nameWords.some(word => word === queryLower)) {
-    // Exact word match
-    score += 80;
+  } else if (allQueryWordsFound && queryWords.length > 1) {
+    // All query words found in tokenized name (handles "makrell i tomat" → "Stabbur-makrell i tomat")
+    // Score based on how many are exact vs partial matches
+    const exactRatio = exactTokenMatches / queryWords.length;
+    score += 70 + (exactRatio * 15); // 70-85 depending on exact matches
+  } else if (nameTokens.some(token => token === queryLower)) {
+    // Exact token match (e.g., "makrell" matches token in "Stabbur-makrell")
+    score += 75;
   } else if (nameLower.includes(queryLower)) {
     // Query is a substring - could be partial match (e.g., "brød" in "knekkebrød")
     // Check if it's a compound word (penalize) vs separate word (reward)
@@ -179,11 +197,11 @@ function processProduct(product: Product, query: string, userPreferences?: any):
     );
     score += isCompoundWord ? 30 : 70; // Penalize compound words like knekkebrød
   } else {
-    // Fuzzy matching - all query words should be present
-    const matches = queryWords.filter((word) =>
-      nameWords.some((nameWord) => nameWord === word || nameWord.startsWith(word)),
+    // Fuzzy matching - check token-level matches
+    const tokenMatches = queryWords.filter((word) =>
+      nameTokens.some((token) => token === word || token.startsWith(word) || token.includes(word)),
     );
-    score += (matches.length / queryWords.length) * 40;
+    score += (tokenMatches.length / queryWords.length) * 50;
   }
 
   // Apply user preference filters
