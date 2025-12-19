@@ -8,9 +8,7 @@ const corsHeaders = {
 
 interface SearchRequest {
   query: string;
-  // Frontend currently sends storeId (e.g. "MENY_NO")
   storeId?: string;
-  // Some callers may send storeCode
   storeCode?: string;
   userPreferences?: {
     allergies?: string[];
@@ -46,20 +44,101 @@ interface ProductCandidate {
   matchReason: string;
 }
 
+// Mapping av søkeord til matkategorier for mer målrettet søk
+const categoryMapping: Record<string, string[]> = {
+  // Meieriprodukter
+  melk: ["meieri", "melk"],
+  yoghurt: ["meieri", "yoghurt"],
+  ost: ["meieri", "ost"],
+  rømme: ["meieri"],
+  fløte: ["meieri"],
+  smør: ["meieri"],
+  egg: ["meieri", "egg"],
+  
+  // Kjøtt
+  kylling: ["kjøtt", "fjærfe"],
+  svin: ["kjøtt"],
+  storfe: ["kjøtt"],
+  lam: ["kjøtt"],
+  bacon: ["kjøtt"],
+  pølse: ["kjøtt"],
+  kjøttdeig: ["kjøtt"],
+  biff: ["kjøtt"],
+  
+  // Fisk og sjømat
+  laks: ["fisk", "sjømat"],
+  torsk: ["fisk", "sjømat"],
+  makrell: ["fisk", "sjømat"],
+  reker: ["fisk", "sjømat"],
+  tunfisk: ["fisk", "sjømat"],
+  
+  // Bakevarer
+  brød: ["bakevarer", "brød"],
+  rundstykker: ["bakevarer"],
+  boller: ["bakevarer"],
+  
+  // Frukt og grønt
+  eple: ["frukt"],
+  banan: ["frukt"],
+  appelsin: ["frukt"],
+  tomat: ["grønnsaker"],
+  agurk: ["grønnsaker"],
+  salat: ["grønnsaker"],
+  løk: ["grønnsaker"],
+  poteter: ["grønnsaker"],
+  gulrot: ["grønnsaker"],
+  
+  // Drikke
+  juice: ["drikke"],
+  brus: ["drikke"],
+  vann: ["drikke"],
+  kaffe: ["drikke", "kaffe"],
+  te: ["drikke"],
+  
+  // Frokost
+  havregryn: ["frokost"],
+  cornflakes: ["frokost"],
+  müsli: ["frokost"],
+  
+  // Pålegg
+  syltetøy: ["pålegg"],
+  leverpostei: ["pålegg"],
+  nugatti: ["pålegg"],
+};
+
+// Kategorier som IKKE er mat/drikke - skal ekskluderes
+const excludedCategories = [
+  "husholdning",
+  "rengjøring",
+  "personlig pleie",
+  "hygiene",
+  "dyremat",
+  "hundemat",
+  "kattemat",
+  "vaskemiddel",
+  "oppvask",
+  "toalettpapir",
+  "bleier",
+  "sjampo",
+  "såpe",
+  "tannkrem",
+  "deodorant",
+  "batterier",
+  "lys",
+  "plastposer",
+];
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const kassalappApiKey = Deno.env.get("KASSALAPP_API_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY"); // optional: used for spelling correction fallback
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
     const { query, storeCode, storeId, userPreferences }: SearchRequest = await req.json();
-
     const effectiveStoreCode = storeCode ?? storeId;
-
     const originalQuery = (query ?? "").toString().trim();
     let effectiveQuery = originalQuery;
 
@@ -72,45 +151,55 @@ serve(async (req) => {
       });
     }
 
-    // Search using Kassalapp API (primary data source)
+    // Finn relevant kategori basert på søkeord
+    const suggestedCategory = findCategoryForQuery(originalQuery);
+    console.log(`Query "${originalQuery}" mapped to category: ${suggestedCategory || "none"}`);
+
     let candidates: ProductCandidate[] = [];
-    const allCandidates: ProductCandidate[] = []; // Keep all for fallback
+    const allCandidates: ProductCandidate[] = [];
 
     try {
-      // Strict: ONLY search within the selected store
-      let kassalappProducts = await searchKassalappAPI(effectiveQuery, effectiveStoreCode, kassalappApiKey);
+      // Søk med kategori først for bedre treff
+      let kassalappProducts = await searchKassalappAPI(
+        effectiveQuery, 
+        effectiveStoreCode, 
+        kassalappApiKey,
+        suggestedCategory
+      );
 
-      // If no hits, retry once with a corrected query (handles typos like "mekrell" -> "makrell")
+      // Hvis ingen resultater med kategori, prøv uten kategori
+      if (kassalappProducts.length === 0 && suggestedCategory) {
+        console.log(`No results with category "${suggestedCategory}", trying without category filter`);
+        kassalappProducts = await searchKassalappAPI(effectiveQuery, effectiveStoreCode, kassalappApiKey);
+      }
+
+      // Hvis fortsatt ingen resultater, prøv med stavekorrigering
       if (kassalappProducts.length === 0 && lovableApiKey) {
         const corrected = await correctSearchQuery(originalQuery, lovableApiKey);
         if (corrected && corrected.toLowerCase() !== originalQuery.toLowerCase()) {
           const retryProducts = await searchKassalappAPI(corrected, effectiveStoreCode, kassalappApiKey);
           if (retryProducts.length > 0) {
-            console.log(
-              `No products for "${originalQuery}". Retrying with corrected query "${corrected}" yielded ${retryProducts.length} products.`,
-            );
+            console.log(`Retry with corrected query "${corrected}" yielded ${retryProducts.length} products.`);
             effectiveQuery = corrected;
             kassalappProducts = retryProducts;
-          } else {
-            console.log(`No products for "${originalQuery}" and corrected "${corrected}".`);
           }
         }
       }
 
-      console.log(`Found ${kassalappProducts.length} products from Kassalapp API for store ${effectiveStoreCode}`);
+      // Filtrer ut ikke-mat produkter
+      kassalappProducts = filterOutNonFoodProducts(kassalappProducts);
+      console.log(`After food filter: ${kassalappProducts.length} products for store ${effectiveStoreCode}`);
 
       for (const product of kassalappProducts) {
         const candidate = processProduct(product, effectiveQuery, userPreferences);
         allCandidates.push(candidate);
-        // Prefer good matches (score >= 50)
         if (candidate.score >= 50) {
           candidates.push(candidate);
         }
       }
 
-      // Fallback: if no good matches, include all store products sorted by relevance
       if (candidates.length === 0 && allCandidates.length > 0) {
-        console.log("No strong matches found in store, falling back to all store products");
+        console.log("No strong matches found, falling back to all products");
         candidates = allCandidates;
       }
     } catch (apiError) {
@@ -124,16 +213,14 @@ serve(async (req) => {
       );
     }
 
-    // Sort by: 1) renvareScore (higher = cleaner), 2) relevance score
+    // Sorter etter renvareScore og relevans
     candidates.sort((a, b) => {
       const renvareDiff = b.renvareScore - a.renvareScore;
       if (Math.abs(renvareDiff) > 20) return renvareDiff;
       return b.score - a.score;
     });
 
-    // Return top results
     const topResults = candidates.slice(0, 20);
-
     console.log(`Returning ${topResults.length} results, best renvareScore: ${topResults[0]?.renvareScore ?? 0}`);
 
     return new Response(
@@ -157,6 +244,37 @@ serve(async (req) => {
     );
   }
 });
+
+// Finn kategori basert på søkeord
+function findCategoryForQuery(query: string): string | undefined {
+  const queryLower = query.toLowerCase();
+  
+  // Sjekk direkte treff i mapping
+  for (const [keyword, categories] of Object.entries(categoryMapping)) {
+    if (queryLower.includes(keyword) || keyword.includes(queryLower)) {
+      return categories[0]; // Returner primærkategori
+    }
+  }
+  
+  return undefined;
+}
+
+// Filtrer ut produkter som ikke er mat/drikke
+function filterOutNonFoodProducts(products: Product[]): Product[] {
+  return products.filter(product => {
+    const category = (product.Kategori || "").toLowerCase();
+    const name = (product.Produktnavn || "").toLowerCase();
+    
+    // Sjekk om produktet er i en ekskludert kategori
+    for (const excluded of excludedCategories) {
+      if (category.includes(excluded) || name.includes(excluded)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+}
 
 async function correctSearchQuery(query: string, lovableApiKey: string): Promise<string | null> {
   const input = query.trim();
@@ -192,8 +310,8 @@ async function correctSearchQuery(query: string, lovableApiKey: string): Promise
     if (!text) return null;
 
     const corrected = text
-      .replace(/^[\"“”']+/, "")
-      .replace(/[\"“”']+$/, "")
+      .replace(/^[\"""']+/, "")
+      .replace(/[\"""']+$/, "")
       .replace(/\s+/g, " ")
       .trim();
 
@@ -213,82 +331,61 @@ function processProduct(product: Product, query: string, userPreferences?: any):
   const price = product.Pris || "0";
   const category = product.Kategori || "";
 
-  // Calculate base relevance score
   let score = 0;
   const queryLower = query.toLowerCase().trim();
   const nameLower = productName.toLowerCase();
   const categoryLower = category.toLowerCase();
 
-  // Tokenize query and product name
-  // Split on spaces, hyphens, and other delimiters for better matching
-  // e.g., "Stabbur-makrell i tomat" → ["stabbur", "makrell", "i", "tomat"]
   const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
   const nameTokens = nameLower.split(/[\s\-\/\(\)]+/).filter(w => w.length > 0);
-  const nameWords = nameLower.split(/\s+/); // Keep original word splits for some checks
+  const nameWords = nameLower.split(/\s+/);
   
-  // Check if ALL query words are found in the product name tokens
   const allQueryWordsFound = queryWords.every(qw => 
     nameTokens.some(nt => nt === qw || nt.includes(qw) || qw.includes(nt))
   );
   
-  // Count how many query words match exactly or as part of tokens
   const exactTokenMatches = queryWords.filter(qw => nameTokens.includes(qw)).length;
-  const partialTokenMatches = queryWords.filter(qw => 
-    nameTokens.some(nt => (nt.includes(qw) || qw.includes(nt)) && nt !== qw)
-  ).length;
   
-  // Exact match gets highest score
   if (nameLower === queryLower) {
     score += 100;
   } else if (nameWords.includes(queryLower) || categoryLower === queryLower) {
-    // Query is a complete word in the product name or matches category
     score += 90;
   } else if (nameLower.startsWith(queryLower + " ") || nameLower.startsWith(queryLower + ",")) {
-    // Product name starts with the query word
     score += 85;
   } else if (allQueryWordsFound && queryWords.length > 1) {
-    // All query words found in tokenized name (handles "makrell i tomat" → "Stabbur-makrell i tomat")
-    // Score based on how many are exact vs partial matches
     const exactRatio = exactTokenMatches / queryWords.length;
-    score += 70 + (exactRatio * 15); // 70-85 depending on exact matches
+    score += 70 + (exactRatio * 15);
   } else if (nameTokens.some(token => token === queryLower)) {
-    // Exact token match (e.g., "makrell" matches token in "Stabbur-makrell")
     score += 75;
   } else if (nameLower.includes(queryLower)) {
-    // Query is a substring - could be partial match (e.g., "brød" in "knekkebrød")
-    // Check if it's a compound word (penalize) vs separate word (reward)
     const isCompoundWord = nameWords.some(word => 
       word.includes(queryLower) && word !== queryLower && word.length > queryLower.length + 2
     );
-    score += isCompoundWord ? 30 : 70; // Penalize compound words like knekkebrød
+    score += isCompoundWord ? 30 : 70;
   } else {
-    // Fuzzy matching - check token-level matches
     const tokenMatches = queryWords.filter((word) =>
       nameTokens.some((token) => token === word || token.startsWith(word) || token.includes(word)),
     );
     score += (tokenMatches.length / queryWords.length) * 50;
   }
 
-  // Apply user preference filters
   if (userPreferences) {
-    // Check allergies
     for (const allergy of userPreferences.allergies || []) {
       if (
         allergies.toLowerCase().includes(allergy.toLowerCase()) ||
         ingredients.toLowerCase().includes(allergy.toLowerCase())
       ) {
-        score = 0; // Exclude products with user allergies
+        score = 0;
         break;
       }
     }
 
-    // Check diet requirements
     for (const diet of userPreferences.diets || []) {
       if (
         diet === "vegetarian" &&
         (ingredients.toLowerCase().includes("kjøtt") || ingredients.toLowerCase().includes("fisk"))
       ) {
-        score *= 0.1; // Heavily penalize non-vegetarian for vegetarians
+        score *= 0.1;
       }
       if (
         diet === "vegan" &&
@@ -297,26 +394,20 @@ function processProduct(product: Product, query: string, userPreferences?: any):
           ingredients.toLowerCase().includes("kjøtt") ||
           ingredients.toLowerCase().includes("fisk"))
       ) {
-        score *= 0.1; // Heavily penalize non-vegan for vegans
+        score *= 0.1;
       }
     }
 
-    // Renvare preference
     if (userPreferences.renvare_only) {
       const isRenvare = filters.toLowerCase().includes("renvare") || productName.toLowerCase().includes("renvare");
       if (!isRenvare) {
-        score *= 0.3; // Penalize non-renvare products if user wants renvare only
+        score *= 0.3;
       }
     }
   }
 
-  // Calculate renvare score
   const renvareScore = calculateRenvareScore(ingredients, filters);
-
-  // Parse price
   const priceNumeric = parsePrice(price);
-
-  // Get availability
   const availability = product.Tilgjengelighet || "unknown";
 
   return {
@@ -330,7 +421,7 @@ function processProduct(product: Product, query: string, userPreferences?: any):
 }
 
 function calculateRenvareScore(ingredients: string, filters: string): number {
-  let score = 100; // Start with perfect score
+  let score = 100;
 
   const harmful = [
     "konserveringsmiddel",
@@ -348,11 +439,10 @@ function calculateRenvareScore(ingredients: string, filters: string): number {
 
   for (const term of harmful) {
     if (ingredientsLower.includes(term)) {
-      score -= 15; // Reduce score for each harmful additive
+      score -= 15;
     }
   }
 
-  // Bonus for explicitly marked as renvare
   if (filtersLower.includes("renvare")) {
     score += 20;
   }
@@ -377,34 +467,25 @@ function getMatchReason(productName: string, query: string, score: number): stri
   return "Svak match";
 }
 
-async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: string): Promise<Product[]> {
+async function searchKassalappAPI(
+  query: string, 
+  storeCode?: string, 
+  apiKey?: string,
+  category?: string
+): Promise<Product[]> {
   if (!apiKey) {
     console.warn("No Kassalapp API key provided");
     return [];
   }
 
-  // Map frontend store codes to Kassalapp store identifiers for filtering.
-  // Kassalapp's `store.name` can be generic (e.g. "Coop"), so we support matching on BOTH:
-  // - store.code (preferred when available)
-  // - store.name (fallback)
-  const storeFilterMapping: Record<
-    string,
-    {
-      names: string[]; // substrings to match against store.name (lowercased)
-      codes?: string[]; // substrings to match against store.code (lowercased)
-    }
-  > = {
+  const storeFilterMapping: Record<string, { names: string[]; codes?: string[] }> = {
     MENY_NO: { names: ["meny"], codes: ["meny"] },
     KIWI: { names: ["kiwi"], codes: ["kiwi"] },
     REMA_1000: { names: ["rema 1000", "rema"], codes: ["rema", "rema_1000"] },
-
-    // Coop stores: Kassalapp often returns store.name as just "Coop".
-    // We still keep the selection within Coop, but cannot reliably distinguish Mega/Extra/Prix/Obs if the API doesn't provide it.
     COOP_MEGA: { names: ["coop mega", "coop"], codes: ["coop", "mega"] },
     COOP_EXTRA: { names: ["coop extra", "coop"], codes: ["coop", "extra"] },
     COOP_PRIX: { names: ["coop prix", "coop"], codes: ["coop", "prix"] },
     COOP_OBS: { names: ["coop obs", "obs", "coop"], codes: ["coop", "obs"] },
-
     SPAR_NO: { names: ["spar", "eurospar"], codes: ["spar"] },
     JOKER_NO: { names: ["joker"], codes: ["joker"] },
     ODA_NO: { names: ["oda"], codes: ["oda"] },
@@ -413,21 +494,31 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
 
   const allowed = storeCode ? storeFilterMapping[storeCode] : null;
 
-  // Strict: if a store is selected but we don't recognize it, return 0 results
-  // (never leak suggestions from other stores)
   if (storeCode && !allowed) {
     console.warn(`Unknown storeCode "${storeCode}" (no mapping). Returning 0 results.`);
     return [];
   }
 
   const allItems: any[] = [];
-  const maxPages = 5; // Fetch up to 5 pages (500 products max)
-  const pageSize = 100; // Maximum allowed by API
+  const maxPages = 10; // Økt fra 5 til 10 for bedre dekning (1000 produkter)
+  const pageSize = 100;
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const fetchPage = async (page: number): Promise<any[]> => {
-    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
+    // Bygg URL med optimaliserte parametere
+    let url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
+    
+    // Legg til unique=true for å unngå duplikater fra samme produkt i forskjellige butikker
+    url += "&unique=true";
+    
+    // Legg til exclude_without_ean for bedre datakvalitet
+    url += "&exclude_without_ean=true";
+    
+    // Legg til kategori hvis spesifisert
+    if (category) {
+      url += `&category=${encodeURIComponent(category)}`;
+    }
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       const response = await fetch(url, {
@@ -440,9 +531,7 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
       if (response.status === 429) {
         const retryAfterHeader = response.headers.get("retry-after");
         const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 600 * attempt;
-        console.warn(
-          `Kassalapp rate-limited (429) on page ${page} (attempt ${attempt}). Waiting ${retryAfterMs}ms...`,
-        );
+        console.warn(`Rate-limited (429) on page ${page} (attempt ${attempt}). Waiting ${retryAfterMs}ms...`);
         await sleep(retryAfterMs);
         continue;
       }
@@ -461,10 +550,8 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
   };
 
   try {
-    console.log(`Searching Kassalapp API for "${query}"${storeCode ? ` (filtering for ${storeCode})` : ""}`);
+    console.log(`Searching Kassalapp: "${query}"${category ? ` (category: ${category})` : ""}${storeCode ? ` (store: ${storeCode})` : ""}`);
 
-    // NOTE: We intentionally avoid fetching all pages in parallel here because Kassalapp rate-limits (429)
-    // when many requests are fired at once (especially when the client searches many list items).
     for (let page = 1; page <= maxPages; page++) {
       const items = await fetchPage(page);
 
@@ -475,7 +562,6 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
       allItems.push(...items);
       console.log(`Page ${page}: Got ${items.length} products (total: ${allItems.length})`);
 
-      // If we got fewer than pageSize, this is likely the last page
       if (items.length < pageSize) {
         break;
       }
@@ -483,27 +569,24 @@ async function searchKassalappAPI(query: string, storeCode?: string, apiKey?: st
 
     console.log(`Total fetched: ${allItems.length} products from up to ${maxPages} pages`);
 
-    // Filter by store if storeCode is provided
+    // Filtrer etter butikk hvis spesifisert
     let filteredItems = allItems;
     if (storeCode && allowed) {
       filteredItems = allItems.filter((item) => {
         const storeName = (item?.store?.name ?? "").toLowerCase();
         const storeCodeFromApi = (item?.store?.code ?? "").toLowerCase();
 
-        // Prefer code match if possible
         if (storeCodeFromApi) {
           if (storeCodeFromApi === storeCode.toLowerCase()) return true;
           if (allowed.codes?.some((c) => storeCodeFromApi.includes(c))) return true;
         }
 
-        // Fallback to name matching
         return allowed.names.some((n) => storeName.includes(n));
       });
     }
 
     console.log(`Total: ${allItems.length} products fetched` + (storeCode ? `, ${filteredItems.length} match ${storeCode}` : ""));
 
-    // Log available store identifiers for debugging if no matches
     if (allItems.length > 0 && filteredItems.length === 0) {
       const storeIdentifiers = [
         ...new Set(
