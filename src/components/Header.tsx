@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import pickiLogo from "@/assets/picki-logo-new.png";
+import pickiLogo from "@/assets/picki-logo.png";
 import { useState } from "react";
 
 export const Header = () => {
