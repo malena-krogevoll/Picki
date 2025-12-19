@@ -414,41 +414,53 @@ async function searchKassalappAPI(
   }
 
   const allItems: any[] = [];
-  const maxPages = 10; // Økt fra 5 til 10 for bedre dekning (1000 produkter)
+  const maxPages = 3; // Reduced for faster response
   const pageSize = 100;
+  const startTime = Date.now();
+  const maxTimeMs = 8000; // Max 8 seconds total to avoid timeout
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const fetchPage = async (page: number): Promise<any[]> => {
-    // Enkel URL uten ekstra parametere som kan forårsake 422-feil
-    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
-
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.status === 429) {
-        const retryAfterHeader = response.headers.get("retry-after");
-        const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 600 * attempt;
-        console.warn(`Rate-limited (429) on page ${page} (attempt ${attempt}). Waiting ${retryAfterMs}ms...`);
-        await sleep(retryAfterMs);
-        continue;
-      }
-
-      if (!response.ok) {
-        console.error(`Kassalapp API error on page ${page}: ${response.status}`);
-        return [];
-      }
-
-      const data = await response.json();
-      return Array.isArray(data?.data) ? data.data : [];
+  const fetchPage = async (page: number): Promise<any[] | null> => {
+    // Check if we're running out of time
+    if (Date.now() - startTime > maxTimeMs) {
+      console.warn(`Time limit reached, skipping page ${page}`);
+      return null;
     }
 
-    console.error(`Kassalapp API still rate-limited after retries for page ${page}`);
+    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.status === 429) {
+          // Short wait only, max 2 seconds
+          const waitMs = Math.min(2000, 1000 * attempt);
+          console.warn(`Rate-limited (429) on page ${page}, waiting ${waitMs}ms...`);
+          await sleep(waitMs);
+          continue;
+        }
+
+        if (!response.ok) {
+          console.error(`Kassalapp API error on page ${page}: ${response.status}`);
+          return [];
+        }
+
+        const data = await response.json();
+        return Array.isArray(data?.data) ? data.data : [];
+      } catch (err) {
+        console.error(`Fetch error on page ${page}:`, err);
+        return [];
+      }
+    }
+
+    console.warn(`Skipping page ${page} after rate limit retries`);
     return [];
   };
 
@@ -457,6 +469,11 @@ async function searchKassalappAPI(
 
     for (let page = 1; page <= maxPages; page++) {
       const items = await fetchPage(page);
+
+      if (items === null) {
+        // Time limit reached
+        break;
+      }
 
       if (items.length === 0) {
         break;
@@ -470,7 +487,7 @@ async function searchKassalappAPI(
       }
     }
 
-    console.log(`Total fetched: ${allItems.length} products from up to ${maxPages} pages`);
+    console.log(`Total fetched: ${allItems.length} products in ${Date.now() - startTime}ms`);
 
     // Filtrer etter butikk hvis spesifisert
     let filteredItems = allItems;
