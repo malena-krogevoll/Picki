@@ -44,67 +44,6 @@ interface ProductCandidate {
   matchReason: string;
 }
 
-// Mapping av søkeord til matkategorier for mer målrettet søk
-const categoryMapping: Record<string, string[]> = {
-  // Meieriprodukter
-  melk: ["meieri", "melk"],
-  yoghurt: ["meieri", "yoghurt"],
-  ost: ["meieri", "ost"],
-  rømme: ["meieri"],
-  fløte: ["meieri"],
-  smør: ["meieri"],
-  egg: ["meieri", "egg"],
-  
-  // Kjøtt
-  kylling: ["kjøtt", "fjærfe"],
-  svin: ["kjøtt"],
-  storfe: ["kjøtt"],
-  lam: ["kjøtt"],
-  bacon: ["kjøtt"],
-  pølse: ["kjøtt"],
-  kjøttdeig: ["kjøtt"],
-  biff: ["kjøtt"],
-  
-  // Fisk og sjømat
-  laks: ["fisk", "sjømat"],
-  torsk: ["fisk", "sjømat"],
-  makrell: ["fisk", "sjømat"],
-  reker: ["fisk", "sjømat"],
-  tunfisk: ["fisk", "sjømat"],
-  
-  // Bakevarer
-  brød: ["bakevarer", "brød"],
-  rundstykker: ["bakevarer"],
-  boller: ["bakevarer"],
-  
-  // Frukt og grønt
-  eple: ["frukt"],
-  banan: ["frukt"],
-  appelsin: ["frukt"],
-  tomat: ["grønnsaker"],
-  agurk: ["grønnsaker"],
-  salat: ["grønnsaker"],
-  løk: ["grønnsaker"],
-  poteter: ["grønnsaker"],
-  gulrot: ["grønnsaker"],
-  
-  // Drikke
-  juice: ["drikke"],
-  brus: ["drikke"],
-  vann: ["drikke"],
-  kaffe: ["drikke", "kaffe"],
-  te: ["drikke"],
-  
-  // Frokost
-  havregryn: ["frokost"],
-  cornflakes: ["frokost"],
-  müsli: ["frokost"],
-  
-  // Pålegg
-  syltetøy: ["pålegg"],
-  leverpostei: ["pålegg"],
-  nugatti: ["pålegg"],
-};
 
 // Kategorier som IKKE er mat/drikke - skal ekskluderes
 const excludedCategories = [
@@ -151,29 +90,18 @@ serve(async (req) => {
       });
     }
 
-    // Finn relevant kategori basert på søkeord
-    const suggestedCategory = findCategoryForQuery(originalQuery);
-    console.log(`Query "${originalQuery}" mapped to category: ${suggestedCategory || "none"}`);
-
     let candidates: ProductCandidate[] = [];
     const allCandidates: ProductCandidate[] = [];
 
     try {
-      // Søk med kategori først for bedre treff
+      // Søk i Kassalapp API
       let kassalappProducts = await searchKassalappAPI(
         effectiveQuery, 
         effectiveStoreCode, 
-        kassalappApiKey,
-        suggestedCategory
+        kassalappApiKey
       );
 
-      // Hvis ingen resultater med kategori, prøv uten kategori
-      if (kassalappProducts.length === 0 && suggestedCategory) {
-        console.log(`No results with category "${suggestedCategory}", trying without category filter`);
-        kassalappProducts = await searchKassalappAPI(effectiveQuery, effectiveStoreCode, kassalappApiKey);
-      }
-
-      // Hvis fortsatt ingen resultater, prøv med stavekorrigering
+      // Hvis ingen resultater, prøv med stavekorrigering
       if (kassalappProducts.length === 0 && lovableApiKey) {
         const corrected = await correctSearchQuery(originalQuery, lovableApiKey);
         if (corrected && corrected.toLowerCase() !== originalQuery.toLowerCase()) {
@@ -245,19 +173,6 @@ serve(async (req) => {
   }
 });
 
-// Finn kategori basert på søkeord
-function findCategoryForQuery(query: string): string | undefined {
-  const queryLower = query.toLowerCase();
-  
-  // Sjekk direkte treff i mapping
-  for (const [keyword, categories] of Object.entries(categoryMapping)) {
-    if (queryLower.includes(keyword) || keyword.includes(queryLower)) {
-      return categories[0]; // Returner primærkategori
-    }
-  }
-  
-  return undefined;
-}
 
 // Filtrer ut produkter som ikke er mat/drikke
 function filterOutNonFoodProducts(products: Product[]): Product[] {
@@ -470,8 +385,7 @@ function getMatchReason(productName: string, query: string, score: number): stri
 async function searchKassalappAPI(
   query: string, 
   storeCode?: string, 
-  apiKey?: string,
-  category?: string
+  apiKey?: string
 ): Promise<Product[]> {
   if (!apiKey) {
     console.warn("No Kassalapp API key provided");
@@ -506,19 +420,8 @@ async function searchKassalappAPI(
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const fetchPage = async (page: number): Promise<any[]> => {
-    // Bygg URL med optimaliserte parametere
-    let url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
-    
-    // Legg til unique=true for å unngå duplikater fra samme produkt i forskjellige butikker
-    url += "&unique=true";
-    
-    // Legg til exclude_without_ean for bedre datakvalitet
-    url += "&exclude_without_ean=true";
-    
-    // Legg til kategori hvis spesifisert
-    if (category) {
-      url += `&category=${encodeURIComponent(category)}`;
-    }
+    // Enkel URL uten ekstra parametere som kan forårsake 422-feil
+    const url = `https://kassal.app/api/v1/products?search=${encodeURIComponent(query)}&size=${pageSize}&page=${page}`;
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       const response = await fetch(url, {
@@ -550,7 +453,7 @@ async function searchKassalappAPI(
   };
 
   try {
-    console.log(`Searching Kassalapp: "${query}"${category ? ` (category: ${category})` : ""}${storeCode ? ` (store: ${storeCode})` : ""}`);
+    console.log(`Searching Kassalapp: "${query}"${storeCode ? ` (store: ${storeCode})` : ""}`);
 
     for (let page = 1; page <= maxPages; page++) {
       const items = await fetchPage(page);
