@@ -44,7 +44,6 @@ interface ProductCandidate {
   matchReason: string;
 }
 
-
 // Kategorier som IKKE er mat/drikke - skal ekskluderes
 const excludedCategories = [
   "husholdning",
@@ -66,6 +65,77 @@ const excludedCategories = [
   "lys",
   "plastposer",
 ];
+
+// Synonym- og variantmapping for bedre søketreff
+const searchSynonyms: Record<string, string[]> = {
+  // Dialektvarianter (bokmål ↔ nynorsk)
+  "helmelk": ["helmjølk", "h-melk", "hel melk"],
+  "helmjølk": ["helmelk", "h-melk", "hel melk"],
+  "lettmelk": ["lettmjølk", "lett melk", "l-melk"],
+  "lettmjølk": ["lettmelk", "lett melk", "l-melk"],
+  "skummetmelk": ["skumma mjølk", "skummet melk", "skumma melk"],
+  "melk": ["mjølk"],
+  "mjølk": ["melk"],
+  "smør": ["meierismør", "butter"],
+  "ost": ["gulost", "cheese"],
+  "brød": ["braud"],
+  "kjøtt": ["kjøt"],
+  "fisk": ["fisk"],
+  "grønnsaker": ["grønsaker", "grønnsak"],
+  "frukt": ["frukt"],
+  
+  // Generiske produktnavn → merkevarer/varianter
+  "potetgull": ["chips", "maarud", "kims", "sørlandschips"],
+  "chips": ["potetgull", "maarud", "kims", "sørlandschips"],
+  "brus": ["cola", "fanta", "sprite", "solo", "pepsi"],
+  "cola": ["coca-cola", "pepsi", "cola zero", "pepsi max"],
+  "juice": ["appelsinjuice", "eplejuice", "tropicana", "sunniva"],
+  "pasta": ["spaghetti", "penne", "makaroni", "fusilli"],
+  "ris": ["jasminris", "basmatiris", "langkornet ris"],
+  "egg": ["frittgående egg", "økologiske egg"],
+  "bacon": ["strimlet bacon", "baconskiver"],
+  "pølse": ["pølser", "grillpølse", "wiener"],
+  "yoghurt": ["yogurt", "gresk yoghurt"],
+  "kaffe": ["coffee", "filterkaffe", "espresso"],
+  "te": ["tea", "grønn te", "svart te"],
+  "sjokolade": ["chocolate", "melkesjokolade"],
+  "is": ["iskrem", "ice cream"],
+  "pizza": ["frossenpizza", "grandiosa"],
+  "frokostblanding": ["corn flakes", "musli", "havregryn"],
+  "müsli": ["musli", "mysli"],
+  "havregryn": ["havre", "oats"],
+};
+
+// Utvid søkeord med synonymer og varianter
+function expandSearchQuery(query: string): string[] {
+  const queryLower = query.toLowerCase().trim();
+  const expandedQueries = [query]; // Alltid inkluder original først
+  
+  // Sjekk eksakte treff i synonym-mappingen
+  if (searchSynonyms[queryLower]) {
+    for (const synonym of searchSynonyms[queryLower]) {
+      if (!expandedQueries.map(q => q.toLowerCase()).includes(synonym.toLowerCase())) {
+        expandedQueries.push(synonym);
+      }
+    }
+  }
+  
+  // Sjekk om query inneholder et synonym-nøkkelord
+  for (const [key, synonyms] of Object.entries(searchSynonyms)) {
+    if (queryLower.includes(key) && queryLower !== key) {
+      // Erstatt nøkkelordet med synonymer
+      for (const synonym of synonyms.slice(0, 2)) { // Maks 2 varianter per nøkkelord
+        const expandedQuery = query.toLowerCase().replace(key, synonym);
+        if (!expandedQueries.map(q => q.toLowerCase()).includes(expandedQuery)) {
+          expandedQueries.push(expandedQuery);
+        }
+      }
+    }
+  }
+  
+  // Returner maks 3 søkeord for å balansere ytelse
+  return expandedQueries.slice(0, 3);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -94,12 +164,29 @@ serve(async (req) => {
     const allCandidates: ProductCandidate[] = [];
 
     try {
-      // Søk i Kassalapp API
-      let kassalappProducts = await searchKassalappAPI(
-        effectiveQuery, 
-        effectiveStoreCode, 
-        kassalappApiKey
+      // Utvid søkeord med synonymer og varianter
+      const searchQueries = expandSearchQuery(effectiveQuery);
+      console.log(`Expanded search queries: ${searchQueries.join(", ")}`);
+
+      // Søk parallelt på alle utvidede søkeord
+      const searchPromises = searchQueries.map(q => 
+        searchKassalappAPI(q, effectiveStoreCode, kassalappApiKey)
       );
+      const allResults = await Promise.all(searchPromises);
+      
+      // Kombiner alle resultater og fjern duplikater basert på EAN
+      const seenEANs = new Set<number>();
+      let kassalappProducts: Product[] = [];
+      
+      for (const results of allResults) {
+        for (const product of results) {
+          if (product.EAN && seenEANs.has(product.EAN)) continue;
+          if (product.EAN) seenEANs.add(product.EAN);
+          kassalappProducts.push(product);
+        }
+      }
+      
+      console.log(`Combined search results: ${kassalappProducts.length} unique products`);
 
       // Hvis ingen resultater, prøv med stavekorrigering
       if (kassalappProducts.length === 0 && lovableApiKey) {
@@ -119,15 +206,22 @@ serve(async (req) => {
       console.log(`After food filter: ${kassalappProducts.length} products for store ${effectiveStoreCode}`);
 
       for (const product of kassalappProducts) {
-        const candidate = processProduct(product, effectiveQuery, userPreferences);
+        // Bruk original query for scoring, men produkter funnet via synonymer får også poeng
+        const candidate = processProduct(product, originalQuery, userPreferences);
         allCandidates.push(candidate);
         if (candidate.score >= 50) {
           candidates.push(candidate);
         }
       }
 
+      // Hvis få sterke treff, inkluder også svakere treff
+      if (candidates.length < 5 && allCandidates.length > 0) {
+        console.log("Few strong matches, including weaker matches");
+        candidates = allCandidates.filter(c => c.score >= 20);
+      }
+      
       if (candidates.length === 0 && allCandidates.length > 0) {
-        console.log("No strong matches found, falling back to all products");
+        console.log("No matches found, falling back to all products");
         candidates = allCandidates;
       }
     } catch (apiError) {
@@ -414,10 +508,10 @@ async function searchKassalappAPI(
   }
 
   const allItems: any[] = [];
-  const maxPages = 3; // Reduced for faster response
+  const maxPages = 2; // Reduced for faster response with parallel searches
   const pageSize = 100;
   const startTime = Date.now();
-  const maxTimeMs = 8000; // Max 8 seconds total to avoid timeout
+  const maxTimeMs = 6000; // Reduced timeout for individual searches
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
