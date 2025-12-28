@@ -119,7 +119,19 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                     };
                   })
               );
-              return { itemId: item.id, products: productsWithNova };
+              // Sorter produktene etter NOVA-score (laveste først = reneste varer)
+              const sortedProducts = productsWithNova.sort((a, b) => {
+                // Primær sortering: NOVA-score (lavest først)
+                if (a.novaScore !== b.novaScore) {
+                  return a.novaScore - b.novaScore;
+                }
+                // Sekundær sortering: pris (lavest først)
+                const priceA = a.price ?? Infinity;
+                const priceB = b.price ?? Infinity;
+                return priceA - priceB;
+              });
+              
+              return { itemId: item.id, products: sortedProducts };
             } else {
               return { itemId: item.id, products: [] };
             }
