@@ -81,19 +81,45 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
               console.error('Error fetching products for', item.name, error);
               return { itemId: item.id, products: [] };
             } else if (data?.results && data.results.length > 0) {
-              // Transform API response to ProductSuggestion format
-              const products: ProductSuggestion[] = data.results
-                .filter((r: any) => r.product)
-                .map((r: any) => ({
-                  ean: r.product.EAN || '',
-                  brand: r.product.Merke || '', // Use actual brand, not store name
-                  name: r.product.Produktnavn || '',
-                  image: r.product.Produktbilde_URL || '',
-                  price: parseFloat(r.product.Pris) || null,
-                  store: r.product.StoreCode || storeId,
-                  novaScore: r.renvareScore ? (r.renvareScore >= 80 ? 1 : r.renvareScore >= 50 ? 2 : r.renvareScore >= 30 ? 3 : 4) : 2
-                }));
-              return { itemId: item.id, products };
+              // Transform API response and get real NOVA classification for each product
+              const productsWithNova: ProductSuggestion[] = await Promise.all(
+                data.results
+                  .filter((r: any) => r.product)
+                  .map(async (r: any) => {
+                    let novaScore = 2; // Fallback only if no ingredients
+                    const ingredienser = r.product.Ingrediensliste;
+                    
+                    if (ingredienser) {
+                      try {
+                        const { data: novaData, error: novaError } = await supabase.functions.invoke('classify-nova', {
+                          body: { ingredients_text: ingredienser }
+                        });
+                        
+                        if (!novaError && novaData?.nova_group) {
+                          novaScore = novaData.nova_group;
+                        } else {
+                          console.warn('NOVA classification returned no data for:', r.product.Produktnavn);
+                        }
+                      } catch (err) {
+                        console.error('NOVA classification failed for product:', r.product.Produktnavn, err);
+                        // Keep fallback of 2, log the error
+                      }
+                    } else {
+                      console.warn('No ingredients found for product:', r.product.Produktnavn);
+                    }
+                    
+                    return {
+                      ean: r.product.EAN || '',
+                      brand: r.product.Merke || '',
+                      name: r.product.Produktnavn || '',
+                      image: r.product.Produktbilde_URL || '',
+                      price: parseFloat(r.product.Pris) || null,
+                      store: r.product.StoreCode || storeId,
+                      novaScore
+                    };
+                  })
+              );
+              return { itemId: item.id, products: productsWithNova };
             } else {
               return { itemId: item.id, products: [] };
             }
