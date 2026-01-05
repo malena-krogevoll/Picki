@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { ShoppingList } from "@/components/ShoppingList";
 import { StoreSelector } from "@/components/StoreSelector";
@@ -16,9 +16,10 @@ const ListEditor = () => {
   const { user, loading: authLoading } = useAuth();
   const { lists, loading: listLoading, updateListStore, setActiveList } = useShoppingList(user?.id);
   const navigate = useNavigate();
-  const searchParams = new URLSearchParams(window.location.search);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState<Step>("list");
   const [selectedStore, setSelectedStore] = useState<string>("");
+  const didInitFromQueryRef = useRef(false);
 
   const currentList = lists.find(l => l.id === listId);
 
@@ -36,23 +37,32 @@ const ListEditor = () => {
   }, [currentList, listId, listLoading, navigate]);
 
   useEffect(() => {
-    if (currentList) {
-      setActiveList(currentList);
-      if (currentList.store_id) {
-        setSelectedStore(currentList.store_id);
-      }
+    if (!currentList) return;
 
-      // Check if we should go directly to shopping mode (coming back from product detail)
-      const viewParam = searchParams.get('view');
-      const storeParam = searchParams.get('store');
-      if (viewParam === 'shopping' && storeParam) {
-        setSelectedStore(storeParam);
-        setStep('shopping');
-      }
+    setActiveList(currentList);
+
+    const viewParam = searchParams.get('view');
+    const storeParam = searchParams.get('store');
+
+    // Only initialize from query params once (used when returning from product detail)
+    if (!didInitFromQueryRef.current && viewParam === 'shopping' && storeParam) {
+      didInitFromQueryRef.current = true;
+      setSelectedStore(storeParam);
+      setStep('shopping');
+      return;
     }
-  }, [currentList]);
+
+    didInitFromQueryRef.current = true;
+
+    // Default: use list's stored store_id, but don't override an explicit in-session selection
+    if (currentList.store_id && !selectedStore) {
+      setSelectedStore(currentList.store_id);
+    }
+  }, [currentList, searchParams, selectedStore, setActiveList]);
+
 
   const handleContinueToStore = async () => {
+    setSearchParams({}, { replace: true });
     setStep("store");
   };
 
@@ -61,6 +71,7 @@ const ListEditor = () => {
     if (listId) {
       await updateListStore(listId, storeId);
     }
+    setSearchParams({ view: "shopping", store: storeId }, { replace: true });
     setStep("shopping");
   };
 
@@ -102,7 +113,13 @@ const ListEditor = () => {
         {step === "store" && (
           <div className="max-w-2xl mx-auto">
             <h1 className="text-2xl font-bold text-center mb-8">Velg butikk</h1>
-            <StoreSelector onSelectStore={handleSelectStore} onBack={() => setStep("list")} />
+            <StoreSelector
+              onSelectStore={handleSelectStore}
+              onBack={() => {
+                setSearchParams({}, { replace: true });
+                setStep("list");
+              }}
+            />
           </div>
         )}
         {step === "shopping" && (
@@ -112,7 +129,10 @@ const ListEditor = () => {
               key={selectedStore} // Force remount when store changes
               storeId={selectedStore}
               listId={currentList.id}
-              onBack={() => setStep("store")}
+              onBack={() => {
+                setSearchParams({}, { replace: true });
+                setStep("store");
+              }}
             />
           </div>
         )}
