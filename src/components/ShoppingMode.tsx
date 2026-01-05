@@ -11,6 +11,8 @@ import { useShoppingList } from "@/hooks/useShoppingList";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { analyzeProductMatch, sortProductsByPreference, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
+import { PreferenceIndicators, AllergyWarningBanner } from "@/components/PreferenceIndicators";
 
 interface ProductSuggestion {
   ean: string;
@@ -20,6 +22,9 @@ interface ProductSuggestion {
   price: number | null;
   store: string;
   novaScore: number;
+  allergener: string;
+  ingredienser: string;
+  matchInfo: MatchInfo;
 }
 
 interface ShoppingModeProps {
@@ -87,7 +92,8 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                   .filter((r: any) => r.product)
                   .map(async (r: any) => {
                     let novaScore = 2; // Fallback only if no ingredients
-                    const ingredienser = r.product.Ingrediensliste;
+                    const ingredienser = r.product.Ingrediensliste || '';
+                    const allergener = r.product["Allergener/Kosthold"] || '';
                     
                     if (ingredienser) {
                       try {
@@ -102,34 +108,40 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                         }
                       } catch (err) {
                         console.error('NOVA classification failed for product:', r.product.Produktnavn, err);
-                        // Keep fallback of 2, log the error
                       }
                     } else {
                       console.warn('No ingredients found for product:', r.product.Produktnavn);
                     }
                     
+                    const productName = r.product.Produktnavn || '';
+                    const brand = r.product.Merke || '';
+                    
+                    // Analyze product match against user preferences
+                    const matchInfo = analyzeProductMatch(
+                      { name: productName, brand, allergener, ingredienser },
+                      profile?.preferences as UserPreferences | null
+                    );
+                    
                     return {
                       ean: r.product.EAN || '',
-                      brand: r.product.Merke || '',
-                      name: r.product.Produktnavn || '',
+                      brand,
+                      name: productName,
                       image: r.product.Produktbilde_URL || '',
                       price: parseFloat(r.product.Pris) || null,
                       store: r.product.StoreCode || storeId,
-                      novaScore
+                      novaScore,
+                      allergener,
+                      ingredienser,
+                      matchInfo
                     };
                   })
               );
-              // Sorter produktene etter NOVA-score (laveste først = reneste varer)
-              const sortedProducts = productsWithNova.sort((a, b) => {
-                // Primær sortering: NOVA-score (lavest først)
-                if (a.novaScore !== b.novaScore) {
-                  return a.novaScore - b.novaScore;
-                }
-                // Sekundær sortering: pris (lavest først)
-                const priceA = a.price ?? Infinity;
-                const priceB = b.price ?? Infinity;
-                return priceA - priceB;
-              });
+              
+              // Sort products by preference match, then NOVA, then price
+              const sortedProducts = sortProductsByPreference(
+                productsWithNova, 
+                profile?.preferences as UserPreferences | null
+              );
               
               return { itemId: item.id, products: sortedProducts };
             } else {
@@ -273,6 +285,13 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
             const selectedProduct = suggestions[selectedIndex];
             const alternatives = suggestions.filter((_, idx) => idx !== selectedIndex);
             const isExpanded = expandedItems.has(item.id);
+            
+            // Check if ALL products have allergen warnings (no safe alternatives)
+            const allHaveAllergyWarnings = suggestions.length > 0 && 
+              suggestions.every(s => s.matchInfo.allergyWarnings.length > 0);
+            const commonAllergyWarnings = allHaveAllergyWarnings && selectedProduct
+              ? selectedProduct.matchInfo.allergyWarnings
+              : [];
 
             return (
               <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
@@ -309,6 +328,11 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
                 {selectedProduct ? (
                   <div className="px-4 pb-4 md:px-5 md:pb-5 space-y-3">
+                    {/* Show allergen warning if ALL products have allergen warnings */}
+                    {allHaveAllergyWarnings && (
+                      <AllergyWarningBanner allergyWarnings={commonAllergyWarnings} />
+                    )}
+                    
                     {selectedProduct.novaScore > 2 && (
                       <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl">
                         <div className="flex items-center gap-2 text-destructive">
@@ -322,7 +346,13 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
                     <div
                       onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
-                      className={`${selectedProduct.novaScore <= 2 ? 'bg-primary/5 border-primary/20' : 'bg-secondary border-border'} border-2 p-3 md:p-4 rounded-xl cursor-pointer active:scale-[0.98] transition-all`}
+                      className={`${
+                        selectedProduct.matchInfo.allergyWarnings.length > 0 
+                          ? 'bg-destructive/5 border-destructive/30' 
+                          : selectedProduct.novaScore <= 2 
+                            ? 'bg-primary/5 border-primary/20' 
+                            : 'bg-secondary border-border'
+                      } border-2 p-3 md:p-4 rounded-xl cursor-pointer active:scale-[0.98] transition-all`}
                     >
                       <div className="flex gap-3">
                         <div className="bg-white p-2 rounded-lg border border-border flex-shrink-0">
@@ -341,7 +371,15 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                           </div>
                           <p className="font-semibold text-foreground mb-1 truncate">{selectedProduct.brand}</p>
                           <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
-                          <div className="flex items-center justify-between gap-2">
+                          
+                          {/* Preference indicators */}
+                          <PreferenceIndicators 
+                            matchInfo={selectedProduct.matchInfo} 
+                            userPreferences={profile?.preferences as UserPreferences | null}
+                            compact
+                          />
+                          
+                          <div className="flex items-center justify-between gap-2 mt-2">
                             <p className="text-base font-bold text-primary">
                               {selectedProduct.price !== null ? `${selectedProduct.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
                             </p>
@@ -371,27 +409,41 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                           <div className="mt-2 space-y-2">
                             {alternatives.map((suggestion) => {
                               const originalIndex = suggestions.findIndex(s => s.ean === suggestion.ean);
+                              const hasAllergyWarning = suggestion.matchInfo.allergyWarnings.length > 0;
                               return (
                                 <div
                                   key={suggestion.ean}
                                   onClick={() => handleSelectProduct(item.id, originalIndex)}
-                                  className="bg-secondary border border-border p-3 rounded-xl flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all touch-target"
+                                  className={`${
+                                    hasAllergyWarning 
+                                      ? 'bg-destructive/5 border-destructive/30' 
+                                      : 'bg-secondary border-border'
+                                  } border p-3 rounded-xl cursor-pointer active:scale-[0.98] transition-all touch-target`}
                                 >
-                                  <div className="bg-white p-1 rounded-lg border border-border flex-shrink-0">
-                                    <img
-                                      src={suggestion.image || '/placeholder.svg'}
-                                      alt={suggestion.name}
-                                      className="w-10 h-10 md:w-12 md:h-12 object-contain"
-                                    />
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-white p-1 rounded-lg border border-border flex-shrink-0">
+                                      <img
+                                        src={suggestion.image || '/placeholder.svg'}
+                                        alt={suggestion.name}
+                                        className="w-10 h-10 md:w-12 md:h-12 object-contain"
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-semibold truncate">{suggestion.brand}</p>
+                                      <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>
+                                      <p className="text-sm font-bold text-primary mt-1">
+                                        {suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
+                                      </p>
+                                    </div>
+                                    <Badge className={`${getNovaColor(suggestion.novaScore)} rounded-full flex-shrink-0`}>
+                                      {suggestion.novaScore}
+                                    </Badge>
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold truncate">{suggestion.brand}</p>
-                                    <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>
-                                    <p className="text-sm font-bold text-primary mt-1">{suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}</p>
-                                  </div>
-                                  <Badge className={`${getNovaColor(suggestion.novaScore)} rounded-full flex-shrink-0`}>
-                                    {suggestion.novaScore}
-                                  </Badge>
+                                  <PreferenceIndicators 
+                                    matchInfo={suggestion.matchInfo} 
+                                    userPreferences={profile?.preferences as UserPreferences | null}
+                                    compact
+                                  />
                                 </div>
                               );
                             })}
