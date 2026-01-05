@@ -58,6 +58,13 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
 
+  // Reset product data when store changes
+  useEffect(() => {
+    setProductData({});
+    setSelectedProducts({});
+    setLoading(true);
+  }, [storeId]);
+
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
