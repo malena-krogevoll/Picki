@@ -109,13 +109,23 @@ function checkAllergens(
   userAllergies: string[]
 ): string[] {
   const warnings: string[] = [];
-  const combinedText = `${allergener} ${ingredienser}`.toLowerCase();
+  
+  // IMPORTANT: Only use ingredients list for allergen checking
+  // The "Allergener/Kosthold" field from Kassalapp API often lists ALL possible allergens
+  // for a category (not just what the product contains), causing false positives
+  // Example: A pure salmon fillet lists "Gluten, Melk, Egg" even though it only contains fish
+  const textToCheck = ingredienser.toLowerCase();
+  
+  // If no ingredients, we can't reliably check - return empty (no warnings)
+  if (!textToCheck.trim()) {
+    return [];
+  }
   
   for (const allergy of userAllergies) {
     const allergyLower = allergy.toLowerCase();
     const allergenKeywords = allergenMapping[allergyLower] || [allergyLower];
     
-    if (containsAny(combinedText, allergenKeywords)) {
+    if (containsAny(textToCheck, allergenKeywords)) {
       warnings.push(allergy);
     }
   }
