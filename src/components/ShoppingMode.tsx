@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { analyzeProductMatch, sortProductsByPreference, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 import { PreferenceIndicators, AllergyWarningBanner } from "@/components/PreferenceIndicators";
+import { groupItemsByCategory } from "@/lib/storeLayoutSort";
 
 interface ProductSuggestion {
   ean: string;
@@ -231,6 +232,16 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     return sum + (selectedProduct?.price || 0);
   }, 0);
 
+  // Group items by store layout categories
+  const groupedItems = useMemo(() => {
+    return groupItemsByCategory(items, (itemId) => {
+      const suggestions = productData[itemId] || [];
+      const selectedIndex = selectedProducts[itemId] ?? 0;
+      const selectedProduct = suggestions[selectedIndex];
+      return selectedProduct ? { name: selectedProduct.name, brand: selectedProduct.brand } : undefined;
+    });
+  }, [items, productData, selectedProducts]);
+
   if (loading) {
     return (
       <div className="flex flex-col min-h-[calc(100vh-60px)] md:min-h-0">
@@ -286,191 +297,205 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       {/* Main content - scrollable */}
       <div className="flex-1 px-4 py-4 md:px-0 overflow-y-auto touch-scroll">
         <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto pb-32 md:pb-6">
-          {items.map((item) => {
-            const suggestions = productData[item.id] || [];
-            const selectedIndex = selectedProducts[item.id] ?? 0;
-            const selectedProduct = suggestions[selectedIndex];
-            const alternatives = suggestions.filter((_, idx) => idx !== selectedIndex);
-            const isExpanded = expandedItems.has(item.id);
-            
-            // Check if ALL products have allergen warnings (no safe alternatives)
-            const allHaveAllergyWarnings = suggestions.length > 0 && 
-              suggestions.every(s => s.matchInfo.allergyWarnings.length > 0);
-            const commonAllergyWarnings = allHaveAllergyWarnings && selectedProduct
-              ? selectedProduct.matchInfo.allergyWarnings
-              : [];
+          {groupedItems.map((group) => (
+            <div key={group.category} className="space-y-3">
+              {/* Category header */}
+              <div className="flex items-center gap-2 px-1 sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-5">
+                <span className="text-lg">{group.emoji}</span>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  {group.category}
+                </h2>
+                <div className="flex-1 h-px bg-border" />
+              </div>
 
-            return (
-              <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
-                <div className="p-4 md:p-5">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={item.in_cart}
-                      onCheckedChange={() => handleToggleCart(item.id, item.in_cart)}
-                      className="mt-1 h-6 w-6 md:h-5 md:w-5 rounded-md touch-target"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-muted-foreground mb-1">Du søkte etter:</p>
-                          <h3 className={`text-base md:text-lg font-semibold truncate ${item.in_cart ? "line-through text-muted-foreground" : ""}`}>
-                            {item.name}
-                          </h3>
-                          {item.in_cart && (
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 rounded-full mt-1 text-xs">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              I handlekurv
-                            </Badge>
-                          )}
+              {/* Items in this category */}
+              {group.items.map((item) => {
+                const suggestions = productData[item.id] || [];
+                const selectedIndex = selectedProducts[item.id] ?? 0;
+                const selectedProduct = suggestions[selectedIndex];
+                const alternatives = suggestions.filter((_, idx) => idx !== selectedIndex);
+                const isExpanded = expandedItems.has(item.id);
+                
+                // Check if ALL products have allergen warnings (no safe alternatives)
+                const allHaveAllergyWarnings = suggestions.length > 0 && 
+                  suggestions.every(s => s.matchInfo.allergyWarnings.length > 0);
+                const commonAllergyWarnings = allHaveAllergyWarnings && selectedProduct
+                  ? selectedProduct.matchInfo.allergyWarnings
+                  : [];
+
+                return (
+                  <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
+                    <div className="p-4 md:p-5">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={item.in_cart}
+                          onCheckedChange={() => handleToggleCart(item.id, item.in_cart)}
+                          className="mt-1 h-6 w-6 md:h-5 md:w-5 rounded-md touch-target"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-muted-foreground mb-1">Du søkte etter:</p>
+                              <h3 className={`text-base md:text-lg font-semibold truncate ${item.in_cart ? "line-through text-muted-foreground" : ""}`}>
+                                {item.name}
+                              </h3>
+                              {item.in_cart && (
+                                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 rounded-full mt-1 text-xs">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  I handlekurv
+                                </Badge>
+                              )}
+                            </div>
+                            {selectedProduct && (
+                              <Badge className={`${getNovaColor(selectedProduct.novaScore)} rounded-full px-2 md:px-3 py-1 text-xs flex-shrink-0`}>
+                                NOVA {selectedProduct.novaScore}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        {selectedProduct && (
-                          <Badge className={`${getNovaColor(selectedProduct.novaScore)} rounded-full px-2 md:px-3 py-1 text-xs flex-shrink-0`}>
-                            NOVA {selectedProduct.novaScore}
-                          </Badge>
-                        )}
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {selectedProduct ? (
-                  <div className="px-4 pb-4 md:px-5 md:pb-5 space-y-3">
-                    {/* Show allergen warning if ALL products have allergen warnings */}
-                    {allHaveAllergyWarnings && (
-                      <AllergyWarningBanner allergyWarnings={commonAllergyWarnings} />
-                    )}
-                    
-                    {selectedProduct.novaScore > 2 && (
-                      <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl">
-                        <div className="flex items-center gap-2 text-destructive">
-                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                          <p className="text-xs font-medium">
-                            Sterkt bearbeidet produkt (NOVA {selectedProduct.novaScore})
+                    {selectedProduct ? (
+                      <div className="px-4 pb-4 md:px-5 md:pb-5 space-y-3">
+                        {/* Show allergen warning if ALL products have allergen warnings */}
+                        {allHaveAllergyWarnings && (
+                          <AllergyWarningBanner allergyWarnings={commonAllergyWarnings} />
+                        )}
+                        
+                        {selectedProduct.novaScore > 2 && (
+                          <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl">
+                            <div className="flex items-center gap-2 text-destructive">
+                              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                              <p className="text-xs font-medium">
+                                Sterkt bearbeidet produkt (NOVA {selectedProduct.novaScore})
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                          className={`${
+                            selectedProduct.matchInfo.allergyWarnings.length > 0 
+                              ? 'bg-destructive/5 border-destructive/30' 
+                              : selectedProduct.novaScore <= 2 
+                                ? 'bg-primary/5 border-primary/20' 
+                                : 'bg-secondary border-border'
+                          } border-2 p-3 md:p-4 rounded-xl cursor-pointer active:scale-[0.98] transition-all`}
+                        >
+                          <div className="flex gap-3">
+                            <div className="bg-white p-2 rounded-lg border border-border flex-shrink-0">
+                              <img
+                                src={selectedProduct.image || '/placeholder.svg'}
+                                alt={selectedProduct.name}
+                                className="w-14 h-14 md:w-16 md:h-16 object-contain"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                {selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
+                                <span className="text-xs font-medium text-muted-foreground truncate">
+                                  {getNovaLabel(selectedProduct.novaScore)}
+                                </span>
+                              </div>
+                              <p className="font-semibold text-foreground mb-1 truncate">{selectedProduct.brand}</p>
+                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
+                              
+                              {/* Preference indicators */}
+                              <PreferenceIndicators 
+                                matchInfo={selectedProduct.matchInfo} 
+                                userPreferences={profile?.preferences as UserPreferences | null}
+                                compact
+                              />
+                              
+                              <div className="flex items-center justify-between gap-2 mt-2">
+                                <p className="text-base font-bold text-primary">
+                                  {selectedProduct.price !== null ? `${selectedProduct.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
+                                </p>
+                                <Badge variant="outline" className="rounded-full text-xs flex-shrink-0">
+                                  Detaljer →
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {alternatives.length > 0 && (
+                          <div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleExpanded(item.id)}
+                              className="w-full justify-between rounded-xl hover:bg-secondary h-11 touch-target"
+                            >
+                              <span className="text-sm">
+                                {alternatives.length} {alternatives.length === 1 ? 'alternativ' : 'alternativer'}
+                              </span>
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+
+                            {isExpanded && (
+                              <div className="mt-2 space-y-2">
+                                {alternatives.map((suggestion) => {
+                                  const originalIndex = suggestions.findIndex(s => s.ean === suggestion.ean);
+                                  const hasAllergyWarning = suggestion.matchInfo.allergyWarnings.length > 0;
+                                  return (
+                                    <div
+                                      key={suggestion.ean}
+                                      onClick={() => handleSelectProduct(item.id, originalIndex)}
+                                      className={`${
+                                        hasAllergyWarning 
+                                          ? 'bg-destructive/5 border-destructive/30' 
+                                          : 'bg-secondary border-border'
+                                      } border p-3 rounded-xl cursor-pointer active:scale-[0.98] transition-all touch-target`}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="bg-white p-1 rounded-lg border border-border flex-shrink-0">
+                                          <img
+                                            src={suggestion.image || '/placeholder.svg'}
+                                            alt={suggestion.name}
+                                            className="w-10 h-10 md:w-12 md:h-12 object-contain"
+                                          />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-semibold truncate">{suggestion.brand}</p>
+                                          <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>
+                                          <p className="text-sm font-bold text-primary mt-1">
+                                            {suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
+                                          </p>
+                                        </div>
+                                        <Badge className={`${getNovaColor(suggestion.novaScore)} rounded-full flex-shrink-0`}>
+                                          {suggestion.novaScore}
+                                        </Badge>
+                                      </div>
+                                      <PreferenceIndicators 
+                                        matchInfo={suggestion.matchInfo} 
+                                        userPreferences={profile?.preferences as UserPreferences | null}
+                                        compact
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="px-4 pb-4 md:px-5 md:pb-5">
+                        <div className="bg-secondary/50 p-4 rounded-xl border border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Ingen produkter funnet for "{item.name}"
                           </p>
                         </div>
                       </div>
                     )}
-
-                    <div
-                      onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
-                      className={`${
-                        selectedProduct.matchInfo.allergyWarnings.length > 0 
-                          ? 'bg-destructive/5 border-destructive/30' 
-                          : selectedProduct.novaScore <= 2 
-                            ? 'bg-primary/5 border-primary/20' 
-                            : 'bg-secondary border-border'
-                      } border-2 p-3 md:p-4 rounded-xl cursor-pointer active:scale-[0.98] transition-all`}
-                    >
-                      <div className="flex gap-3">
-                        <div className="bg-white p-2 rounded-lg border border-border flex-shrink-0">
-                          <img
-                            src={selectedProduct.image || '/placeholder.svg'}
-                            alt={selectedProduct.name}
-                            className="w-14 h-14 md:w-16 md:h-16 object-contain"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            {selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
-                            <span className="text-xs font-medium text-muted-foreground truncate">
-                              {getNovaLabel(selectedProduct.novaScore)}
-                            </span>
-                          </div>
-                          <p className="font-semibold text-foreground mb-1 truncate">{selectedProduct.brand}</p>
-                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
-                          
-                          {/* Preference indicators */}
-                          <PreferenceIndicators 
-                            matchInfo={selectedProduct.matchInfo} 
-                            userPreferences={profile?.preferences as UserPreferences | null}
-                            compact
-                          />
-                          
-                          <div className="flex items-center justify-between gap-2 mt-2">
-                            <p className="text-base font-bold text-primary">
-                              {selectedProduct.price !== null ? `${selectedProduct.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
-                            </p>
-                            <Badge variant="outline" className="rounded-full text-xs flex-shrink-0">
-                              Detaljer →
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {alternatives.length > 0 && (
-                      <div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleExpanded(item.id)}
-                          className="w-full justify-between rounded-xl hover:bg-secondary h-11 touch-target"
-                        >
-                          <span className="text-sm">
-                            {alternatives.length} {alternatives.length === 1 ? 'alternativ' : 'alternativer'}
-                          </span>
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-
-                        {isExpanded && (
-                          <div className="mt-2 space-y-2">
-                            {alternatives.map((suggestion) => {
-                              const originalIndex = suggestions.findIndex(s => s.ean === suggestion.ean);
-                              const hasAllergyWarning = suggestion.matchInfo.allergyWarnings.length > 0;
-                              return (
-                                <div
-                                  key={suggestion.ean}
-                                  onClick={() => handleSelectProduct(item.id, originalIndex)}
-                                  className={`${
-                                    hasAllergyWarning 
-                                      ? 'bg-destructive/5 border-destructive/30' 
-                                      : 'bg-secondary border-border'
-                                  } border p-3 rounded-xl cursor-pointer active:scale-[0.98] transition-all touch-target`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className="bg-white p-1 rounded-lg border border-border flex-shrink-0">
-                                      <img
-                                        src={suggestion.image || '/placeholder.svg'}
-                                        alt={suggestion.name}
-                                        className="w-10 h-10 md:w-12 md:h-12 object-contain"
-                                      />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-semibold truncate">{suggestion.brand}</p>
-                                      <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>
-                                      <p className="text-sm font-bold text-primary mt-1">
-                                        {suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
-                                      </p>
-                                    </div>
-                                    <Badge className={`${getNovaColor(suggestion.novaScore)} rounded-full flex-shrink-0`}>
-                                      {suggestion.novaScore}
-                                    </Badge>
-                                  </div>
-                                  <PreferenceIndicators 
-                                    matchInfo={suggestion.matchInfo} 
-                                    userPreferences={profile?.preferences as UserPreferences | null}
-                                    compact
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                ) : (
-                  <div className="px-4 pb-4 md:px-5 md:pb-5">
-                    <div className="bg-secondary/50 p-4 rounded-xl border border-border">
-                      <p className="text-sm text-muted-foreground">
-                        Ingen produkter funnet for "{item.name}"
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          ))}
 
           {items.length === 0 && (
             <div className="bg-card border-2 border-border rounded-2xl p-8 text-center">
