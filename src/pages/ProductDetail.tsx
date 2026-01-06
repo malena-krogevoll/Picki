@@ -263,22 +263,58 @@ export default function ProductDetail() {
           </CardContent>
         </Card>
 
-        {/* Allergens */}
-        {product.allergens && product.allergens.filter(a => a.contains === "YES").length > 0 && (
+        {/* Detected Allergens from Ingredients */}
+        {product.ingredients && (
           <Card>
             <CardHeader>
-              <CardTitle>Allergener</CardTitle>
+              <CardTitle>Allergener (fra ingredienslisten)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {product.allergens
-                  .filter(allergen => allergen.contains === "YES")
-                  .map((allergen, idx) => (
-                    <Badge key={idx} variant="destructive" className="rounded-full">
-                      {allergen.display_name || allergen.code}
-                    </Badge>
-                  ))}
-              </div>
+              {(() => {
+                const allergenMapping: Record<string, string[]> = {
+                  "Gluten": ["hvete", "rug", "bygg", "havre", "spelt", "gluten", "mel", "semule", "durumhvete"],
+                  "Melk": ["melk", "laktose", "fløte", "smør", "ost", "kasein", "myse", "kremfløte", "rømme", "yoghurt"],
+                  "Egg": ["egg", "eggehvite", "eggeplomme", "majonese"],
+                  "Nøtter": ["mandel", "hasselnøtt", "valnøtt", "cashew", "pistasjnøtt", "pekannøtt", "macadamia", "nøtter"],
+                  "Peanøtter": ["peanøtt", "peanøtter", "jordnøtt", "jordnøtter"],
+                  "Skalldyr": ["reke", "krabbe", "hummer", "skjell", "østers", "sjøkreps", "scampi"],
+                  "Fisk": ["fisk", "torsk", "laks", "makrell", "sild", "sei", "hyse", "kveite", "ørret"],
+                  "Soya": ["soya", "soyabønne", "soyaprotein", "soyaolje", "soyalecitin"],
+                  "Sesam": ["sesam", "sesamfrø", "sesamolje"],
+                  "Selleri": ["selleri", "sellerisalt"],
+                  "Sennep": ["sennep", "sennepsfrø"],
+                  "Lupin": ["lupin", "lupinfrø"],
+                  "Bløtdyr": ["blekksprut", "blåskjell", "muslinger", "snegler", "kamskjell"],
+                  "Sulfitt": ["sulfitt", "svoveldioksid", "e220", "e221", "e222", "e223", "e224", "e225", "e226", "e227", "e228"]
+                };
+                
+                const ingredientsLower = product.ingredients.toLowerCase();
+                const detectedAllergens: string[] = [];
+                
+                for (const [allergen, keywords] of Object.entries(allergenMapping)) {
+                  if (keywords.some(kw => ingredientsLower.includes(kw))) {
+                    detectedAllergens.push(allergen);
+                  }
+                }
+                
+                if (detectedAllergens.length === 0) {
+                  return (
+                    <p className="text-muted-foreground text-sm">
+                      Ingen kjente allergener funnet i ingredienslisten
+                    </p>
+                  );
+                }
+                
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    {detectedAllergens.map((allergen, idx) => (
+                      <Badge key={idx} variant="destructive" className="rounded-full">
+                        {allergen}
+                      </Badge>
+                    ))}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
