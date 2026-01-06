@@ -111,9 +111,10 @@ export const storeLayoutOrder: StoreCategory[] = [
     category: "Snacks og godteri",
     emoji: "🍫",
     keywords: [
-      "chips", "popcorn", "nøtter", "snacks", "sjokolade", "kvikk lunsj", "daim",
+      "chips", "potetgull", "popcorn", "nøtter", "snacks", "sjokolade", "kvikk lunsj", "daim",
       "smash", "twist", "non-stop", "seigmenn", "lakris", "tyggegummi", "drops",
-      "kjeks", "cookies", "vafler", "is", "godteri", "smågodt"
+      "kjeks", "cookies", "vafler", "is", "godteri", "smågodt", "maarud", "kims",
+      "sørlandschips", "diplom-is", "hennig-olsen"
     ]
   },
   {
@@ -157,17 +158,28 @@ export function categorizeProduct(
     productBrand || ''
   ].join(' ').toLowerCase();
 
+  // Finn den lengste matchende keyword for å unngå at "potet" matcher før "potetgull"
+  let bestMatch: { categoryIndex: number; keywordLength: number } | null = null;
+
   for (let i = 0; i < storeLayoutOrder.length; i++) {
     const category = storeLayoutOrder[i];
     for (const keyword of category.keywords) {
-      if (searchText.includes(keyword.toLowerCase())) {
-        return {
-          category: category.category,
-          emoji: category.emoji,
-          sortOrder: i
-        };
+      const keywordLower = keyword.toLowerCase();
+      if (searchText.includes(keywordLower)) {
+        if (!bestMatch || keywordLower.length > bestMatch.keywordLength) {
+          bestMatch = { categoryIndex: i, keywordLength: keywordLower.length };
+        }
       }
     }
+  }
+
+  if (bestMatch) {
+    const category = storeLayoutOrder[bestMatch.categoryIndex];
+    return {
+      category: category.category,
+      emoji: category.emoji,
+      sortOrder: bestMatch.categoryIndex
+    };
   }
 
   // Ukjent kategori kommer til slutt
