@@ -264,18 +264,20 @@ export default function ProductDetail() {
         </Card>
 
         {/* Allergens */}
-        {product.allergens && product.allergens.length > 0 && (
+        {product.allergens && product.allergens.filter(a => a.contains === "YES").length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>Allergener</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {product.allergens.map((allergen, idx) => (
-                  <Badge key={idx} variant="destructive" className="rounded-full">
-                    {allergen.display_name || allergen.code}
-                  </Badge>
-                ))}
+                {product.allergens
+                  .filter(allergen => allergen.contains === "YES")
+                  .map((allergen, idx) => (
+                    <Badge key={idx} variant="destructive" className="rounded-full">
+                      {allergen.display_name || allergen.code}
+                    </Badge>
+                  ))}
               </div>
             </CardContent>
           </Card>
