@@ -269,7 +269,7 @@ export default function ProductDetail() {
             <CardHeader>
               <CardTitle>Allergener (fra ingredienslisten)</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               {(() => {
                 const allergenMapping: Record<string, string[]> = {
                   "Gluten": ["hvete", "rug", "bygg", "havre", "spelt", "gluten", "mel", "semule", "durumhvete"],
@@ -315,6 +315,14 @@ export default function ProductDetail() {
                   </div>
                 );
               })()}
+              
+              <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg border border-border">
+                <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  Allergeninformasjon er hentet automatisk fra ingredienslisten og kan inneholde feil. 
+                  Sjekk alltid produktets emballasje før bruk. Picki kan ikke garantere at produkter er fri for allergener.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
