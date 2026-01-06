@@ -15,6 +15,15 @@ import { analyzeProductMatch, sortProductsByPreference, MatchInfo, UserPreferenc
 import { PreferenceIndicators, AllergyWarningBanner } from "@/components/PreferenceIndicators";
 import { groupItemsByCategory } from "@/lib/storeLayoutSort";
 
+interface ItemIntent {
+  original: string;
+  primaryProduct: string;
+  productCategory: string;
+  alternativeTerms: string[];
+  excludePatterns: string[];
+  isGenericTerm: boolean;
+}
+
 interface ProductSuggestion {
   ean: string;
   brand: string;
@@ -74,17 +83,51 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       setLoading(true);
 
       try {
+        // Step 1: Batch analyze all item names with AI
+        const itemNames = items.map(i => i.name);
+        let intentMap: Map<string, ItemIntent> = new Map();
+        
+        try {
+          console.log("Fetching AI intents for items:", itemNames);
+          const { data: intentData, error: intentError } = await supabase.functions.invoke('analyze-shopping-intent', {
+            body: { items: itemNames }
+          });
+          
+          if (!intentError && intentData?.intents) {
+            console.log("AI intent analysis:", {
+              cached: intentData.cached,
+              aiProcessed: intentData.aiProcessed,
+              estimatedCost: intentData.estimatedCost
+            });
+            
+            // Create a map from item name to intent
+            for (const intent of intentData.intents as ItemIntent[]) {
+              intentMap.set(intent.original.toLowerCase(), intent);
+            }
+          } else {
+            console.warn("Intent analysis failed, falling back to basic search:", intentError);
+          }
+        } catch (intentErr) {
+          console.error("Intent analysis error:", intentErr);
+          // Continue with basic search if AI fails
+        }
+
+        // Step 2: Search products with AI intent data
         const productPromises = items.map(async (item) => {
           try {
             const timeoutPromise = new Promise((_, reject) => {
               setTimeout(() => reject(new Error('Request timeout')), 8000);
             });
 
+            // Get intent for this item (if available)
+            const intent = intentMap.get(item.name.toLowerCase());
+
             const fetchPromise = supabase.functions.invoke('search-products', {
               body: {
                 query: item.name,
                 storeId,
-                userPreferences: profile?.preferences
+                userPreferences: profile?.preferences,
+                intent // Pass AI intent to search-products
               }
             });
 
@@ -97,7 +140,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
               // Transform API response and get real NOVA classification for each product
               const productsWithNova: ProductSuggestion[] = await Promise.all(
                 data.results
-                  .filter((r: any) => r.product)
+                  .filter((r: any) => r.product && r.score > -50) // Filter out heavily penalized products
                   .map(async (r: any) => {
                     let novaScore = 2; // Fallback only if no ingredients
                     const ingredienser = r.product.Ingrediensliste || '';

@@ -17,6 +17,16 @@ interface SearchRequest {
     priority_order?: string[];
     other_preferences?: Record<string, unknown>;
   };
+  intent?: ItemIntent;
+}
+
+interface ItemIntent {
+  original: string;
+  primaryProduct: string;
+  productCategory: string;
+  alternativeTerms: string[];
+  excludePatterns: string[];
+  isGenericTerm: boolean;
 }
 
 interface Product {
@@ -265,12 +275,12 @@ serve(async (req) => {
     const kassalappApiKey = Deno.env.get("KASSALAPP_API_KEY")!;
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    const { query, storeCode, storeId, userPreferences }: SearchRequest = await req.json();
+    const { query, storeCode, storeId, userPreferences, intent }: SearchRequest = await req.json();
     const effectiveStoreCode = storeCode ?? storeId;
     const originalQuery = (query ?? "").toString().trim();
     let effectiveQuery = originalQuery;
 
-    console.log("Search request:", { query: originalQuery, storeCode: effectiveStoreCode, userPreferences });
+    console.log("Search request:", { query: originalQuery, storeCode: effectiveStoreCode, hasIntent: !!intent, userPreferences });
 
     if (!originalQuery) {
       return new Response(JSON.stringify({ error: "Query is required" }), {
@@ -325,8 +335,10 @@ serve(async (req) => {
       console.log(`After food filter: ${kassalappProducts.length} products for store ${effectiveStoreCode}`);
 
       for (const product of kassalappProducts) {
-        // Bruk original query for scoring, men produkter funnet via synonymer får også poeng
-        const candidate = processProduct(product, originalQuery, userPreferences);
+        // Use intent-based scoring if available, otherwise fall back to basic scoring
+        const candidate = intent 
+          ? processProductWithIntent(product, originalQuery, intent, userPreferences)
+          : processProduct(product, originalQuery, userPreferences);
         allCandidates.push(candidate);
         if (candidate.score >= 50) {
           candidates.push(candidate);
@@ -546,6 +558,147 @@ function processProduct(product: Product, query: string, userPreferences?: any):
     availability,
     matchReason: getMatchReason(productName, query, score),
   };
+}
+
+// NEW: Intent-based product scoring for semantic search
+function processProductWithIntent(
+  product: Product, 
+  query: string, 
+  intent: ItemIntent, 
+  userPreferences?: any
+): ProductCandidate {
+  const productName = product.Produktnavn || "";
+  const allergies = product["Allergener/Kosthold"] || "";
+  const ingredients = product.Ingrediensliste || "";
+  const filters = product.Tilleggsfiltre || "";
+  const price = product.Pris || "0";
+  const category = product.Kategori || "";
+
+  let score = 0;
+  const nameLower = productName.toLowerCase();
+  const categoryLower = category.toLowerCase();
+
+  // 1. Category match (50 points)
+  if (matchesCategory(categoryLower, intent.productCategory)) {
+    score += 50;
+  }
+
+  // 2. Exclude patterns - HEAVY penalty (-100 points per match)
+  for (const pattern of intent.excludePatterns) {
+    if (nameLower.includes(pattern.toLowerCase())) {
+      score -= 100;
+      console.log(`Excluding "${productName}" for pattern "${pattern}"`);
+    }
+  }
+
+  // 3. Primary product match (80 points)
+  const primaryLower = intent.primaryProduct.toLowerCase();
+  if (nameLower.includes(primaryLower) || primaryLower.includes(nameLower.split(' ')[0])) {
+    score += 80;
+  }
+
+  // 4. Alternative terms match (30 points, max once)
+  for (const alt of intent.alternativeTerms) {
+    if (nameLower.includes(alt.toLowerCase())) {
+      score += 30;
+      break;
+    }
+  }
+
+  // 5. Original query match (for relevance)
+  const queryLower = query.toLowerCase().trim();
+  if (nameLower.includes(queryLower)) {
+    score += 20;
+  }
+
+  // 6. Generic term handling - boost variety
+  if (intent.isGenericTerm) {
+    // For generic terms, slightly boost based on name length (shorter = more specific)
+    const nameWords = nameLower.split(' ').length;
+    if (nameWords <= 3) score += 10;
+  }
+
+  // 7. User preferences (allergies, diets, etc.)
+  if (userPreferences) {
+    for (const allergy of userPreferences.allergies || []) {
+      if (
+        allergies.toLowerCase().includes(allergy.toLowerCase()) ||
+        ingredients.toLowerCase().includes(allergy.toLowerCase())
+      ) {
+        score = Math.min(score, 0); // Cap at 0, don't go lower for allergens
+        break;
+      }
+    }
+
+    for (const diet of userPreferences.diets || []) {
+      if (
+        diet === "vegetarian" &&
+        (ingredients.toLowerCase().includes("kjøtt") || ingredients.toLowerCase().includes("fisk"))
+      ) {
+        score *= 0.1;
+      }
+      if (
+        diet === "vegan" &&
+        (ingredients.toLowerCase().includes("melk") ||
+          ingredients.toLowerCase().includes("egg") ||
+          ingredients.toLowerCase().includes("kjøtt") ||
+          ingredients.toLowerCase().includes("fisk"))
+      ) {
+        score *= 0.1;
+      }
+    }
+
+    if (userPreferences.renvare_only) {
+      const isRenvare = filters.toLowerCase().includes("renvare") || productName.toLowerCase().includes("renvare");
+      if (!isRenvare) {
+        score *= 0.3;
+      }
+    }
+  }
+
+  const renvareScore = calculateRenvareScore(ingredients, filters);
+  const priceNumeric = parsePrice(price);
+  const availability = product.Tilgjengelighet || "unknown";
+
+  return {
+    product,
+    score,
+    priceNumeric,
+    renvareScore,
+    availability,
+    matchReason: getIntentMatchReason(productName, intent, score),
+  };
+}
+
+// Category matching helper
+function matchesCategory(productCategory: string, intentCategory: string): boolean {
+  const categoryMap: Record<string, string[]> = {
+    "meieri": ["meieri", "melk", "ost", "yoghurt", "fløte", "smør"],
+    "grønnsaker": ["grønnsaker", "frukt og grønt", "frukt", "grønt"],
+    "frukt": ["frukt", "frukt og grønt", "bær"],
+    "kjøtt": ["kjøtt", "ferskvarer", "pålegg", "kjøttvarer"],
+    "fisk": ["fisk", "sjømat", "ferskvarer"],
+    "bakervarer": ["bakervarer", "brød", "bakeriet", "ferske bakervarer"],
+    "snacks": ["snacks", "chips", "godteri", "konfekt", "søtsaker"],
+    "frysemat": ["frysevarer", "frysemat", "is", "frossen"],
+    "drikkevarer": ["drikkevarer", "drikke", "brus", "juice", "kaffe", "te"],
+    "basisvarer": ["tørrmat", "basisvarer", "mel", "sukker", "pasta", "ris"],
+    "egg": ["egg", "meieri", "frokost"],
+  };
+
+  const intentLower = intentCategory.toLowerCase();
+  const allowedCategories = categoryMap[intentLower] || [intentLower];
+  
+  return allowedCategories.some(cat => productCategory.includes(cat));
+}
+
+function getIntentMatchReason(productName: string, intent: ItemIntent, score: number): string {
+  if (score < 0) return "Ekskludert (ikke relevant)";
+  if (score >= 130) return "Perfekt match";
+  if (score >= 100) return "God kategori- og produktmatch";
+  if (score >= 50) return "Kategori match";
+  if (score > 0) return "Mulig match";
+  return "Svak match";
 }
 
 function calculateRenvareScore(ingredients: string, filters: string): number {
