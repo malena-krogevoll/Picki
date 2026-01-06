@@ -220,7 +220,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     toast.success("Handleliste fullført!", {
       description: "Listen er nå arkivert."
     });
-    onBack();
+    navigate("/dashboard");
   };
 
   const allItemsInCart = items.length > 0 && items.every(item => item.in_cart);
