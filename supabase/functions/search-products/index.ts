@@ -590,6 +590,29 @@ function processProductWithIntent(
       console.log(`Excluding "${productName}" for pattern "${pattern}"`);
     }
   }
+  
+  // 2b. Check for compound words - if the query is part of a larger word, penalize heavily
+  // This catches cases like "yogurt" matching "yogurtbrød" even when "brød" isn't in excludePatterns
+  const queryLower = query.toLowerCase().trim();
+  const nameWords = nameLower.split(/[\s\-\/\(\),]+/).filter(w => w.length > 0);
+  const isCompoundMatch = nameWords.some(word => {
+    // Word contains query but is longer (compound word)
+    if (word.includes(queryLower) && word.length > queryLower.length + 2) {
+      // The suffix after the query
+      const suffixStart = word.indexOf(queryLower) + queryLower.length;
+      const suffix = word.substring(suffixStart);
+      // If there's a significant suffix, this is likely a compound word (not what user wants)
+      if (suffix.length >= 3) {
+        console.log(`Compound word penalty for "${productName}" (word: ${word}, suffix: ${suffix})`);
+        return true;
+      }
+    }
+    return false;
+  });
+  
+  if (isCompoundMatch && score > 0) {
+    score -= 80; // Heavy penalty for compound words
+  }
 
   // 3. Primary product match (80 points)
   const primaryLower = intent.primaryProduct.toLowerCase();
@@ -605,17 +628,16 @@ function processProductWithIntent(
     }
   }
 
-  // 5. Original query match (for relevance)
-  const queryLower = query.toLowerCase().trim();
-  if (nameLower.includes(queryLower)) {
+  // 5. Original query match (for relevance) - but not if it's a compound word
+  if (nameLower.includes(queryLower) && !isCompoundMatch) {
     score += 20;
   }
 
   // 6. Generic term handling - boost variety
   if (intent.isGenericTerm) {
     // For generic terms, slightly boost based on name length (shorter = more specific)
-    const nameWords = nameLower.split(' ').length;
-    if (nameWords <= 3) score += 10;
+    const wordCount = nameLower.split(' ').length;
+    if (wordCount <= 3) score += 10;
   }
 
   // 7. User preferences (allergies, diets, etc.)
