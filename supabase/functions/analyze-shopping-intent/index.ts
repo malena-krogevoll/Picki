@@ -38,7 +38,9 @@ const COMMON_INTENTS: Record<string, Omit<ItemIntent, 'original'>> = {
   "melk": { primaryProduct: "melk", productCategory: "meieri", alternativeTerms: ["mjølk", "helmelk", "lettmelk"], excludePatterns: ["sjokolademelk", "havremelk", "mandelmelk"], isGenericTerm: true },
   "ost": { primaryProduct: "gulost", productCategory: "meieri", alternativeTerms: ["cheese", "norvegia", "jarlsberg"], excludePatterns: ["ostepop", "ostesnacks"], isGenericTerm: true },
   "smør": { primaryProduct: "smør", productCategory: "meieri", alternativeTerms: ["meierismør", "bremykt"], excludePatterns: ["smørbrød", "smøreolje"], isGenericTerm: false },
-  "yoghurt": { primaryProduct: "yoghurt", productCategory: "meieri", alternativeTerms: ["yogurt", "gresk yoghurt"], excludePatterns: [], isGenericTerm: true },
+  "yoghurt": { primaryProduct: "yoghurt", productCategory: "meieri", alternativeTerms: ["yogurt", "gresk yoghurt", "youghurt"], excludePatterns: ["yoghurtbrød", "yogurtbrød", "youghurtbrød", "brød"], isGenericTerm: true },
+  "yogurt": { primaryProduct: "yoghurt", productCategory: "meieri", alternativeTerms: ["yoghurt", "gresk yoghurt"], excludePatterns: ["yogurtbrød", "yoghurtbrød", "brød"], isGenericTerm: true },
+  "youghurt": { primaryProduct: "yoghurt", productCategory: "meieri", alternativeTerms: ["yoghurt", "yogurt", "gresk yoghurt"], excludePatterns: ["youghurtbrød", "yoghurtbrød", "yogurtbrød", "brød"], isGenericTerm: true },
   "fløte": { primaryProduct: "fløte", productCategory: "meieri", alternativeTerms: ["kremfløte", "matfløte"], excludePatterns: ["fløtegrateng", "fløteis"], isGenericTerm: false },
   "rømme": { primaryProduct: "rømme", productCategory: "meieri", alternativeTerms: ["lettrømme", "seterrømme"], excludePatterns: [], isGenericTerm: false },
   
