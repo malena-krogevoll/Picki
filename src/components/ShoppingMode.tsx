@@ -112,11 +112,17 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
           // Continue with basic search if AI fails
         }
 
-        // Step 2: Search products with AI intent data
-        const productPromises = items.map(async (item) => {
+        // Step 2: Search products with AI intent data (staggered to avoid rate limiting)
+        const BATCH_SIZE = 3; // Process 3 items at a time
+        const DELAY_BETWEEN_BATCHES = 500; // 500ms between batches
+        
+        const allResults: { itemId: string; products: ProductSuggestion[] }[] = [];
+        
+        // Helper function to process a single item
+        const processItem = async (item: typeof items[0]) => {
           try {
             const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Request timeout')), 8000);
+              setTimeout(() => reject(new Error('Request timeout')), 15000); // Increased timeout
             });
 
             // Get intent for this item (if available)
@@ -135,7 +141,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
             if (error) {
               console.error('Error fetching products for', item.name, error);
-              return { itemId: item.id, products: [] };
+              return { itemId: item.id, products: [] as ProductSuggestion[] };
             } else if (data?.results && data.results.length > 0) {
               // Transform API response and get real NOVA classification for each product
               const productsWithNova: ProductSuggestion[] = await Promise.all(
@@ -196,25 +202,49 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
               
               return { itemId: item.id, products: sortedProducts };
             } else {
-              return { itemId: item.id, products: [] };
+              return { itemId: item.id, products: [] as ProductSuggestion[] };
             }
           } catch (err) {
             console.error('Error fetching products for', item.name, err);
-            toast.error(`Kunne ikke hente produkter for "${item.name}"`);
-            return { itemId: item.id, products: [] };
+            return { itemId: item.id, products: [] as ProductSuggestion[] };
           }
-        });
+        };
 
-        const allResults = await Promise.all(productPromises);
+        // Process items in batches to avoid rate limiting
+        for (let i = 0; i < items.length; i += BATCH_SIZE) {
+          if (!isMounted) break;
+          
+          const batch = items.slice(i, i + BATCH_SIZE);
+          const batchResults = await Promise.all(batch.map(processItem));
+          allResults.push(...batchResults);
+          
+          // Update UI with partial results as they come in
+          if (isMounted && batchResults.length > 0) {
+            setProductData(prev => {
+              const updated = { ...prev };
+              batchResults.forEach(({ itemId, products }) => {
+                updated[itemId] = products;
+              });
+              return updated;
+            });
+          }
+          
+          // Wait between batches (except for the last one)
+          if (i + BATCH_SIZE < items.length) {
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
+          }
+        }
 
         if (!isMounted) return;
 
-        const results: Record<string, ProductSuggestion[]> = {};
-        allResults.forEach(({ itemId, products }) => {
-          results[itemId] = products;
-        });
-
-        setProductData(results);
+        // Final update with all results
+        if (isMounted) {
+          const results: Record<string, ProductSuggestion[]> = {};
+          allResults.forEach(({ itemId, products }) => {
+            results[itemId] = products;
+          });
+          setProductData(results);
+        }
       } catch (error) {
         console.error('Error in fetchProducts:', error);
       } finally {
