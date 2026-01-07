@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, AlertTriangle, Leaf, ChefHat, Zap } from "lucide-react";
+import { Clock, Users, AlertTriangle, Leaf, ChefHat, Zap, Gauge } from "lucide-react";
 import { Recipe } from "@/hooks/useRecipes";
 
 interface RecipeCardEnhancedProps {
@@ -12,10 +12,47 @@ interface RecipeCardEnhancedProps {
   onClick: () => void;
 }
 
+type Difficulty = "lett" | "middels" | "vanskelig";
+
+const getDifficulty = (recipe: Recipe): Difficulty => {
+  const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
+  const stepsCount = recipe.steps?.length || 0;
+  
+  // Calculate difficulty based on time and steps
+  if (totalTime <= 30 && stepsCount <= 5) {
+    return "lett";
+  } else if (totalTime > 60 || stepsCount > 10) {
+    return "vanskelig";
+  }
+  return "middels";
+};
+
+const difficultyConfig: Record<Difficulty, { label: string; color: string; bars: number }> = {
+  lett: { label: "Lett", color: "text-green-600", bars: 1 },
+  middels: { label: "Middels", color: "text-amber-600", bars: 2 },
+  vanskelig: { label: "Vanskelig", color: "text-red-600", bars: 3 },
+};
+
+const DifficultyIndicator = ({ difficulty }: { difficulty: Difficulty }) => {
+  const config = difficultyConfig[difficulty];
+  
+  return (
+    <div className={`flex items-center gap-1 ${config.color}`}>
+      <div className="flex items-end gap-0.5 h-4">
+        <div className={`w-1 rounded-sm ${config.bars >= 1 ? "bg-current h-2" : "bg-muted h-2"}`} />
+        <div className={`w-1 rounded-sm ${config.bars >= 2 ? "bg-current h-3" : "bg-muted h-3"}`} />
+        <div className={`w-1 rounded-sm ${config.bars >= 3 ? "bg-current h-4" : "bg-muted h-4"}`} />
+      </div>
+      <span className="text-xs">{config.label}</span>
+    </div>
+  );
+};
+
 export const RecipeCardEnhanced = ({ recipe, onClick }: RecipeCardEnhancedProps) => {
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const isQuickRecipe = totalTime > 0 && totalTime < 30;
   const hasWarnings = recipe._hasWarnings || false;
+  const difficulty = getDifficulty(recipe);
 
   return (
     <Card
@@ -43,7 +80,8 @@ export const RecipeCardEnhanced = ({ recipe, onClick }: RecipeCardEnhancedProps)
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+          <DifficultyIndicator difficulty={difficulty} />
           {isQuickRecipe && (
             <div className="flex items-center gap-1 text-amber-600">
               <Zap className="w-4 h-4" />
