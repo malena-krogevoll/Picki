@@ -82,6 +82,7 @@ const Profile = () => {
   const [lowestPrice, setLowestPrice] = useState(false);
   const [animalWelfare, setAnimalWelfare] = useState(false);
   const [priorityOrder, setPriorityOrder] = useState<string[]>([]);
+  const [householdSize, setHouseholdSize] = useState<number>(2);
   const [saving, setSaving] = useState(false);
 
   const sensors = useSensors(
@@ -104,6 +105,7 @@ const Profile = () => {
       setOrganic(profile.preferences.other_preferences?.organic || false);
       setLowestPrice(profile.preferences.other_preferences?.lowest_price || false);
       setAnimalWelfare(profile.preferences.other_preferences?.animal_welfare || false);
+      setHouseholdSize(profile.preferences.household_size || 2);
 
       const savedOrder = profile.preferences.priority_order || [];
       const orderWithoutCleanFood = savedOrder.filter(item => item !== "clean_food");
@@ -184,6 +186,7 @@ const Profile = () => {
         animal_welfare: animalWelfare
       },
       priority_order: finalPriorityOrder,
+      household_size: householdSize,
     });
     setSaving(false);
   };
@@ -253,6 +256,35 @@ const Profile = () => {
                     </Label>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Husstandsstørrelse</Label>
+              <p className="text-sm text-muted-foreground">
+                Standard antall porsjoner for middagsoppskrifter
+              </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setHouseholdSize(Math.max(1, householdSize - 1))}
+                  disabled={householdSize <= 1}
+                >
+                  -
+                </Button>
+                <span className="text-2xl font-semibold w-12 text-center">{householdSize}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setHouseholdSize(Math.min(12, householdSize + 1))}
+                  disabled={householdSize >= 12}
+                >
+                  +
+                </Button>
+                <span className="text-muted-foreground">personer</span>
               </div>
             </div>
 

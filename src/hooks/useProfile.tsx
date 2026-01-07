@@ -13,6 +13,7 @@ export interface UserProfile {
       animal_welfare?: boolean;
     };
     priority_order: string[];
+    household_size?: number;
   };
 }
 
