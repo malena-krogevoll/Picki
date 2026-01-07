@@ -3,14 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Clock, Users, Plus } from "lucide-react";
-import { Recipe } from "@/pages/DinnerExplorer";
+import { LegacyRecipe } from "@/components/RecipeCard";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { removeUnitsFromIngredient } from "@/utils/ingredientUtils";
 
 interface RecipeDetailProps {
-  recipe: Recipe;
+  recipe: LegacyRecipe;
   onBack: () => void;
 }
 

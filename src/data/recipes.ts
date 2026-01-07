@@ -1,6 +1,6 @@
-import { Recipe } from "@/pages/DinnerExplorer";
+import { LegacyRecipe } from "@/components/RecipeCard";
 
-export const recipes: Recipe[] = [
+export const recipes: LegacyRecipe[] = [
   {
     id: "1",
     title: "Bakt laks med grønnsaker",

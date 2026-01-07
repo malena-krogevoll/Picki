@@ -1,9 +1,22 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, Users } from "lucide-react";
-import { Recipe } from "@/pages/DinnerExplorer";
+
+// Legacy Recipe interface for backwards compatibility with hardcoded recipes
+export interface LegacyRecipe {
+  id: string;
+  title: string;
+  description: string;
+  servings: number;
+  prepTime: number;
+  cookTime: number;
+  ingredients: string[];
+  steps: string[];
+  category: string;
+  image?: string;
+}
 
 interface RecipeCardProps {
-  recipe: Recipe;
+  recipe: LegacyRecipe;
   onClick: () => void;
 }
 

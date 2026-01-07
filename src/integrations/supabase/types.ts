@@ -35,6 +35,114 @@ export type Database = {
         }
         Relationships: []
       }
+      recipe_ingredients: {
+        Row: {
+          allergens: string[] | null
+          base_product_id: string | null
+          created_at: string
+          id: string
+          is_optional: boolean | null
+          name: string
+          quantity: string | null
+          recipe_id: string
+          unit: string | null
+        }
+        Insert: {
+          allergens?: string[] | null
+          base_product_id?: string | null
+          created_at?: string
+          id?: string
+          is_optional?: boolean | null
+          name: string
+          quantity?: string | null
+          recipe_id: string
+          unit?: string | null
+        }
+        Update: {
+          allergens?: string[] | null
+          base_product_id?: string | null
+          created_at?: string
+          id?: string
+          is_optional?: boolean | null
+          name?: string
+          quantity?: string | null
+          recipe_id?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_ingredients_base_product_id_fkey"
+            columns: ["base_product_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_ingredients_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipes: {
+        Row: {
+          allergens: string[] | null
+          category: string
+          cook_time: number | null
+          created_at: string
+          description: string | null
+          diet_tags: string[] | null
+          id: string
+          image_url: string | null
+          prep_time: number | null
+          recipe_type: string
+          replaces: string | null
+          servings: number | null
+          status: string
+          steps: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          allergens?: string[] | null
+          category: string
+          cook_time?: number | null
+          created_at?: string
+          description?: string | null
+          diet_tags?: string[] | null
+          id?: string
+          image_url?: string | null
+          prep_time?: number | null
+          recipe_type?: string
+          replaces?: string | null
+          servings?: number | null
+          status?: string
+          steps?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          allergens?: string[] | null
+          category?: string
+          cook_time?: number | null
+          created_at?: string
+          description?: string | null
+          diet_tags?: string[] | null
+          id?: string
+          image_url?: string | null
+          prep_time?: number | null
+          recipe_type?: string
+          replaces?: string | null
+          servings?: number | null
+          status?: string
+          steps?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shopping_list_items: {
         Row: {
           created_at: string | null
@@ -105,6 +213,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_recipe_substitutions: {
+        Row: {
+          created_at: string
+          id: string
+          recipe_id: string
+          substitutions: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recipe_id: string
+          substitutions?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recipe_id?: string
+          substitutions?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_recipe_substitutions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

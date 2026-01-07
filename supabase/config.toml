@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.analyze-shopping-intent]
 verify_jwt = false
+
+[functions.generate-recipe]
+verify_jwt = false
+
+[functions.suggest-substitutions]
+verify_jwt = false
