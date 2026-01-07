@@ -21,6 +21,7 @@ const DinnerExplorer = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showOnlyCompatible, setShowOnlyCompatible] = useState(false);
+  const [showOnlyQuick, setShowOnlyQuick] = useState(false);
 
   const userPreferences = profile?.preferences ? {
     allergies: profile.preferences.allergies || [],
@@ -56,8 +57,16 @@ const DinnerExplorer = () => {
       result = result.filter(r => !(r as any)._hasWarnings);
     }
 
+    // Filter by quick recipes (under 30 min)
+    if (showOnlyQuick) {
+      result = result.filter(r => {
+        const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
+        return totalTime > 0 && totalTime < 30;
+      });
+    }
+
     return result;
-  }, [recipes, activeTab, searchQuery, selectedCategory, showOnlyCompatible, userPreferences]);
+  }, [recipes, activeTab, searchQuery, selectedCategory, showOnlyCompatible, showOnlyQuick, userPreferences]);
 
   const categories = useMemo(() => {
     const typeRecipes = getRecipesByType(activeTab as "dinner" | "base" | "diy");
@@ -146,6 +155,9 @@ const DinnerExplorer = () => {
                   showOnlyCompatible={showOnlyCompatible}
                   onCompatibleChange={setShowOnlyCompatible}
                   hasPreferences={!!hasPreferences}
+                  showOnlyQuick={showOnlyQuick}
+                  onQuickChange={setShowOnlyQuick}
+                  activeTab={activeTab}
                 />
               </div>
 
