@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, AlertTriangle, Leaf, ChefHat } from "lucide-react";
+import { Clock, Users, AlertTriangle, Leaf, ChefHat, Zap } from "lucide-react";
 import { Recipe } from "@/hooks/useRecipes";
 
 interface RecipeCardEnhancedProps {
@@ -14,6 +14,7 @@ interface RecipeCardEnhancedProps {
 
 export const RecipeCardEnhanced = ({ recipe, onClick }: RecipeCardEnhancedProps) => {
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
+  const isQuickRecipe = totalTime > 0 && totalTime < 30;
   const hasWarnings = recipe._hasWarnings || false;
 
   return (
@@ -43,6 +44,12 @@ export const RecipeCardEnhanced = ({ recipe, onClick }: RecipeCardEnhancedProps)
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-4 text-sm text-muted-foreground">
+          {isQuickRecipe && (
+            <div className="flex items-center gap-1 text-amber-600">
+              <Zap className="w-4 h-4" />
+              <span>Rask</span>
+            </div>
+          )}
           {totalTime > 0 && (
             <div className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
