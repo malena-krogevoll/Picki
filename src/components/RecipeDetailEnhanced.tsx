@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2, Minus } from "lucide-react";
 import { Recipe, RecipeIngredient } from "@/hooks/useRecipes";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,6 +35,14 @@ interface RecipeDetailEnhancedProps {
 export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedProps) => {
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
+  
+  // For dinner recipes, use household_size as default. For base/diy, use recipe's servings.
+  const isDinnerRecipe = recipe.recipe_type === "dinner";
+  const defaultServings = isDinnerRecipe 
+    ? (profile?.preferences?.household_size || recipe.servings || 4)
+    : (recipe.servings || 1);
+  
+  const [servings, setServings] = useState<number>(defaultServings);
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(
     new Set(recipe.ingredients?.map(i => i.name) || [])
   );
@@ -46,6 +54,43 @@ export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedPro
   
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const hasWarnings = recipe._hasWarnings || false;
+  const originalServings = recipe.servings || 4;
+  const scaleFactor = servings / originalServings;
+  
+  // Scale ingredient quantity
+  const scaleQuantity = (quantity: string | null): string => {
+    if (!quantity) return "";
+    
+    // Try to parse the quantity as a number
+    const numMatch = quantity.match(/^([\d.,\/]+)\s*(.*)$/);
+    if (!numMatch) return quantity;
+    
+    let numPart = numMatch[1];
+    const textPart = numMatch[2];
+    
+    // Handle fractions like "1/2"
+    if (numPart.includes("/")) {
+      const [numerator, denominator] = numPart.split("/").map(n => parseFloat(n.replace(",", ".")));
+      const scaledValue = (numerator / denominator) * scaleFactor;
+      
+      // Format nicely
+      if (scaledValue === Math.floor(scaledValue)) {
+        return `${scaledValue}${textPart ? " " + textPart : ""}`;
+      }
+      return `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
+    }
+    
+    const num = parseFloat(numPart.replace(",", "."));
+    if (isNaN(num)) return quantity;
+    
+    const scaledValue = num * scaleFactor;
+    
+    // Format: use whole numbers when possible, otherwise 1 decimal
+    if (scaledValue === Math.floor(scaledValue)) {
+      return `${scaledValue}${textPart ? " " + textPart : ""}`;
+    }
+    return `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
+  };
 
   const toggleIngredient = (ingredientName: string) => {
     const newSelected = new Set(selectedIngredients);
@@ -190,12 +235,38 @@ export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedPro
                 <span>Total tid: {totalTime} min</span>
               </div>
             )}
-            {recipe.servings && (
+            {isDinnerRecipe ? (
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setServings(Math.max(1, servings - 1))}
+                  disabled={servings <= 1}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="font-medium min-w-[3ch] text-center">{servings}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setServings(Math.min(20, servings + 1))}
+                  disabled={servings >= 20}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+                <span>porsjoner</span>
+              </div>
+            ) : recipe.servings ? (
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
                 <span>{recipe.servings} porsjoner</span>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -285,7 +356,7 @@ export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedPro
                       display.isSubstituted ? "text-primary" : ""
                     }`}
                   >
-                    {ingredient.quantity} {ingredient.unit} {display.name}
+                    {isDinnerRecipe ? scaleQuantity(ingredient.quantity) : ingredient.quantity} {ingredient.unit} {display.name}
                     {display.isSubstituted && (
                       <span className="text-xs text-muted-foreground ml-2">
                         (erstatter {display.original})
