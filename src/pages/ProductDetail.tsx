@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Leaf, AlertCircle } from "lucide-react";
+import { ArrowLeft, Leaf, AlertCircle, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -30,8 +30,10 @@ interface ProductDetails {
 }
 
 interface NovaClassification {
-  score: number;
+  score: number | null;
   reasoning: string;
+  hasIngredients: boolean;
+  isEstimated: boolean;
   matchedRules: Array<{
     type: string;
     description: string;
@@ -91,25 +93,25 @@ export default function ProductDetail() {
         if (productError) throw productError;
         setProduct(productData);
 
-        // Fetch NOVA classification with reasoning
-        if (productData.ingredients) {
-          const { data: novaResult, error: novaError } = await supabase.functions.invoke(
-            'classify-nova',
-            { body: { ingredients_text: productData.ingredients } }
-          );
+        // Fetch NOVA classification with reasoning (always call, even without ingredients)
+        const { data: novaResult, error: novaError } = await supabase.functions.invoke(
+          'classify-nova',
+          { body: { ingredients_text: productData.ingredients || '' } }
+        );
 
-          if (novaError) {
-            console.error('Error classifying NOVA:', novaError);
-          } else {
-            setNovaData({
-              score: novaResult.nova_group,
-              reasoning: novaResult.reasoning,
-              matchedRules: novaResult.signals.map((s: any) => ({
-                type: s.type,
-                description: s.description
-              }))
-            });
-          }
+        if (novaError) {
+          console.error('Error classifying NOVA:', novaError);
+        } else {
+          setNovaData({
+            score: novaResult.nova_group,
+            reasoning: novaResult.reasoning,
+            hasIngredients: novaResult.has_ingredients,
+            isEstimated: novaResult.is_estimated,
+            matchedRules: (novaResult.signals || []).map((s: any) => ({
+              type: s.type,
+              description: s.description
+            }))
+          });
         }
       } catch (error) {
         console.error('Error fetching product details:', error);
@@ -201,53 +203,77 @@ export default function ProductDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>NOVA-klassifisering</CardTitle>
-                <Badge className={`${getNovaColor(novaData.score)} rounded-full px-4 py-2 text-lg`}>
-                  NOVA {novaData.score}
-                </Badge>
+                {novaData.hasIngredients && novaData.score !== null ? (
+                  <Badge className={`${getNovaColor(novaData.score)} rounded-full px-4 py-2 text-lg`}>
+                    NOVA {novaData.score}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="rounded-full px-4 py-2 text-lg border-dashed">
+                    <HelpCircle className="h-4 w-4 mr-2" />
+                    Ukjent
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className={`p-4 rounded-xl ${novaData.score <= 2 ? 'bg-primary/10 border border-primary/20' : 'bg-destructive/10 border border-destructive/20'}`}>
-                <div className="flex items-start gap-3">
-                  {novaData.score <= 2 ? (
-                    <Leaf className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-1" />
-                  )}
-                  <div>
-                    <h3 className="font-semibold mb-1">{getNovaLabel(novaData.score)}</h3>
-                    <p className="text-sm text-muted-foreground">{getNovaDescription(novaData.score)}</p>
+              {!novaData.hasIngredients ? (
+                <div className="p-4 rounded-xl bg-muted border border-border">
+                  <div className="flex items-start gap-3">
+                    <HelpCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
+                    <div>
+                      <h3 className="font-semibold mb-1">Ingrediensdata ikke tilgjengelig</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Vi har ikke tilgang til ingredienslisten for dette produktet, og kan derfor ikke gi en pålitelig NOVA-klassifisering. 
+                        Sjekk produktets emballasje for ingrediensinformasjon.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {novaData.reasoning && (
-                <div>
-                  <h4 className="font-semibold mb-2">Grunnlag for klassifisering</h4>
-                  <p className="text-sm text-muted-foreground">{novaData.reasoning}</p>
-                </div>
-              )}
-
-              {novaData.matchedRules && novaData.matchedRules.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Identifiserte ingredienser</h4>
-                  <div className="space-y-2">
-                    {novaData.matchedRules.map((rule, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 p-2 bg-secondary rounded-lg"
-                      >
-                        <Badge
-                          variant={rule.type === 'strong' ? 'destructive' : 'secondary'}
-                          className="rounded-full"
-                        >
-                          {rule.type === 'strong' ? 'Sterk' : 'Svak'}
-                        </Badge>
-                        <span className="text-sm">{rule.description}</span>
+              ) : novaData.score !== null && (
+                <>
+                  <div className={`p-4 rounded-xl ${novaData.score <= 2 ? 'bg-primary/10 border border-primary/20' : 'bg-destructive/10 border border-destructive/20'}`}>
+                    <div className="flex items-start gap-3">
+                      {novaData.score <= 2 ? (
+                        <Leaf className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-1" />
+                      )}
+                      <div>
+                        <h3 className="font-semibold mb-1">{getNovaLabel(novaData.score)}</h3>
+                        <p className="text-sm text-muted-foreground">{getNovaDescription(novaData.score)}</p>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
+
+                  {novaData.reasoning && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Grunnlag for klassifisering</h4>
+                      <p className="text-sm text-muted-foreground">{novaData.reasoning}</p>
+                    </div>
+                  )}
+
+                  {novaData.matchedRules && novaData.matchedRules.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Identifiserte ingredienser</h4>
+                      <div className="space-y-2">
+                        {novaData.matchedRules.map((rule, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 p-2 bg-secondary rounded-lg"
+                          >
+                            <Badge
+                              variant={rule.type === 'strong' ? 'destructive' : 'secondary'}
+                              className="rounded-full"
+                            >
+                              {rule.type === 'strong' ? 'Sterk' : 'Svak'}
+                            </Badge>
+                            <span className="text-sm">{rule.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -259,7 +285,18 @@ export default function ProductDetail() {
             <CardTitle>Ingredienser</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-foreground whitespace-pre-wrap">{product.ingredients}</p>
+            {product.ingredients ? (
+              <p className="text-foreground whitespace-pre-wrap">{product.ingredients}</p>
+            ) : (
+              <div className="flex items-start gap-3 p-4 bg-muted rounded-xl">
+                <HelpCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Ingrediensliste ikke tilgjengelig for dette produktet. Sjekk produktets emballasje for fullstendig informasjon.
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

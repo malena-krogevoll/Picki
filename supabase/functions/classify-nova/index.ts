@@ -111,10 +111,12 @@ interface ClassificationInput {
 }
 
 interface ClassificationResult {
-  nova_group: 1 | 2 | 3 | 4;
+  nova_group: 1 | 2 | 3 | 4 | null;
   confidence: number;
   reasoning: string;
   signals: Signal[];
+  has_ingredients: boolean;
+  is_estimated: boolean;
   debug: {
     ingredients_count: number;
     has_e_numbers: boolean;
@@ -128,13 +130,24 @@ interface ClassificationResult {
   timestamp: string;
 }
 
+// High-risk categories that are typically NOVA 4 (ultra-processed)
+const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon'];
+
 function classifyNova(input: ClassificationInput): ClassificationResult {
   const { ingredients_text, additives = [], product_category } = input;
   
   if (!ingredients_text || ingredients_text.trim().length === 0) {
+    const categoryLower = (product_category || '').toLowerCase();
+    const isHighRiskCategory = HIGH_RISK_CATEGORIES.some(cat => categoryLower.includes(cat));
+    
     return {
-      nova_group: 2, confidence: 0.2,
-      reasoning: 'Ingen ingrediensinformasjon tilgjengelig for klassifisering.',
+      nova_group: isHighRiskCategory ? 4 : null,
+      confidence: isHighRiskCategory ? 0.15 : 0,
+      has_ingredients: false,
+      is_estimated: true,
+      reasoning: isHighRiskCategory 
+        ? `Ingrediensliste mangler. Basert på produktkategori (${product_category}) anslås produktet som sterkt bearbeidet (NOVA 4), men dette er usikkert.`
+        : 'Ingen ingrediensinformasjon tilgjengelig. Klassifisering ikke mulig uten ingrediensliste.',
       signals: [],
       debug: { ingredients_count: 0, has_e_numbers: false, e_numbers: [], strong_hits: 0, weak_hits: 0, real_food_hits: 0, normalized_text_sample: "" },
       version: VERSION, timestamp: new Date().toISOString()
@@ -201,6 +214,8 @@ function classifyNova(input: ClassificationInput): ClassificationResult {
   
   return {
     nova_group: novaGroup, confidence: Math.round(confidence * 100) / 100, reasoning, signals: allSignals,
+    has_ingredients: true,
+    is_estimated: false,
     debug: { ingredients_count: ingredientsCount, has_e_numbers: hasENumbers, e_numbers: allENumbers, strong_hits: strongHits, weak_hits: weakHits, real_food_hits: realFoodHits, normalized_text_sample: normalizedText.substring(0, 100) },
     version: VERSION, timestamp: new Date().toISOString()
   };
