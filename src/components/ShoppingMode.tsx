@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useProfile } from "@/hooks/useProfile";
@@ -31,7 +31,9 @@ interface ProductSuggestion {
   image: string;
   price: number | null;
   store: string;
-  novaScore: number;
+  novaScore: number | null;
+  novaIsEstimated: boolean;
+  hasIngredients: boolean;
   allergener: string;
   ingredienser: string;
   matchInfo: MatchInfo;
@@ -43,13 +45,16 @@ interface ShoppingModeProps {
   onBack: () => void;
 }
 
-const getNovaColor = (score: number) => {
+const getNovaColor = (score: number | null, isEstimated: boolean = false) => {
+  if (score === null) return "bg-muted text-muted-foreground border-dashed border";
+  if (isEstimated) return "bg-muted text-muted-foreground border-dashed border";
   if (score <= 2) return "bg-primary text-primary-foreground";
   if (score === 3) return "bg-yellow-500 text-white";
   return "bg-destructive text-destructive-foreground";
 };
 
-const getNovaLabel = (score: number) => {
+const getNovaLabel = (score: number | null, hasIngredients: boolean = true) => {
+  if (score === null || !hasIngredients) return "Data mangler";
   if (score <= 2) return "Ren vare";
   if (score === 3) return "Moderat bearbeidet";
   return "Sterkt bearbeidet";
@@ -148,26 +153,30 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                 data.results
                   .filter((r: any) => r.product && r.score > -50) // Filter out heavily penalized products
                   .map(async (r: any) => {
-                    let novaScore = 2; // Fallback only if no ingredients
                     const ingredienser = r.product.Ingrediensliste || '';
                     const allergener = r.product["Allergener/Kosthold"] || '';
                     
-                    if (ingredienser) {
-                      try {
-                        const { data: novaData, error: novaError } = await supabase.functions.invoke('classify-nova', {
-                          body: { ingredients_text: ingredienser }
-                        });
-                        
-                        if (!novaError && novaData?.nova_group) {
-                          novaScore = novaData.nova_group;
-                        } else {
-                          console.warn('NOVA classification returned no data for:', r.product.Produktnavn);
+                    let novaScore: number | null = null;
+                    let novaIsEstimated = false;
+                    let hasIngredients = !!ingredienser;
+                    
+                    try {
+                      const { data: novaData, error: novaError } = await supabase.functions.invoke('classify-nova', {
+                        body: { 
+                          ingredients_text: ingredienser || '',
+                          product_category: r.product.Kategori || ''
                         }
-                      } catch (err) {
-                        console.error('NOVA classification failed for product:', r.product.Produktnavn, err);
+                      });
+                      
+                      if (!novaError && novaData) {
+                        novaScore = novaData.nova_group;
+                        novaIsEstimated = novaData.is_estimated || false;
+                        hasIngredients = novaData.has_ingredients;
+                      } else {
+                        console.warn('NOVA classification returned no data for:', r.product.Produktnavn);
                       }
-                    } else {
-                      console.warn('No ingredients found for product:', r.product.Produktnavn);
+                    } catch (err) {
+                      console.error('NOVA classification failed for product:', r.product.Produktnavn, err);
                     }
                     
                     const productName = r.product.Produktnavn || '';
@@ -187,6 +196,8 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                       price: parseFloat(r.product.Pris) || null,
                       store: r.product.StoreCode || storeId,
                       novaScore,
+                      novaIsEstimated,
+                      hasIngredients,
                       allergener,
                       ingredienser,
                       matchInfo
@@ -420,8 +431,12 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                               )}
                             </div>
                             {selectedProduct && (
-                              <Badge className={`${getNovaColor(selectedProduct.novaScore)} rounded-full px-2 md:px-3 py-1 text-xs flex-shrink-0`}>
-                                NOVA {selectedProduct.novaScore}
+                              <Badge className={`${getNovaColor(selectedProduct.novaScore, selectedProduct.novaIsEstimated)} rounded-full px-2 md:px-3 py-1 text-xs flex-shrink-0`}>
+                                {!selectedProduct.hasIngredients ? (
+                                  <><HelpCircle className="h-3 w-3 mr-1" />Ukjent</>
+                                ) : (
+                                  <>NOVA {selectedProduct.novaScore}</>
+                                )}
                               </Badge>
                             )}
                           </div>
@@ -436,7 +451,18 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                           <AllergyWarningBanner allergyWarnings={commonAllergyWarnings} />
                         )}
                         
-                        {selectedProduct.novaScore > 2 && (
+                        {!selectedProduct.hasIngredients && (
+                          <div className="bg-muted border border-border p-3 rounded-xl">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <HelpCircle className="h-4 w-4 flex-shrink-0" />
+                              <p className="text-xs font-medium">
+                                Ingrediensdata mangler – sjekk emballasjen for allergiinformasjon
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {selectedProduct.hasIngredients && selectedProduct.novaScore !== null && selectedProduct.novaScore > 2 && (
                           <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl">
                             <div className="flex items-center gap-2 text-destructive">
                               <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -467,9 +493,10 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                {selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
+                                {selectedProduct.hasIngredients && selectedProduct.novaScore !== null && selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
+                                {!selectedProduct.hasIngredients && <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                                 <span className="text-xs font-medium text-muted-foreground truncate">
-                                  {getNovaLabel(selectedProduct.novaScore)}
+                                  {getNovaLabel(selectedProduct.novaScore, selectedProduct.hasIngredients)}
                                 </span>
                               </div>
                               <p className="font-semibold text-foreground mb-1 truncate">{selectedProduct.brand}</p>
@@ -538,8 +565,8 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                                             {suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
                                           </p>
                                         </div>
-                                        <Badge className={`${getNovaColor(suggestion.novaScore)} rounded-full flex-shrink-0`}>
-                                          {suggestion.novaScore}
+                                      <Badge className={`${getNovaColor(suggestion.novaScore, suggestion.novaIsEstimated)} rounded-full flex-shrink-0`}>
+                                          {!suggestion.hasIngredients ? '?' : suggestion.novaScore}
                                         </Badge>
                                       </div>
                                       <PreferenceIndicators 
