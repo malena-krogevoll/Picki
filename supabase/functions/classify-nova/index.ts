@@ -222,9 +222,9 @@ function classifyNova(input: ClassificationInput): ClassificationResult {
 }
 
 const ClassifyInputSchema = z.object({
-  ingredients_text: z.string().min(1).max(5000),
+  ingredients_text: z.string().max(5000),
   additives: z.array(z.string()).optional(),
-  product_category: z.enum(['snacks', 'frokostblanding', 'drikke', 'kjeks', 'pålegg', 'meieri', 'ferdigrett', 'annet']).optional(),
+  product_category: z.string().optional(),
   language: z.string().default('no').optional()
 });
 
