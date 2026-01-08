@@ -156,9 +156,9 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                     const ingredienser = r.product.Ingrediensliste || '';
                     const allergener = r.product["Allergener/Kosthold"] || '';
                     
-                    let novaScore: number | null = null;
-                    let novaIsEstimated = false;
-                    let hasIngredients = !!ingredienser;
+                    let productNovaScore: number | null = null;
+                    let productNovaIsEstimated = false;
+                    let productHasIngredients = !!ingredienser;
                     
                     try {
                       const { data: novaData, error: novaError } = await supabase.functions.invoke('classify-nova', {
@@ -169,9 +169,9 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                       });
                       
                       if (!novaError && novaData) {
-                        novaScore = novaData.nova_group;
-                        novaIsEstimated = novaData.is_estimated || false;
-                        hasIngredients = novaData.has_ingredients;
+                        productNovaScore = novaData.nova_group;
+                        productNovaIsEstimated = novaData.is_estimated || false;
+                        productHasIngredients = novaData.has_ingredients;
                       } else {
                         console.warn('NOVA classification returned no data for:', r.product.Produktnavn);
                       }
@@ -195,9 +195,9 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                       image: r.product.Produktbilde_URL || '',
                       price: parseFloat(r.product.Pris) || null,
                       store: r.product.StoreCode || storeId,
-                      novaScore,
-                      novaIsEstimated,
-                      hasIngredients,
+                      novaScore: productNovaScore,
+                      novaIsEstimated: productNovaIsEstimated,
+                      hasIngredients: productHasIngredients,
                       allergener,
                       ingredienser,
                       matchInfo
