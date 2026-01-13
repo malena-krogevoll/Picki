@@ -81,6 +81,7 @@ const Profile = () => {
   const [organic, setOrganic] = useState(false);
   const [lowestPrice, setLowestPrice] = useState(false);
   const [animalWelfare, setAnimalWelfare] = useState(false);
+  const [localFood, setLocalFood] = useState(false);
   const [priorityOrder, setPriorityOrder] = useState<string[]>([]);
   const [householdSize, setHouseholdSize] = useState<number>(2);
   const [saving, setSaving] = useState(false);
@@ -105,6 +106,7 @@ const Profile = () => {
       setOrganic(profile.preferences.other_preferences?.organic || false);
       setLowestPrice(profile.preferences.other_preferences?.lowest_price || false);
       setAnimalWelfare(profile.preferences.other_preferences?.animal_welfare || false);
+      setLocalFood(profile.preferences.other_preferences?.local_food || false);
       setHouseholdSize(profile.preferences.household_size || 2);
 
       const savedOrder = profile.preferences.priority_order || [];
@@ -150,6 +152,7 @@ const Profile = () => {
     if (organic) prefs.push({ id: "organic", label: "Økologisk mat" });
     if (lowestPrice) prefs.push({ id: "price", label: "Lavest pris" });
     if (animalWelfare) prefs.push({ id: "animal_welfare", label: "Dyrevelferd" });
+    if (localFood) prefs.push({ id: "local_food", label: "Lokalmat" });
 
     // Sort according to priorityOrder
     const sortedPrefs = [...prefs].sort((a, b) => {
@@ -174,6 +177,7 @@ const Profile = () => {
       if (p === "organic") return organic;
       if (p === "price") return lowestPrice;
       if (p === "animal_welfare") return animalWelfare;
+      if (p === "local_food") return localFood;
       return false;
     })];
 
@@ -183,7 +187,8 @@ const Profile = () => {
       other_preferences: {
         organic,
         lowest_price: lowestPrice,
-        animal_welfare: animalWelfare
+        animal_welfare: animalWelfare,
+        local_food: localFood
       },
       priority_order: finalPriorityOrder,
       household_size: householdSize,
@@ -319,6 +324,16 @@ const Profile = () => {
                   />
                   <Label htmlFor="animal_welfare" className="cursor-pointer">
                     Dyrevelferd
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="local_food"
+                    checked={localFood}
+                    onCheckedChange={(checked) => setLocalFood(checked as boolean)}
+                  />
+                  <Label htmlFor="local_food" className="cursor-pointer">
+                    Lokalmat
                   </Label>
                 </div>
               </div>

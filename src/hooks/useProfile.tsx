@@ -11,6 +11,7 @@ export interface UserProfile {
       organic: boolean;
       lowest_price: boolean;
       animal_welfare?: boolean;
+      local_food?: boolean;
     };
     priority_order: string[];
     household_size?: number;
