@@ -18,6 +18,7 @@ interface ProductData {
   price: number | null;
   image: string;
   novaScore: number | null;
+  isEstimated?: boolean;
   store: string;
   ingredients?: string;
   allergenInfo?: string;
@@ -176,6 +177,7 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
       price: product.price,
       image: product.image,
       novaScore: product.novaScore,
+      isEstimated: product.isEstimated,
       store: product.store,
       ingredients: product.ingredients,
       allergenInfo: product.allergenInfo,

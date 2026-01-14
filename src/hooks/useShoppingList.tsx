@@ -10,7 +10,11 @@ export interface ProductData {
   price: number | null;
   image: string;
   novaScore: number | null;
+  isEstimated?: boolean;
   store: string;
+  ingredients?: string;
+  allergenInfo?: string;
+  filters?: string;
 }
 
 export interface ShoppingListItem {
@@ -45,7 +49,11 @@ const parseProductData = (data: Json | null): ProductData | null => {
     price: typeof obj.price === 'number' ? obj.price : null,
     image: String(obj.image || ''),
     novaScore: typeof obj.novaScore === 'number' ? obj.novaScore : null,
+    isEstimated: Boolean(obj.isEstimated),
     store: String(obj.store || ''),
+    ingredients: obj.ingredients ? String(obj.ingredients) : undefined,
+    allergenInfo: obj.allergenInfo ? String(obj.allergenInfo) : undefined,
+    filters: obj.filters ? String(obj.filters) : undefined,
   };
 };
 
@@ -192,7 +200,11 @@ export const useShoppingList = (userId: string | undefined) => {
       price: productData.price,
       image: productData.image,
       novaScore: productData.novaScore,
+      isEstimated: productData.isEstimated,
       store: productData.store,
+      ingredients: productData.ingredients,
+      allergenInfo: productData.allergenInfo,
+      filters: productData.filters,
     } as Json : undefined;
 
     const { error } = await supabase
@@ -226,7 +238,11 @@ export const useShoppingList = (userId: string | undefined) => {
       price: productData.price,
       image: productData.image,
       novaScore: productData.novaScore,
+      isEstimated: productData.isEstimated,
       store: productData.store,
+      ingredients: productData.ingredients,
+      allergenInfo: productData.allergenInfo,
+      filters: productData.filters,
     } as Json;
 
     const { error } = await supabase
