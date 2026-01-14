@@ -156,7 +156,36 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
           };
         });
 
-        setSuggestions(products);
+        // Sort products: lowest NOVA first, then by user preferences, then by price
+        const sortedProducts = products.sort((a, b) => {
+          // 1. Prioritize products with allergy warnings last
+          const aHasAllergyWarning = (a.matchInfo?.allergyWarnings?.length || 0) > 0;
+          const bHasAllergyWarning = (b.matchInfo?.allergyWarnings?.length || 0) > 0;
+          if (aHasAllergyWarning !== bHasAllergyWarning) {
+            return aHasAllergyWarning ? 1 : -1;
+          }
+
+          // 2. Sort by NOVA score (lowest first, null/unknown last)
+          const aNovaScore = a.novaScore ?? 99;
+          const bNovaScore = b.novaScore ?? 99;
+          if (aNovaScore !== bNovaScore) {
+            return aNovaScore - bNovaScore;
+          }
+
+          // 3. Sort by match score (higher is better)
+          const aMatchScore = a.matchInfo?.matchScore ?? 0;
+          const bMatchScore = b.matchInfo?.matchScore ?? 0;
+          if (aMatchScore !== bMatchScore) {
+            return bMatchScore - aMatchScore;
+          }
+
+          // 4. Sort by price (lowest first)
+          const aPrice = a.price ?? 999;
+          const bPrice = b.price ?? 999;
+          return aPrice - bPrice;
+        });
+
+        setSuggestions(sortedProducts);
         setShowSuggestions(true);
       } catch (error) {
         console.error('Error searching products:', error);
