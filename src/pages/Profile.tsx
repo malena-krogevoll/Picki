@@ -29,6 +29,8 @@ import { CSS } from '@dnd-kit/utilities';
 
 const AVAILABLE_DIETS = [
   { value: "vegan", label: "Veganer" },
+  { value: "vegetarian", label: "Vegetarianer" },
+  { value: "pescatarian", label: "Peskitarianer" },
   { value: "low_fodmap", label: "LavFODMAP" },
   { value: "paleo", label: "Paleo" },
   { value: "anti_inflammatory", label: "Antiinflammatorisk" },
