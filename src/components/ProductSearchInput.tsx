@@ -156,30 +156,37 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
           };
         });
 
-        // Sort products: lowest NOVA first, then by user preferences, then by price
+        // Sort products: allergy/diet safety first, then NOVA, then preferences, then price
         const sortedProducts = products.sort((a, b) => {
-          // 1. Prioritize products with allergy warnings last
-          const aHasAllergyWarning = (a.matchInfo?.allergyWarnings?.length || 0) > 0;
-          const bHasAllergyWarning = (b.matchInfo?.allergyWarnings?.length || 0) > 0;
-          if (aHasAllergyWarning !== bHasAllergyWarning) {
-            return aHasAllergyWarning ? 1 : -1;
+          // 1. Prioritize products WITHOUT allergy warnings (critical safety)
+          const aAllergyCount = a.matchInfo?.allergyWarnings?.length || 0;
+          const bAllergyCount = b.matchInfo?.allergyWarnings?.length || 0;
+          if (aAllergyCount !== bAllergyCount) {
+            return aAllergyCount - bAllergyCount;
           }
 
-          // 2. Sort by NOVA score (lowest first, null/unknown last)
+          // 2. Prioritize products WITHOUT diet warnings
+          const aDietWarningCount = a.matchInfo?.dietWarnings?.length || 0;
+          const bDietWarningCount = b.matchInfo?.dietWarnings?.length || 0;
+          if (aDietWarningCount !== bDietWarningCount) {
+            return aDietWarningCount - bDietWarningCount;
+          }
+
+          // 3. Sort by NOVA score (lowest first, null/unknown last)
           const aNovaScore = a.novaScore ?? 99;
           const bNovaScore = b.novaScore ?? 99;
           if (aNovaScore !== bNovaScore) {
             return aNovaScore - bNovaScore;
           }
 
-          // 3. Sort by match score (higher is better)
+          // 4. Sort by match score (higher is better - includes preference bonuses)
           const aMatchScore = a.matchInfo?.matchScore ?? 0;
           const bMatchScore = b.matchInfo?.matchScore ?? 0;
           if (aMatchScore !== bMatchScore) {
             return bMatchScore - aMatchScore;
           }
 
-          // 4. Sort by price (lowest first)
+          // 5. Sort by price (lowest first)
           const aPrice = a.price ?? 999;
           const bPrice = b.price ?? 999;
           return aPrice - bPrice;
