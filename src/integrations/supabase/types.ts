@@ -150,6 +150,7 @@ export type Database = {
           in_cart: boolean | null
           list_id: string
           name: string
+          product_data: Json | null
           selected_product_ean: string | null
           updated_at: string | null
         }
@@ -159,6 +160,7 @@ export type Database = {
           in_cart?: boolean | null
           list_id: string
           name: string
+          product_data?: Json | null
           selected_product_ean?: string | null
           updated_at?: string | null
         }
@@ -168,6 +170,7 @@ export type Database = {
           in_cart?: boolean | null
           list_id?: string
           name?: string
+          product_data?: Json | null
           selected_product_ean?: string | null
           updated_at?: string | null
         }

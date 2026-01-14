@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SwipeableCard } from "@/components/SwipeableCard";
+import { StoreSelectorDialog, getStoreName } from "@/components/StoreSelectorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { Plus, ShoppingCart, Clock, Copy, ChevronRight, Package, UtensilsCrossed, Trash2 } from "lucide-react";
@@ -15,6 +16,7 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { lists, completedLists, loading: listLoading, createList, duplicateList, deleteList, setActiveList } = useShoppingList(user?.id);
   const navigate = useNavigate();
+  const [showStoreSelector, setShowStoreSelector] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -22,8 +24,13 @@ const Dashboard = () => {
     }
   }, [user, authLoading, navigate]);
 
-  const handleCreateNewList = async () => {
-    const result = await createList("Min handleliste");
+  const handleCreateNewList = () => {
+    // Show store selector first
+    setShowStoreSelector(true);
+  };
+
+  const handleStoreSelected = async (storeId: string) => {
+    const result = await createList("Min handleliste", storeId);
     if (result?.data) {
       navigate(`/list/${result.data.id}`);
     }
@@ -84,7 +91,7 @@ const Dashboard = () => {
                     <Plus className="h-5 w-5 md:h-8 md:w-8 text-primary" />
                   </div>
                   <h3 className="text-sm md:text-xl font-semibold">Ny liste</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground hidden md:block">Start en ny liste</p>
+                  <p className="text-xs md:text-sm text-muted-foreground hidden md:block">Velg butikk og start</p>
                 </div>
               </CardContent>
             </Card>
@@ -104,6 +111,13 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Store Selector Dialog */}
+          <StoreSelectorDialog
+            open={showStoreSelector}
+            onOpenChange={setShowStoreSelector}
+            onSelectStore={handleStoreSelected}
+          />
 
           {/* Aktive handlelister */}
           {lists.length > 0 && (
@@ -143,7 +157,7 @@ const Dashboard = () => {
                             </Badge>
                             {list.store_id && (
                               <Badge variant="outline" className="rounded-full text-xs">
-                                {list.store_id.toUpperCase()}
+                                {getStoreName(list.store_id)}
                               </Badge>
                             )}
                           </div>
@@ -221,7 +235,7 @@ const Dashboard = () => {
                             </Badge>
                             {list.store_id && (
                               <Badge variant="outline" className="rounded-full text-xs">
-                                {list.store_id.toUpperCase()}
+                                {getStoreName(list.store_id)}
                               </Badge>
                             )}
                           </div>

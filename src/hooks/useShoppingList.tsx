@@ -1,12 +1,24 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Json } from "@/integrations/supabase/types";
+
+export interface ProductData {
+  ean: string;
+  name: string;
+  brand: string;
+  price: number | null;
+  image: string;
+  novaScore: number | null;
+  store: string;
+}
 
 export interface ShoppingListItem {
   id: string;
   list_id: string;
   name: string;
   selected_product_ean: string | null;
+  product_data: ProductData | null;
   in_cart: boolean;
   created_at: string;
 }
@@ -21,6 +33,34 @@ export interface ShoppingList {
   completed_at?: string | null;
   items?: ShoppingListItem[];
 }
+
+// Helper to safely convert JSON to ProductData
+const parseProductData = (data: Json | null): ProductData | null => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const obj = data as Record<string, Json | undefined>;
+  return {
+    ean: String(obj.ean || ''),
+    name: String(obj.name || ''),
+    brand: String(obj.brand || ''),
+    price: typeof obj.price === 'number' ? obj.price : null,
+    image: String(obj.image || ''),
+    novaScore: typeof obj.novaScore === 'number' ? obj.novaScore : null,
+    store: String(obj.store || ''),
+  };
+};
+
+// Helper to convert DB items to our interface
+const mapDbItemsToShoppingListItems = (items: any[]): ShoppingListItem[] => {
+  return items.map(item => ({
+    id: item.id,
+    list_id: item.list_id,
+    name: item.name,
+    selected_product_ean: item.selected_product_ean,
+    product_data: parseProductData(item.product_data),
+    in_cart: item.in_cart ?? false,
+    created_at: item.created_at,
+  }));
+};
 
 export const useShoppingList = (userId: string | undefined) => {
   const [lists, setLists] = useState<ShoppingList[]>([]);
@@ -56,13 +96,21 @@ export const useShoppingList = (userId: string | undefined) => {
         variant: "destructive",
       });
     } else {
-      // Sort items by created_at to maintain consistent order
-      const sortedData = data?.map(list => ({
-        ...list,
-        items: list.items?.sort((a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        )
-      })) || [];
+      // Sort items by created_at and map to our interface
+      const sortedData: ShoppingList[] = (data || []).map(list => ({
+        id: list.id,
+        user_id: list.user_id,
+        name: list.name,
+        status: list.status,
+        store_id: list.store_id,
+        created_at: list.created_at || '',
+        completed_at: list.completed_at,
+        items: mapDbItemsToShoppingListItems(
+          (list.items || []).sort((a: any, b: any) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          )
+        ),
+      }));
 
       setLists(sortedData);
       if (sortedData && sortedData.length > 0 && !activeList) {
@@ -89,16 +137,35 @@ export const useShoppingList = (userId: string | undefined) => {
     if (error) {
       console.error("Error fetching completed lists:", error);
     } else {
-      setCompletedLists(data || []);
+      const mappedData: ShoppingList[] = (data || []).map(list => ({
+        id: list.id,
+        user_id: list.user_id,
+        name: list.name,
+        status: list.status,
+        store_id: list.store_id,
+        created_at: list.created_at || '',
+        completed_at: list.completed_at,
+        items: mapDbItemsToShoppingListItems(list.items || []),
+      }));
+      setCompletedLists(mappedData);
     }
   };
 
-  const createList = async (name: string = "Min handleliste") => {
+  const createList = async (name: string = "Min handleliste", storeId?: string) => {
     if (!userId) return;
+
+    const insertData: { user_id: string; name: string; store_id?: string } = { 
+      user_id: userId, 
+      name 
+    };
+    
+    if (storeId) {
+      insertData.store_id = storeId;
+    }
 
     const { data, error } = await supabase
       .from("shopping_lists")
-      .insert({ user_id: userId, name })
+      .insert(insertData)
       .select()
       .single();
 
@@ -116,14 +183,63 @@ export const useShoppingList = (userId: string | undefined) => {
     return { data, error: null };
   };
 
-  const addItem = async (listId: string, name: string) => {
+  const addItem = async (listId: string, name: string, productData?: ProductData) => {
+    // Convert ProductData to Json-compatible format
+    const productDataAsJson = productData ? {
+      ean: productData.ean,
+      name: productData.name,
+      brand: productData.brand,
+      price: productData.price,
+      image: productData.image,
+      novaScore: productData.novaScore,
+      store: productData.store,
+    } as Json : undefined;
+
     const { error } = await supabase
       .from("shopping_list_items")
-      .insert({ list_id: listId, name });
+      .insert({
+        list_id: listId,
+        name,
+        product_data: productDataAsJson ?? null,
+        selected_product_ean: productData?.ean ?? null,
+      });
 
     if (error) {
       toast({
         title: "Feil ved tillegg av vare",
+        description: error.message,
+        variant: "destructive",
+      });
+      return { error };
+    }
+
+    await fetchLists();
+    return { error: null };
+  };
+
+  const updateItemProduct = async (itemId: string, productData: ProductData) => {
+    // Convert ProductData to Json-compatible format
+    const productDataAsJson = {
+      ean: productData.ean,
+      name: productData.name,
+      brand: productData.brand,
+      price: productData.price,
+      image: productData.image,
+      novaScore: productData.novaScore,
+      store: productData.store,
+    } as Json;
+
+    const { error } = await supabase
+      .from("shopping_list_items")
+      .update({ 
+        product_data: productDataAsJson,
+        selected_product_ean: productData.ean 
+      })
+      .eq("id", itemId);
+
+    if (error) {
+      toast({
+        title: "Feil ved oppdatering av produkt",
         description: error.message,
         variant: "destructive",
       });
@@ -282,7 +398,7 @@ export const useShoppingList = (userId: string | undefined) => {
 
     // Kopier alle varer
     if (originalList.items && originalList.items.length > 0) {
-      const itemsToInsert = originalList.items.map((item: ShoppingListItem) => ({
+      const itemsToInsert = originalList.items.map((item: any) => ({
         list_id: newList.id,
         name: item.name,
         in_cart: false,
@@ -354,6 +470,7 @@ export const useShoppingList = (userId: string | undefined) => {
     addItem,
     removeItem,
     updateItemStatus,
+    updateItemProduct,
     completeList,
     updateListStore,
     duplicateList,
