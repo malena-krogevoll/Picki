@@ -1,10 +1,14 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, X, ShoppingBasket, Info, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ShoppingBasket, Info, HelpCircle } from "lucide-react";
+import { PreferenceIndicators } from "@/components/PreferenceIndicators";
+import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ProductData {
   ean: string;
@@ -13,7 +17,10 @@ interface ProductData {
   price: number | null;
   image: string;
   novaScore: number | null;
+  isEstimated?: boolean;
   store: string;
+  ingredients?: string;
+  allergenInfo?: string;
 }
 
 interface ShoppingListItemProps {
@@ -42,15 +49,46 @@ export const ShoppingListItem = ({
   storeId,
 }: ShoppingListItemProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchDelta, setTouchDelta] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // Convert profile preferences to UserPreferences format
+  const userPreferences: UserPreferences | null = useMemo(() => {
+    if (!profile?.preferences) return null;
+    return {
+      allergies: profile.preferences.allergies || [],
+      diets: profile.preferences.diets || [],
+      other_preferences: {
+        organic: profile.preferences.other_preferences?.organic || false,
+        lowest_price: profile.preferences.other_preferences?.lowest_price || false,
+        animal_welfare: profile.preferences.other_preferences?.animal_welfare || false,
+      },
+      priority_order: profile.preferences.priority_order || [],
+    };
+  }, [profile?.preferences]);
+
   // All products (current + alternatives)
   const allProducts = productData ? [productData, ...alternatives] : [];
   const currentProduct = allProducts[currentIndex];
   const hasMultiple = allProducts.length > 1;
+
+  // Analyze current product for preference match
+  const matchInfo = useMemo(() => {
+    if (!currentProduct) return null;
+    return analyzeProductMatch(
+      {
+        name: currentProduct.name,
+        brand: currentProduct.brand,
+        allergener: currentProduct.allergenInfo || '',
+        ingredienser: currentProduct.ingredients || '',
+      },
+      userPreferences
+    );
+  }, [currentProduct, userPreferences]);
 
   const handleSwipe = (direction: 'left' | 'right') => {
     if (!hasMultiple) return;
@@ -96,7 +134,8 @@ export const ShoppingListItem = ({
 
   const getNovaColor = (score: number | null) => {
     if (score === null) return "bg-muted text-muted-foreground";
-    if (score <= 2) return "bg-primary text-primary-foreground";
+    if (score === 1) return "bg-emerald-500 text-white";
+    if (score === 2) return "bg-primary text-primary-foreground";
     if (score === 3) return "bg-yellow-500 text-white";
     return "bg-destructive text-destructive-foreground";
   };
@@ -187,16 +226,21 @@ export const ShoppingListItem = ({
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {currentProduct?.brand && <span>{currentProduct.brand}</span>}
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
                       {currentProduct?.price && (
                         <span className="font-semibold text-sm">
                           {currentProduct.price.toFixed(2)} kr
                         </span>
                       )}
                       {currentProduct?.novaScore !== null && currentProduct?.novaScore !== undefined && (
-                        <Badge className={`${getNovaColor(currentProduct.novaScore)} text-xs px-2 py-0`}>
-                          NOVA {currentProduct.novaScore}
+                        <Badge className={`${getNovaColor(currentProduct.novaScore)} text-[10px] px-1.5 py-0 h-5`}>
+                          {currentProduct.isEstimated ? (
+                            <span className="flex items-center gap-0.5">N{currentProduct.novaScore}<HelpCircle className="h-2.5 w-2.5" /></span>
+                          ) : `N${currentProduct.novaScore}`}
                         </Badge>
+                      )}
+                      {matchInfo && (
+                        <PreferenceIndicators matchInfo={matchInfo} userPreferences={userPreferences} compact />
                       )}
                     </div>
                   </div>

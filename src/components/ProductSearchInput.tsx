@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Sparkles, AlertCircle, ShoppingBasket } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, Search, Sparkles, ShoppingBasket, HelpCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { PreferenceIndicators } from "@/components/PreferenceIndicators";
+import { analyzeProductMatch, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 
 interface ProductData {
   ean: string;
@@ -17,6 +19,9 @@ interface ProductData {
   image: string;
   novaScore: number | null;
   store: string;
+  ingredients?: string;
+  allergenInfo?: string;
+  filters?: string;
 }
 
 interface ProductSuggestion {
@@ -26,8 +31,13 @@ interface ProductSuggestion {
   price: number | null;
   image: string;
   novaScore: number | null;
+  isEstimated?: boolean;
   store: string;
   score: number;
+  ingredients?: string;
+  allergenInfo?: string;
+  filters?: string;
+  matchInfo?: MatchInfo;
 }
 
 interface ProductSearchInputProps {
@@ -43,6 +53,21 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Convert profile preferences to UserPreferences format
+  const userPreferences: UserPreferences | null = useMemo(() => {
+    if (!profile?.preferences) return null;
+    return {
+      allergies: profile.preferences.allergies || [],
+      diets: profile.preferences.diets || [],
+      other_preferences: {
+        organic: profile.preferences.other_preferences?.organic || false,
+        lowest_price: profile.preferences.other_preferences?.lowest_price || false,
+        animal_welfare: profile.preferences.other_preferences?.animal_welfare || false,
+      },
+      priority_order: profile.preferences.priority_order || [],
+    };
+  }, [profile?.preferences]);
 
   // Debounced search
   useEffect(() => {
@@ -65,18 +90,56 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
 
         if (error) throw error;
 
-        const products: ProductSuggestion[] = (data?.results || [])
-          .slice(0, 8)
-          .map((r: any) => ({
+        // Fetch NOVA scores for the products
+        const rawProducts = (data?.results || []).slice(0, 8);
+        
+        // Batch classify NOVA for all products
+        let novaResults: any[] = [];
+        try {
+          const { data: novaData } = await supabase.functions.invoke('classify-nova/classify-batch', {
+            body: rawProducts.map((r: any) => ({
+              ingredients_text: r.product?.Ingrediensliste || '',
+              product_category: r.product?.Kategori || '',
+            }))
+          });
+          novaResults = novaData || [];
+        } catch (e) {
+          console.warn('Failed to fetch NOVA scores:', e);
+        }
+
+        const products: ProductSuggestion[] = rawProducts.map((r: any, idx: number) => {
+          const productName = r.product?.Produktnavn || '';
+          const productBrand = r.product?.Merke || '';
+          const ingredients = r.product?.Ingrediensliste || '';
+          const allergenInfo = r.product?.["Allergener/Kosthold"] || '';
+          
+          // Analyze product match with user preferences
+          const matchInfo = analyzeProductMatch(
+            {
+              name: productName,
+              brand: productBrand,
+              allergener: allergenInfo,
+              ingredienser: ingredients,
+            },
+            userPreferences
+          );
+
+          return {
             ean: r.product?.EAN?.toString() || '',
-            name: r.product?.Produktnavn || '',
-            brand: r.product?.Merke || '',
+            name: productName,
+            brand: productBrand,
             price: r.product?.Pris ? parseFloat(r.product.Pris) : null,
             image: r.product?.Produktbilde_URL || '',
-            novaScore: null, // Will be fetched later if needed
+            novaScore: novaResults[idx]?.nova_group ?? null,
+            isEstimated: novaResults[idx]?.is_estimated ?? false,
             store: r.product?.StoreCode || storeId,
             score: r.score || 0,
-          }));
+            ingredients,
+            allergenInfo,
+            filters: r.product?.Tilleggsfiltre || '',
+            matchInfo,
+          };
+        });
 
         setSuggestions(products);
         setShowSuggestions(true);
@@ -89,7 +152,7 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, storeId, profile?.preferences]);
+  }, [query, storeId, userPreferences]);
 
   const handleSelectProduct = (product: ProductSuggestion) => {
     const productData: ProductData = {
@@ -100,6 +163,9 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
       image: product.image,
       novaScore: product.novaScore,
       store: product.store,
+      ingredients: product.ingredients,
+      allergenInfo: product.allergenInfo,
+      filters: product.filters,
     };
     onAddProduct(product.name, productData);
     setQuery("");
@@ -118,7 +184,8 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
 
   const getNovaColor = (score: number | null) => {
     if (score === null) return "bg-muted text-muted-foreground";
-    if (score <= 2) return "bg-primary text-primary-foreground";
+    if (score === 1) return "bg-emerald-500 text-white";
+    if (score === 2) return "bg-primary text-primary-foreground";
     if (score === 3) return "bg-yellow-500 text-white";
     return "bg-destructive text-destructive-foreground";
   };
@@ -182,21 +249,21 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
               {suggestions.map((product, idx) => (
                 <button
                   key={`${product.ean}-${idx}`}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors text-left"
+                  className="w-full flex items-start gap-3 p-3 hover:bg-secondary/50 transition-colors text-left"
                   onClick={() => handleSelectProduct(product)}
                 >
                   {product.image ? (
                     <img 
                       src={product.image} 
                       alt={product.name}
-                      className="h-12 w-12 object-contain rounded-lg bg-white border border-border"
+                      className="h-12 w-12 object-contain rounded-lg bg-white border border-border flex-shrink-0"
                     />
                   ) : (
-                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                       <ShoppingBasket className="h-5 w-5 text-muted-foreground" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 space-y-1">
                     <p className="font-medium text-sm truncate">{product.name}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {product.brand && <span>{product.brand}</span>}
@@ -206,12 +273,30 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
                         </span>
                       )}
                     </div>
+                    {/* NOVA Badge */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {product.novaScore !== null && (
+                        <Badge className={`${getNovaColor(product.novaScore)} text-[10px] px-1.5 py-0 h-5`}>
+                          {product.isEstimated ? (
+                            <span className="flex items-center gap-0.5">
+                              N{product.novaScore}
+                              <HelpCircle className="h-2.5 w-2.5" />
+                            </span>
+                          ) : (
+                            `NOVA ${product.novaScore}`
+                          )}
+                        </Badge>
+                      )}
+                      {/* Preference indicators */}
+                      {product.matchInfo && (
+                        <PreferenceIndicators
+                          matchInfo={product.matchInfo}
+                          userPreferences={userPreferences}
+                          compact
+                        />
+                      )}
+                    </div>
                   </div>
-                  {product.novaScore !== null && (
-                    <Badge className={`${getNovaColor(product.novaScore)} text-xs px-2`}>
-                      NOVA {product.novaScore}
-                    </Badge>
-                  )}
                 </button>
               ))}
               
