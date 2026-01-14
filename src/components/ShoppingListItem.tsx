@@ -21,6 +21,7 @@ interface ProductData {
   store: string;
   ingredients?: string;
   allergenInfo?: string;
+  filters?: string;
 }
 
 interface ShoppingListItemProps {
