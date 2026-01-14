@@ -80,12 +80,17 @@ export const ShoppingListItem = ({
   // Analyze current product for preference match
   const matchInfo = useMemo(() => {
     if (!currentProduct) return null;
+    
+    // Combine allergenInfo and ingredients for comprehensive allergen detection
+    const allergenSource = currentProduct.allergenInfo || '';
+    const ingredientSource = currentProduct.ingredients || '';
+    
     return analyzeProductMatch(
       {
         name: currentProduct.name,
-        brand: currentProduct.brand,
-        allergener: currentProduct.allergenInfo || '',
-        ingredienser: currentProduct.ingredients || '',
+        brand: currentProduct.brand || '',
+        allergener: allergenSource,
+        ingredienser: ingredientSource || allergenSource, // Fallback to allergenInfo if no ingredients
       },
       userPreferences
     );
