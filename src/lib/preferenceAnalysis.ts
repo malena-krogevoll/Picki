@@ -7,6 +7,8 @@ export interface MatchInfo {
   organicMatch: boolean;
   animalWelfareLevel: 'high' | 'medium' | 'low' | 'unknown';
   animalWelfareReason?: string;
+  localFoodMatch: boolean;
+  localFoodReason?: string;
   matchScore: number; // 0-100, higher is better match
 }
 
@@ -17,6 +19,7 @@ export interface UserPreferences {
     organic: boolean;
     lowest_price: boolean;
     animal_welfare?: boolean;
+    local_food?: boolean;
   };
   priority_order: string[];
 }
@@ -98,6 +101,126 @@ const animalWelfareMediumKeywords = [
   { keywords: ["tradisjonelt"], label: "Tradisjonelt" },
   { keywords: ["kortreist"], label: "Kortreist" },
   { keywords: ["småskala"], label: "Småskala" },
+];
+
+// === LOKALMAT DATABASE ===
+// Norwegian brands, certifications, and regional producers
+const localFoodHighKeywords: { keywords: string[]; label: string }[] = [
+  // === NYT NORGE OG OFFISIELLE MERKINGER ===
+  { keywords: ["nyt norge", "nyt-norge"], label: "Nyt Norge" },
+  { keywords: ["spesialitet.no", "spesialitet"], label: "Beskyttet betegnelse" },
+  { keywords: ["hanen merket", "hanen-merket", "hanen"], label: "Hanen-merket" },
+  
+  // === STORE NORSKE PRODUSENTER ===
+  { keywords: ["tine"], label: "Norsk meieri" },
+  { keywords: ["nortura"], label: "Norsk kjøtt" },
+  { keywords: ["gilde"], label: "Norsk kjøtt" },
+  { keywords: ["prior"], label: "Norsk fjørfe" },
+  { keywords: ["synnøve finden", "synnøve"], label: "Norsk meieri" },
+  { keywords: ["fjordland"], label: "Norsk mat" },
+  { keywords: ["lerøy"], label: "Norsk sjømat" },
+  { keywords: ["mowi"], label: "Norsk sjømat" },
+  { keywords: ["salmar"], label: "Norsk sjømat" },
+  { keywords: ["bama"], label: "Norsk frukt/grønt" },
+  { keywords: ["gartnerhallen"], label: "Norsk grønt" },
+  
+  // === REGIONALE MEIERIER ===
+  { keywords: ["rørosmeieriet"], label: "Trøndelag" },
+  { keywords: ["valdresmeieriet"], label: "Valdres" },
+  { keywords: ["jerseymeieriet"], label: "Vestlandet" },
+  { keywords: ["gausdalsmeieriet"], label: "Gudbrandsdalen" },
+  { keywords: ["jæren meieri"], label: "Jæren" },
+  { keywords: ["q-meieriene", "q meieriene"], label: "Norsk meieri" },
+  
+  // === REGIONALE KJØTTPRODUSENTER ===
+  { keywords: ["trøndermat"], label: "Trøndelag" },
+  { keywords: ["lofotlam"], label: "Lofoten" },
+  { keywords: ["ryafeet"], label: "Trøndelag" },
+  { keywords: ["nordfjordkjøtt"], label: "Nordfjord" },
+  { keywords: ["hardanger kjøtt"], label: "Hardanger" },
+  { keywords: ["jæren kjøtt"], label: "Jæren" },
+  { keywords: ["idsøe"], label: "Rogaland" },
+  { keywords: ["fatland"], label: "Vestlandet" },
+  
+  // === LOKALE BRYGGERIER OG DRIKKEVARER ===
+  { keywords: ["olden"], label: "Nordfjord" },
+  { keywords: ["imsdal"], label: "Norsk vann" },
+  { keywords: ["farris"], label: "Larvik" },
+  { keywords: ["aass"], label: "Drammen" },
+  { keywords: ["hansa"], label: "Bergen" },
+  { keywords: ["ringnes"], label: "Oslo" },
+  { keywords: ["mack"], label: "Tromsø" },
+  { keywords: ["grans"], label: "Sandefjord" },
+  
+  // === TRADISJONELLE NORSKE PRODUKTER ===
+  { keywords: ["stabburet"], label: "Norsk mat" },
+  { keywords: ["idun"], label: "Norsk mat" },
+  { keywords: ["orkla"], label: "Norsk mat" },
+  { keywords: ["kavli"], label: "Norsk mat" },
+  { keywords: ["mills"], label: "Norsk mat" },
+  { keywords: ["freia"], label: "Norsk sjokolade" },
+  { keywords: ["nidar"], label: "Trondheim" },
+  
+  // === SJØMATPRODUSENTER ===
+  { keywords: ["domstein"], label: "Norsk sjømat" },
+  { keywords: ["norway seafoods"], label: "Norsk sjømat" },
+  { keywords: ["brødrene sperre"], label: "Norsk sjømat" },
+  { keywords: ["king oscar"], label: "Norsk sjømat" },
+  { keywords: ["lofoten"], label: "Lofoten" },
+  { keywords: ["vesterålen"], label: "Vesterålen" },
+  { keywords: ["finnmark"], label: "Finnmark" },
+  
+  // === BAKEVARER OG MØLLER ===
+  { keywords: ["møllerens"], label: "Norsk mel" },
+  { keywords: ["regal"], label: "Norsk bakst" },
+  { keywords: ["hatting"], label: "Norsk bakst" },
+  { keywords: ["mesterbakeren"], label: "Norsk bakst" },
+  { keywords: ["bakehuset"], label: "Norsk bakst" },
+];
+
+const localFoodMediumKeywords: { keywords: string[]; label: string }[] = [
+  // === GENERELLE NORSKE INDIKATORER ===
+  { keywords: ["norsk", "norwegian"], label: "Norsk opprinnelse" },
+  { keywords: ["made in norway", "laget i norge"], label: "Produsert i Norge" },
+  { keywords: ["kortreist"], label: "Kortreist" },
+  { keywords: ["lokal", "lokalt"], label: "Lokal" },
+  { keywords: ["tradisjonell norsk"], label: "Tradisjonell" },
+  
+  // === REGIONALE BETEGNELSER ===
+  { keywords: ["trøndelag", "trøndersk"], label: "Trøndelag" },
+  { keywords: ["vestland", "vestlandsk"], label: "Vestlandet" },
+  { keywords: ["nordland", "nordnorsk"], label: "Nord-Norge" },
+  { keywords: ["østland", "østlandsk"], label: "Østlandet" },
+  { keywords: ["sørlandet", "sørlandsk"], label: "Sørlandet" },
+  { keywords: ["telemark"], label: "Telemark" },
+  { keywords: ["hedmark"], label: "Hedmark" },
+  { keywords: ["oppland"], label: "Oppland" },
+  { keywords: ["rogaland"], label: "Rogaland" },
+  { keywords: ["hordaland"], label: "Hordaland" },
+  { keywords: ["sogn og fjordane", "sogn"], label: "Sogn og Fjordane" },
+  { keywords: ["møre og romsdal", "møre"], label: "Møre og Romsdal" },
+  { keywords: ["nordland"], label: "Nordland" },
+  { keywords: ["troms"], label: "Troms" },
+  { keywords: ["finnmark"], label: "Finnmark" },
+  
+  // === BESKYTTEDE BETEGNELSER ===
+  { keywords: ["hardangereple"], label: "Hardanger" },
+  { keywords: ["ringerikserts"], label: "Ringerike" },
+  { keywords: ["suldalsrøyra"], label: "Suldal" },
+  { keywords: ["tørrfisk fra lofoten"], label: "Lofoten" },
+  { keywords: ["fenalår fra norge"], label: "Norsk fenalår" },
+  { keywords: ["klippfisk"], label: "Norsk klippfisk" },
+  { keywords: ["rakfisk"], label: "Norsk tradisjon" },
+  { keywords: ["lutefisk"], label: "Norsk tradisjon" },
+  { keywords: ["pinnekjøtt"], label: "Norsk tradisjon" },
+  { keywords: ["smalahove"], label: "Vestlandsk tradisjon" },
+  
+  // === GÅRDSMAT OG SMÅSKALA ===
+  { keywords: ["gårdsmeieri", "gardsmeieri"], label: "Gårdsmeieri" },
+  { keywords: ["gårdsost", "gardsost"], label: "Gårdsost" },
+  { keywords: ["småskala"], label: "Småskala" },
+  { keywords: ["håndlaget"], label: "Håndlaget" },
+  { keywords: ["hjemmelaget"], label: "Hjemmelaget" },
 ];
 
 // Allergen mapping for Norwegian products
@@ -262,6 +385,29 @@ function checkAnimalWelfare(
   return { level: 'unknown', reason: undefined };
 }
 
+function checkLocalFood(
+  productName: string,
+  brand: string
+): { isLocal: boolean; reason?: string } {
+  const combinedText = `${productName} ${brand}`.toLowerCase();
+  
+  // Check for high-confidence local food indicators first
+  for (const item of localFoodHighKeywords) {
+    if (containsAny(combinedText, item.keywords)) {
+      return { isLocal: true, reason: item.label };
+    }
+  }
+  
+  // Check for medium-confidence local food indicators
+  for (const item of localFoodMediumKeywords) {
+    if (containsAny(combinedText, item.keywords)) {
+      return { isLocal: true, reason: item.label };
+    }
+  }
+  
+  return { isLocal: false, reason: undefined };
+}
+
 function calculateMatchScore(
   matchInfo: Omit<MatchInfo, 'matchScore'>,
   userPreferences: UserPreferences | null
@@ -300,6 +446,15 @@ function calculateMatchScore(
     }
   }
   
+  // Check local food preference
+  if (userPreferences.other_preferences?.local_food) {
+    if (matchInfo.localFoodMatch) {
+      score += 15;
+    } else {
+      score -= 5; // Smaller penalty since non-local isn't harmful
+    }
+  }
+  
   // Apply priority order weighting
   priorityOrder.forEach((pref, index) => {
     const weight = (priorityOrder.length - index) * 2;
@@ -308,6 +463,9 @@ function calculateMatchScore(
       score += weight;
     }
     if (pref === 'animal_welfare' && matchInfo.animalWelfareLevel === 'high') {
+      score += weight;
+    }
+    if (pref === 'local_food' && matchInfo.localFoodMatch) {
       score += weight;
     }
   });
@@ -343,6 +501,9 @@ export function analyzeProductMatch(
   // Check animal welfare
   const animalWelfareResult = checkAnimalWelfare(product.name, product.brand, ingredienser);
   
+  // Check local food
+  const localFoodResult = checkLocalFood(product.name, product.brand);
+  
   const partialMatchInfo = {
     allergyWarnings,
     dietWarnings: dietResult.warnings,
@@ -350,6 +511,8 @@ export function analyzeProductMatch(
     organicMatch,
     animalWelfareLevel: animalWelfareResult.level,
     animalWelfareReason: animalWelfareResult.reason,
+    localFoodMatch: localFoodResult.isLocal,
+    localFoodReason: localFoodResult.reason,
   };
   
   const matchScore = calculateMatchScore(partialMatchInfo, userPreferences);

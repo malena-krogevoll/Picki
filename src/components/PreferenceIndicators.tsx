@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Check, Leaf, Heart } from "lucide-react";
+import { AlertTriangle, Check, Leaf, Heart, MapPin } from "lucide-react";
 import { MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 
 interface PreferenceIndicatorsProps {
@@ -20,7 +20,8 @@ export const PreferenceIndicators = ({
     matchInfo.dietWarnings.length > 0 ||
     matchInfo.dietMatches.length > 0 ||
     (userPreferences.other_preferences?.organic) ||
-    (userPreferences.other_preferences?.animal_welfare && matchInfo.animalWelfareLevel !== 'unknown');
+    (userPreferences.other_preferences?.animal_welfare && matchInfo.animalWelfareLevel !== 'unknown') ||
+    (userPreferences.other_preferences?.local_food);
 
   if (!hasAnyIndicators) return null;
 
@@ -90,6 +91,22 @@ export const PreferenceIndicators = ({
             matchInfo.animalWelfareLevel === 'medium' ? 'Bedre dyrevelferd' :
             'Standard'
           )}
+        </Badge>
+      )}
+
+      {/* Local food indicator */}
+      {userPreferences.other_preferences?.local_food && (
+        <Badge 
+          className={`text-xs px-2 py-0.5 rounded-full ${
+            matchInfo.localFoodMatch 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          <MapPin className="h-3 w-3 mr-1" />
+          {matchInfo.localFoodMatch 
+            ? (matchInfo.localFoodReason || 'Norsk') 
+            : 'Ikke norsk'}
         </Badge>
       )}
     </div>
