@@ -120,7 +120,7 @@ const DinnerExplorer = () => {
           <>
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                Middag-explorer
+                Oppskrift-explorer
               </h1>
               <p className="text-muted-foreground">
                 Oppskrifter laget med renvarer - enkle ingredienser uten tilsetningsstoffer
