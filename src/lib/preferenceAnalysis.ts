@@ -2,6 +2,7 @@
 
 export interface MatchInfo {
   allergyWarnings: string[];
+  allergyTriggers: Record<string, string[]>; // Maps allergen to detected ingredients
   dietWarnings: string[];
   dietMatches: string[];
   organicMatch: boolean;
@@ -304,12 +305,18 @@ function containsAny(text: string, keywords: string[]): boolean {
   return keywords.some(keyword => normalizedText.includes(normalizeText(keyword)));
 }
 
+interface AllergenCheckResult {
+  warnings: string[];
+  triggers: Record<string, string[]>; // Maps allergen to the specific keywords found
+}
+
 function checkAllergens(
   allergener: string,
   ingredienser: string,
   userAllergies: string[]
-): string[] {
+): AllergenCheckResult {
   const warnings: string[] = [];
+  const triggers: Record<string, string[]> = {};
   
   // IMPORTANT: Only use ingredients list for allergen checking
   // The "Allergener/Kosthold" field from Kassalapp API often lists ALL possible allergens
@@ -319,19 +326,25 @@ function checkAllergens(
   
   // If no ingredients, we can't reliably check - return empty (no warnings)
   if (!textToCheck.trim()) {
-    return [];
+    return { warnings: [], triggers: {} };
   }
   
   for (const allergy of userAllergies) {
     const allergyLower = allergy.toLowerCase();
     const allergenKeywords = allergenMapping[allergyLower] || [allergyLower];
     
-    if (containsAny(textToCheck, allergenKeywords)) {
+    // Find all matching keywords for this allergen
+    const matchedKeywords = allergenKeywords.filter(keyword => 
+      textToCheck.includes(normalizeText(keyword))
+    );
+    
+    if (matchedKeywords.length > 0) {
       warnings.push(allergy);
+      triggers[allergy] = matchedKeywords;
     }
   }
   
-  return warnings;
+  return { warnings, triggers };
 }
 
 function checkDiets(
@@ -508,9 +521,9 @@ export function analyzeProductMatch(
   const ingredienser = product.ingredienser || '';
   
   // Check allergens
-  const allergyWarnings = userPreferences?.allergies 
+  const allergenResult = userPreferences?.allergies 
     ? checkAllergens(allergener, ingredienser, userPreferences.allergies)
-    : [];
+    : { warnings: [], triggers: {} };
   
   // Check diets
   const dietResult = userPreferences?.diets
@@ -527,7 +540,8 @@ export function analyzeProductMatch(
   const localFoodResult = checkLocalFood(product.name, product.brand);
   
   const partialMatchInfo = {
-    allergyWarnings,
+    allergyWarnings: allergenResult.warnings,
+    allergyTriggers: allergenResult.triggers,
     dietWarnings: dietResult.warnings,
     dietMatches: dietResult.matches,
     organicMatch,
