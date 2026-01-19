@@ -212,6 +212,16 @@ export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedPro
       </Button>
 
       <div className="space-y-6">
+        {recipe.image_url && (
+          <div className="rounded-xl overflow-hidden shadow-lg">
+            <img 
+              src={recipe.image_url} 
+              alt={recipe.title}
+              className="w-full h-64 md:h-80 object-cover"
+            />
+          </div>
+        )}
+        
         <div>
           <div className="flex items-center gap-2 mb-2">
             <h1 className="text-4xl font-bold text-foreground">{recipe.title}</h1>
