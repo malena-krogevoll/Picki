@@ -27,16 +27,23 @@ export const PreferenceIndicators = ({
 
   return (
     <div className={`flex flex-wrap gap-1 ${compact ? 'mt-1' : 'mt-2'}`}>
-      {/* Allergen warnings - RED (dangerous) */}
-      {matchInfo.allergyWarnings.map((warning) => (
-        <Badge 
-          key={`allergy-${warning}`}
-          className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full"
-        >
-          <AlertTriangle className="h-3 w-3 mr-1" />
-          {warning}
-        </Badge>
-      ))}
+      {/* Allergen warnings - RED (dangerous) with trigger info */}
+      {matchInfo.allergyWarnings.map((warning) => {
+        const triggers = matchInfo.allergyTriggers?.[warning] || [];
+        const triggerText = triggers.length > 0 
+          ? ` (${triggers.slice(0, 2).join(', ')}${triggers.length > 2 ? '...' : ''})`
+          : '';
+        return (
+          <Badge 
+            key={`allergy-${warning}`}
+            className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full"
+            title={triggers.length > 0 ? `Funnet: ${triggers.join(', ')}` : undefined}
+          >
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            {warning}{triggerText}
+          </Badge>
+        );
+      })}
 
       {/* Diet warnings - RED */}
       {matchInfo.dietWarnings.map((warning) => (
