@@ -5,36 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SwipeableCard } from "@/components/SwipeableCard";
-import { StoreSelectorDialog, getStoreName } from "@/components/StoreSelectorDialog";
+import { getStoreName } from "@/components/StoreSelectorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
-import { Plus, ShoppingCart, Clock, Copy, ChevronRight, Package, UtensilsCrossed, Trash2 } from "lucide-react";
+import TextInputShoppingList from "@/components/TextInputShoppingList";
+import { ShoppingCart, Clock, Copy, ChevronRight, Package, UtensilsCrossed, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
-  const { lists, completedLists, loading: listLoading, createList, duplicateList, deleteList, setActiveList } = useShoppingList(user?.id);
+  const { lists, completedLists, loading: listLoading, duplicateList, deleteList, setActiveList, refetch } = useShoppingList(user?.id);
   const navigate = useNavigate();
-  const [showStoreSelector, setShowStoreSelector] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
-
-  const handleCreateNewList = () => {
-    // Show store selector first
-    setShowStoreSelector(true);
-  };
-
-  const handleStoreSelected = async (storeId: string) => {
-    const result = await createList("Min handleliste", storeId);
-    if (result?.data) {
-      navigate(`/list/${result.data.id}`);
-    }
-  };
 
   const handleEditList = (listId: string) => {
     const list = lists.find(l => l.id === listId);
@@ -55,6 +43,10 @@ const Dashboard = () => {
     if (window.confirm("Er du sikker på at du vil slette denne listen?")) {
       await deleteList(listId);
     }
+  };
+
+  const handleListCreated = () => {
+    refetch();
   };
 
   if (authLoading || listLoading) {
@@ -79,45 +71,26 @@ const Dashboard = () => {
             <p className="text-sm md:text-base text-muted-foreground">Administrer dine handlelister</p>
           </div>
 
-          {/* Quick actions - compact on mobile */}
-          <div className="grid grid-cols-2 gap-3 md:gap-4">
-            <Card 
-              className="border-2 border-dashed border-primary/30 bg-primary/5 hover:border-primary/50 transition-colors cursor-pointer" 
-              onClick={handleCreateNewList}
-            >
-              <CardContent className="flex items-center justify-center py-6 md:py-12 px-2 md:px-6">
-                <div className="text-center space-y-1 md:space-y-2">
-                  <div className="bg-primary/10 w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-2 md:mb-4">
-                    <Plus className="h-5 w-5 md:h-8 md:w-8 text-primary" />
-                  </div>
-                  <h3 className="text-sm md:text-xl font-semibold">Ny liste</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground hidden md:block">Velg butikk og start</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Text input for creating new shopping list */}
+          <TextInputShoppingList onListCreated={handleListCreated} />
 
-            <Card 
-              className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" 
-              onClick={() => navigate("/dinner-explorer")}
-            >
-              <CardContent className="flex items-center justify-center py-6 md:py-12 px-2 md:px-6">
-                <div className="text-center space-y-1 md:space-y-2">
-                  <div className="bg-secondary/10 w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-2 md:mb-4">
-                    <UtensilsCrossed className="h-5 w-5 md:h-8 md:w-8 text-secondary-foreground" />
-                  </div>
-                  <h3 className="text-sm md:text-xl font-semibold">Middager</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground hidden md:block">Oppskrifter med renvarer</p>
+          {/* Quick action for dinner explorer */}
+          <Card 
+            className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" 
+            onClick={() => navigate("/dinner-explorer")}
+          >
+            <CardContent className="flex items-center justify-center py-6 md:py-8 px-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center">
+                  <UtensilsCrossed className="h-6 w-6 text-secondary-foreground" />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Store Selector Dialog */}
-          <StoreSelectorDialog
-            open={showStoreSelector}
-            onOpenChange={setShowStoreSelector}
-            onSelectStore={handleStoreSelected}
-          />
+                <div>
+                  <h3 className="text-lg font-semibold">Middager</h3>
+                  <p className="text-sm text-muted-foreground">Oppskrifter med renvarer</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Aktive handlelister */}
           {lists.length > 0 && (
@@ -275,7 +248,7 @@ const Dashboard = () => {
               <CardContent className="py-8 md:py-12 text-center">
                 <Package className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground text-sm md:text-base">Du har ingen handlelister ennå</p>
-                <p className="text-xs md:text-sm text-muted-foreground mt-2">Opprett din første handleliste</p>
+                <p className="text-xs md:text-sm text-muted-foreground mt-2">Bruk tekstfeltet over til å opprette din første handleliste</p>
               </CardContent>
             </Card>
           )}
