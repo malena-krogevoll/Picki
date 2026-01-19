@@ -80,12 +80,12 @@ const TextInputShoppingList = ({ onListCreated }: Props) => {
 
       if (listError) throw listError;
 
-      // Add items to the list - format item name with quantity if > 1
+      // Add items to the list - store name, quantity, and notes separately
       const itemsToInsert = parsedItems.map(item => ({
         list_id: listData.id,
-        name: item.quantity > 1 
-          ? `${item.quantity}x ${item.product_name}${item.notes ? ` (${item.notes})` : ''}`
-          : `${item.product_name}${item.notes ? ` (${item.notes})` : ''}`
+        name: item.product_name,
+        quantity: item.quantity,
+        notes: item.notes || null
       }));
 
       const { error: itemsError } = await supabase

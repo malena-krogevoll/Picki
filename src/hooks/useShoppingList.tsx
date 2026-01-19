@@ -21,6 +21,8 @@ export interface ShoppingListItem {
   id: string;
   list_id: string;
   name: string;
+  quantity: number;
+  notes: string | null;
   selected_product_ean: string | null;
   product_data: ProductData | null;
   in_cart: boolean;
@@ -63,6 +65,8 @@ const mapDbItemsToShoppingListItems = (items: any[]): ShoppingListItem[] => {
     id: item.id,
     list_id: item.list_id,
     name: item.name,
+    quantity: item.quantity ?? 1,
+    notes: item.notes ?? null,
     selected_product_ean: item.selected_product_ean,
     product_data: parseProductData(item.product_data),
     in_cart: item.in_cart ?? false,
@@ -191,7 +195,7 @@ export const useShoppingList = (userId: string | undefined) => {
     return { data, error: null };
   };
 
-  const addItem = async (listId: string, name: string, productData?: ProductData) => {
+  const addItem = async (listId: string, name: string, productData?: ProductData, quantity: number = 1, notes?: string) => {
     // Convert ProductData to Json-compatible format
     const productDataAsJson = productData ? {
       ean: productData.ean,
@@ -212,6 +216,8 @@ export const useShoppingList = (userId: string | undefined) => {
       .insert({
         list_id: listId,
         name,
+        quantity: Math.max(1, quantity),
+        notes: notes || null,
         product_data: productDataAsJson ?? null,
         selected_product_ean: productData?.ean ?? null,
       });
@@ -226,6 +232,48 @@ export const useShoppingList = (userId: string | undefined) => {
     }
 
     await fetchLists();
+    return { error: null };
+  };
+
+  const updateItemQuantity = async (itemId: string, quantity: number) => {
+    const newQuantity = Math.max(1, quantity);
+    
+    // Optimistic update
+    setLists(prevLists =>
+      prevLists.map(list => ({
+        ...list,
+        items: list.items?.map(item =>
+          item.id === itemId ? { ...item, quantity: newQuantity } : item
+        )
+      }))
+    );
+
+    // Update active list as well
+    if (activeList?.items) {
+      setActiveList({
+        ...activeList,
+        items: activeList.items.map(item =>
+          item.id === itemId ? { ...item, quantity: newQuantity } : item
+        )
+      });
+    }
+
+    const { error } = await supabase
+      .from("shopping_list_items")
+      .update({ quantity: newQuantity })
+      .eq("id", itemId);
+
+    if (error) {
+      toast({
+        title: "Feil ved oppdatering av mengde",
+        description: error.message,
+        variant: "destructive",
+      });
+      // Revert on error
+      await fetchLists();
+      return { error };
+    }
+
     return { error: null };
   };
 
@@ -417,6 +465,8 @@ export const useShoppingList = (userId: string | undefined) => {
       const itemsToInsert = originalList.items.map((item: any) => ({
         list_id: newList.id,
         name: item.name,
+        quantity: item.quantity ?? 1,
+        notes: item.notes ?? null,
         in_cart: false,
       }));
 
@@ -486,6 +536,7 @@ export const useShoppingList = (userId: string | undefined) => {
     addItem,
     removeItem,
     updateItemStatus,
+    updateItemQuantity,
     updateItemProduct,
     completeList,
     updateListStore,

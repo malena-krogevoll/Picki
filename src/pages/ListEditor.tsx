@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, X, Store, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus } from "lucide-react";
 import { toast } from "sonner";
 
 type ViewMode = 'edit' | 'select-store' | 'shop';
@@ -17,7 +17,7 @@ type ViewMode = 'edit' | 'select-store' | 'shop';
 const ListEditor = () => {
   const { listId } = useParams<{ listId: string }>();
   const { user, loading: authLoading } = useAuth();
-  const { lists, loading: listLoading, addItem, removeItem, updateListStore, setActiveList } = useShoppingList(user?.id);
+  const { lists, loading: listLoading, addItem, removeItem, updateListStore, updateItemQuantity, setActiveList } = useShoppingList(user?.id);
   const navigate = useNavigate();
   const [newItemName, setNewItemName] = useState("");
   const [view, setView] = useState<ViewMode>('edit');
@@ -63,6 +63,11 @@ const ListEditor = () => {
   const handleRemoveItem = async (itemId: string) => {
     await removeItem(itemId);
     toast.success("Vare fjernet");
+  };
+
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+    if (newQuantity < 1) return;
+    await updateItemQuantity(itemId, newQuantity);
   };
 
   const handleSelectStore = async (storeId: string) => {
@@ -177,13 +182,47 @@ const ListEditor = () => {
             
             {items.map((item) => (
               <Card key={item.id} className="border-2 border-border">
-                <CardContent className="p-3 flex items-center justify-between">
-                  <span className="text-sm font-medium">{item.name}</span>
+                <CardContent className="p-3 flex items-center gap-3">
+                  {/* Quantity controls */}
+                  <div className="flex items-center gap-1 bg-muted rounded-full p-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-full"
+                      onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                      disabled={item.quantity <= 1}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="w-6 text-center text-sm font-medium tabular-nums">
+                      {item.quantity}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-full"
+                      onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  
+                  {/* Item name and notes */}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium">{item.name}</span>
+                    {item.notes && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({item.notes})
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Remove button */}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRemoveItem(item.id)}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </Button>
