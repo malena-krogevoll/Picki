@@ -43,6 +43,12 @@ interface ProductSource {
   fetched_at: string;
 }
 
+interface ExistingProduct {
+  ean: string;
+  ingredients_hash: string | null;
+  nova_class: number | null;
+}
+
 interface MasterProduct {
   ean: string;
   name: string | null;
@@ -50,7 +56,18 @@ interface MasterProduct {
   image_url: string | null;
   ingredients_raw: string | null;
   ingredients_hash: string | null;
+  nova_class: number | null;
+  nova_confidence: number | null;
+  nova_reason: string | null;
   updated_at: string;
+}
+
+interface NovaClassificationResult {
+  nova_group: 1 | 2 | 3 | 4 | null;
+  confidence: number;
+  reasoning: string;
+  has_ingredients: boolean;
+  is_estimated: boolean;
 }
 
 // Generate SHA-256 hash of ingredients for cache invalidation
@@ -93,12 +110,43 @@ function getBestFieldValue<T>(
   return null;
 }
 
+// Call the classify-nova edge function
+async function classifyNova(ingredientsRaw: string, productCategory?: string): Promise<NovaClassificationResult | null> {
+  try {
+    const functionUrl = `${supabaseUrl}/functions/v1/classify-nova/classify-nova`;
+    
+    const response = await fetch(functionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        ingredients_text: ingredientsRaw,
+        product_category: productCategory,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`NOVA classification failed: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const result = await response.json();
+    return result as NovaClassificationResult;
+  } catch (error) {
+    console.error("Error calling classify-nova:", error);
+    return null;
+  }
+}
+
 // Main function to recompute master product from sources
 async function recomputeMasterProduct(ean: string): Promise<{
   success: boolean;
   product?: MasterProduct;
   error?: string;
   sourcesUsed?: string[];
+  novaRecomputed?: boolean;
 }> {
   console.log(`Recomputing master product for EAN: ${ean}`);
 
@@ -120,16 +168,81 @@ async function recomputeMasterProduct(ean: string): Promise<{
 
   console.log(`Found ${sources.length} sources: ${sources.map(s => s.source).join(", ")}`);
 
-  // 2. Apply field-specific priority to select best values
+  // 2. Fetch existing product to check if NOVA needs recomputation
+  const { data: existingProduct } = await supabase
+    .from("products")
+    .select("ean, ingredients_hash, nova_class")
+    .eq("ean", ean)
+    .maybeSingle();
+
+  // 3. Apply field-specific priority to select best values
   const name = getBestFieldValue<string>(sources, "name", FIELD_PRIORITY.name);
   const brand = getBestFieldValue<string>(sources, "brand", FIELD_PRIORITY.brand);
   const image_url = getBestFieldValue<string>(sources, "image_url", FIELD_PRIORITY.image_url);
   const ingredients_raw = getBestFieldValue<string>(sources, "ingredients_raw", FIELD_PRIORITY.ingredients_raw);
 
-  // 3. Generate ingredients hash
+  // 4. Generate ingredients hash
   const ingredients_hash = await hashIngredients(ingredients_raw);
 
-  // 4. Build the master product record
+  // 5. Determine if NOVA needs recomputation
+  const oldHash = existingProduct?.ingredients_hash;
+  const oldNovaClass = existingProduct?.nova_class;
+  
+  const needsNovaRecomputation = 
+    oldNovaClass === null || 
+    oldNovaClass === undefined || 
+    (ingredients_hash !== null && ingredients_hash !== oldHash);
+
+  console.log(`NOVA recomputation needed: ${needsNovaRecomputation} (oldHash: ${oldHash?.substring(0, 16) ?? 'null'}, newHash: ${ingredients_hash?.substring(0, 16) ?? 'null'}, oldNova: ${oldNovaClass})`);
+
+  // 6. Compute NOVA if needed
+  let nova_class: number | null = existingProduct?.nova_class ?? null;
+  let nova_confidence: number | null = null;
+  let nova_reason: string | null = null;
+
+  if (needsNovaRecomputation && ingredients_raw) {
+    console.log("Computing NOVA classification...");
+    
+    // Try to get product category from sources for better classification
+    const payload = sources[0]?.payload as { category?: string } | undefined;
+    const productCategory = payload?.category;
+    
+    const novaResult = await classifyNova(ingredients_raw, productCategory);
+    
+    if (novaResult) {
+      nova_class = novaResult.nova_group;
+      nova_confidence = novaResult.confidence;
+      nova_reason = novaResult.reasoning;
+      console.log(`NOVA classification result: NOVA ${nova_class} (confidence: ${nova_confidence})`);
+    } else {
+      console.warn("NOVA classification returned null, keeping existing values");
+      // Keep existing values if classification fails
+      if (!needsNovaRecomputation) {
+        nova_class = existingProduct?.nova_class ?? null;
+      }
+    }
+  } else if (!ingredients_raw) {
+    console.log("No ingredients available, skipping NOVA classification");
+  } else {
+    console.log("Ingredients unchanged, using cached NOVA values");
+    // Keep existing NOVA values since ingredients haven't changed
+    // We need to fetch them if we don't have them
+    if (existingProduct) {
+      const { data: fullProduct } = await supabase
+        .from("products")
+        .select("nova_class, nova_confidence, nova_reason")
+        .eq("ean", ean)
+        .maybeSingle();
+      
+      if (fullProduct) {
+        nova_class = fullProduct.nova_class;
+        nova_confidence = fullProduct.nova_confidence;
+        nova_reason = fullProduct.nova_reason;
+      }
+    }
+  }
+
+  // 7. Build the master product record
   const masterProduct: MasterProduct = {
     ean,
     name,
@@ -137,6 +250,9 @@ async function recomputeMasterProduct(ean: string): Promise<{
     image_url,
     ingredients_raw,
     ingredients_hash,
+    nova_class,
+    nova_confidence,
+    nova_reason,
     updated_at: new Date().toISOString(),
   };
 
@@ -147,9 +263,11 @@ async function recomputeMasterProduct(ean: string): Promise<{
     hasImage: !!image_url,
     hasIngredients: !!ingredients_raw,
     ingredientsHash: ingredients_hash?.substring(0, 16),
+    novaClass: nova_class,
+    novaConfidence: nova_confidence,
   });
 
-  // 5. Upsert into products table
+  // 8. Upsert into products table
   const { data: upsertedProduct, error: upsertError } = await supabase
     .from("products")
     .upsert(masterProduct, {
@@ -170,6 +288,7 @@ async function recomputeMasterProduct(ean: string): Promise<{
     success: true,
     product: upsertedProduct,
     sourcesUsed: sources.map(s => s.source),
+    novaRecomputed: needsNovaRecomputation,
   };
 }
 
@@ -202,6 +321,7 @@ serve(async (req) => {
         success: true,
         product: result.product,
         sourcesUsed: result.sourcesUsed,
+        novaRecomputed: result.novaRecomputed,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
