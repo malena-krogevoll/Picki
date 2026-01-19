@@ -225,19 +225,41 @@ const localFoodMediumKeywords: { keywords: string[]; label: string }[] = [
 
 // Allergen mapping for Norwegian products
 const allergenMapping: Record<string, string[]> = {
-  "gluten": ["hvete", "rug", "bygg", "havre", "spelt", "gluten", "mel", "semule", "durumhvete"],
-  "melk": ["melk", "laktose", "fløte", "smør", "ost", "kasein", "myse", "kremfløte", "rømme", "yoghurt"],
-  "egg": ["egg", "eggehvite", "eggeplomme", "majonese"],
-  "nøtter": ["mandel", "hasselnøtt", "valnøtt", "cashew", "pistasjnøtt", "pekannøtt", "macadamia", "nøtter"],
-  "peanøtter": ["peanøtt", "peanøtter", "jordnøtt", "jordnøtter"],
-  "skalldyr": ["reke", "krabbe", "hummer", "skjell", "østers", "sjøkreps", "scampi"],
-  "fisk": ["fisk", "torsk", "laks", "makrell", "sild", "sei", "hyse", "kveite", "ørret"],
-  "soya": ["soya", "soyabønne", "soyaprotein", "soyaolje", "soyalecitin"],
-  "sesam": ["sesam", "sesamfrø", "sesamolje"],
-  "selleri": ["selleri", "sellerisalt"],
-  "sennep": ["sennep", "sennepsfrø"],
-  "lupin": ["lupin", "lupinfrø"],
-  "bløtdyr": ["blekksprut", "blåskjell", "muslinger", "snegler", "kamskjell"],
+  "gluten": ["hvete", "rug", "bygg", "havre", "spelt", "gluten", "mel", "semule", "durumhvete", "seitan", "couscous", "bulgur", "kamut", "emmer"],
+  "melk": ["melk", "laktose", "fløte", "smør", "ost", "kasein", "myse", "kremfløte", "rømme", "yoghurt", "helmelk", "lettmelk", "skummetmelk", "kondensert melk", "tørrmelk", "melkepulver", "melkefett", "melkeprotein", "valle", "kesam", "kremost"],
+  "egg": ["egg", "eggehvite", "eggeplomme", "majonese", "eggemasse", "eggepulver", "pasteurisert egg", "aioli"],
+  "nøtter": ["mandel", "hasselnøtt", "valnøtt", "cashew", "pistasjnøtt", "pekannøtt", "macadamia", "nøtter", "paranøtt", "mandelmel", "nøtteolje"],
+  "peanøtter": ["peanøtt", "peanøtter", "jordnøtt", "jordnøtter", "peanøttolje", "peanøttsmør"],
+  "skalldyr": [
+    // Grunnleggende
+    "reke", "reker", "krabbe", "hummer", "skjell", "østers", "sjøkreps", "scampi",
+    // Krepsdyr-varianter
+    "krepsdyr", "languster", "langustiner", "langustin", "crevettes", "sjøkrebs",
+    // Kjøtt/deler
+    "krabbekjøtt", "krabbeklør", "hummerkjøtt", "rekekjøtt",
+    // Bearbeidede produkter
+    "rekesalat", "rekefett", "rekepulver", "rekebuljong", "rekeolje",
+    "skalldyrbuljong", "skalldyrekstrakt", "skalldyrprotein", "skalldyrpulver",
+    // Andre varianter
+    "kreps", "ferskvannskreps", "signalkreps", "taskekrabbe", "trollkrabbe", "kongekrabbe"
+  ],
+  "fisk": ["fisk", "torsk", "laks", "makrell", "sild", "sei", "hyse", "kveite", "ørret", "sardiner", "ansjos", "tunfisk", "steinbit", "breiflabb", "fiskegelatin", "fiskeolje", "kaviar", "rogn"],
+  "soya": ["soya", "soyabønne", "soyaprotein", "soyaolje", "soyalecitin", "tofu", "miso", "tempeh", "edamame", "soyasaus"],
+  "sesam": ["sesam", "sesamfrø", "sesamolje", "tahini", "gomashio"],
+  "selleri": ["selleri", "sellerisalt", "selleristang", "sellerirot", "knollselleri"],
+  "sennep": ["sennep", "sennepsfrø", "sennepspulver", "dijonsennep"],
+  "lupin": ["lupin", "lupinfrø", "lupinmel", "lupinprotein"],
+  "bløtdyr": [
+    // Grunnleggende
+    "blekksprut", "blåskjell", "muslinger", "snegler", "kamskjell",
+    // Blekksprut-varianter
+    "akkar", "calamari", "squid", "blekksprutringer", "sepia", "åttearmet blekksprut",
+    // Skjell-varianter
+    "hjerteskjell", "sandskjell", "østersskjell", "grønnleppet musling",
+    "hjertemusling", "daggarskjell", "strandsnegl", "sjøsnegle", "albusnegl",
+    // Bearbeidede produkter
+    "bløtdyrprotein", "bløtdyrekstrakt", "muslingsaus", "østerssaus"
+  ],
   "sulfitt": ["sulfitt", "svoveldioksid", "e220", "e221", "e222", "e223", "e224", "e225", "e226", "e227", "e228"]
 };
 
