@@ -1,10 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Initialize Supabase client with service role for DB writes
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface SearchRequest {
   query: string;
@@ -390,6 +396,12 @@ serve(async (req) => {
 
     const topResults = candidates.slice(0, 20);
     console.log(`Returning ${topResults.length} results, best renvareScore: ${topResults[0]?.renvareScore ?? 0}`);
+
+    // Write-through cache: save to DB in background (best effort, don't block response)
+    // We pass allCandidates to cache all products we received, not just top results
+    cacheProductsToDatabase(allCandidates).catch(err => {
+      console.error("Background cache write failed:", err);
+    });
 
     return new Response(
       JSON.stringify({
@@ -940,5 +952,182 @@ async function searchKassalappAPI(
   } catch (error) {
     console.error("Kassalapp API search failed:", error);
     throw error;
+  }
+}
+
+// ============================================
+// Write-through cache: Save products to database
+// ============================================
+
+interface RawKassalappItem {
+  ean?: string | number;
+  name?: string;
+  brand?: string;
+  image?: string;
+  ingredients?: string;
+  store?: {
+    name?: string;
+    code?: string;
+  };
+  [key: string]: unknown;
+}
+
+async function cacheProductsToDatabase(candidates: ProductCandidate[]): Promise<void> {
+  const startTime = Date.now();
+  
+  // Extract unique products with EAN
+  const productsWithEan = candidates.filter(c => c.product.EAN);
+  if (productsWithEan.length === 0) {
+    console.log("No products with EAN to cache");
+    return;
+  }
+
+  console.log(`Caching ${productsWithEan.length} products to database...`);
+
+  try {
+    // 1. Collect unique chain names from all products
+    const chainNames = new Set<string>();
+    for (const candidate of productsWithEan) {
+      const chainName = candidate.product.Kjede;
+      if (chainName) {
+        chainNames.add(chainName.toLowerCase().trim());
+      }
+    }
+
+    // 2. Upsert chains (batch)
+    const chainMap = new Map<string, string>(); // name -> id
+    if (chainNames.size > 0) {
+      const chainsToUpsert = Array.from(chainNames).map(name => ({ 
+        name: name 
+      }));
+
+      const { data: chainData, error: chainError } = await supabase
+        .from("chains")
+        .upsert(chainsToUpsert, { 
+          onConflict: "name",
+          ignoreDuplicates: false 
+        })
+        .select("id, name");
+
+      if (chainError) {
+        console.error("Chain upsert error:", chainError);
+      } else if (chainData) {
+        for (const chain of chainData) {
+          chainMap.set(chain.name.toLowerCase(), chain.id);
+        }
+        console.log(`Upserted ${chainData.length} chains`);
+      }
+    }
+
+    // 3. Prepare product_sources batch
+    const productSourcesData = productsWithEan.map(candidate => {
+      const product = candidate.product;
+      const ean = String(product.EAN);
+      
+      // Build the raw payload as stored from Kassalapp
+      const payload: RawKassalappItem = {
+        ean: product.EAN,
+        name: product.Produktnavn,
+        brand: product.Merke,
+        image: product.Produktbilde_URL,
+        ingredients: product.Ingrediensliste,
+        category: product.Kategori,
+        price: product.Pris,
+        store: {
+          name: product.Kjede,
+          code: product.StoreCode,
+        },
+        allergens: product["Allergener/Kosthold"],
+        nutrition: product.Tilleggsfiltre,
+      };
+
+      return {
+        ean,
+        source: "KASSALAPP" as const,
+        source_product_id: ean, // Using EAN as source ID for Kassalapp
+        payload,
+        name: product.Produktnavn || null,
+        brand: product.Merke || null,
+        image_url: product.Produktbilde_URL || null,
+        ingredients_raw: product.Ingrediensliste || null,
+        fetched_at: new Date().toISOString(),
+      };
+    });
+
+    // Remove duplicates by EAN (keep first occurrence)
+    const seenEans = new Set<string>();
+    const uniqueProductSources = productSourcesData.filter(ps => {
+      if (seenEans.has(ps.ean)) return false;
+      seenEans.add(ps.ean);
+      return true;
+    });
+
+    // 4. Upsert product_sources (batch)
+    const { error: psError } = await supabase
+      .from("product_sources")
+      .upsert(uniqueProductSources, { 
+        onConflict: "ean,source",
+        ignoreDuplicates: false 
+      });
+
+    if (psError) {
+      console.error("Product sources upsert error:", psError);
+    } else {
+      console.log(`Upserted ${uniqueProductSources.length} product_sources`);
+    }
+
+    // 5. Prepare offers batch (ean + chain_id)
+    const offersData: Array<{
+      ean: string;
+      chain_id: string;
+      last_seen_at: string;
+      source: string;
+    }> = [];
+
+    for (const candidate of productsWithEan) {
+      const product = candidate.product;
+      const ean = String(product.EAN);
+      const chainName = product.Kjede?.toLowerCase().trim();
+      
+      if (chainName && chainMap.has(chainName)) {
+        const chainId = chainMap.get(chainName)!;
+        offersData.push({
+          ean,
+          chain_id: chainId,
+          last_seen_at: new Date().toISOString(),
+          source: "KASSALAPP",
+        });
+      }
+    }
+
+    // Remove duplicate offers (same ean + chain_id)
+    const seenOffers = new Set<string>();
+    const uniqueOffers = offersData.filter(offer => {
+      const key = `${offer.ean}:${offer.chain_id}`;
+      if (seenOffers.has(key)) return false;
+      seenOffers.add(key);
+      return true;
+    });
+
+    // 6. Upsert offers (batch)
+    if (uniqueOffers.length > 0) {
+      const { error: offersError } = await supabase
+        .from("offers")
+        .upsert(uniqueOffers, { 
+          onConflict: "ean,chain_id",
+          ignoreDuplicates: false 
+        });
+
+      if (offersError) {
+        console.error("Offers upsert error:", offersError);
+      } else {
+        console.log(`Upserted ${uniqueOffers.length} offers`);
+      }
+    }
+
+    console.log(`Cache write completed in ${Date.now() - startTime}ms`);
+  } catch (error) {
+    console.error("Cache write failed:", error);
+    // Don't throw - this is best effort
   }
 }
