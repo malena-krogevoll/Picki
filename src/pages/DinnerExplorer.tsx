@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChefHat, UtensilsCrossed, Soup, AlertCircle } from "lucide-react";
+import { ChefHat, UtensilsCrossed, Soup, AlertCircle, Coffee } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const DinnerExplorer = () => {
@@ -32,7 +32,7 @@ const DinnerExplorer = () => {
     (userPreferences.allergies.length > 0 || userPreferences.diets.length > 0);
 
   const filteredRecipes = useMemo(() => {
-    let result = getRecipesByType(activeTab as "dinner" | "base" | "diy");
+    let result = getRecipesByType(activeTab as "dinner" | "base" | "diy" | "breakfast");
     
     // Apply user preference filtering
     result = filterRecipesByPreferences(result, userPreferences);
@@ -69,13 +69,14 @@ const DinnerExplorer = () => {
   }, [recipes, activeTab, searchQuery, selectedCategory, showOnlyCompatible, showOnlyQuick, userPreferences]);
 
   const categories = useMemo(() => {
-    const typeRecipes = getRecipesByType(activeTab as "dinner" | "base" | "diy");
+    const typeRecipes = getRecipesByType(activeTab as "dinner" | "base" | "diy" | "breakfast");
     return [...new Set(typeRecipes.map(r => r.category))];
   }, [recipes, activeTab]);
 
   const getTabTitle = (tab: string) => {
     switch (tab) {
       case "dinner": return "Middager";
+      case "breakfast": return "Frokost/Lunsj";
       case "base": return "Baseprodukter";
       case "diy": return "DIY";
       default: return tab;
@@ -85,6 +86,7 @@ const DinnerExplorer = () => {
   const getTabDescription = (tab: string) => {
     switch (tab) {
       case "dinner": return "Renvare-middager med enkle ingredienser";
+      case "breakfast": return "Frokost- og lunsjoppskrifter for en god start på dagen";
       case "base": return "Grunnoppskrifter som buljong, pesto og sauser";
       case "diy": return "Hjemmelagde alternativer til ferdigprodukter";
       default: return "";
@@ -126,18 +128,22 @@ const DinnerExplorer = () => {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3 max-w-md">
+              <TabsList className="grid w-full grid-cols-4 max-w-lg">
                 <TabsTrigger value="dinner" className="gap-2">
                   <UtensilsCrossed className="h-4 w-4" />
-                  Middager
+                  <span className="hidden sm:inline">Middager</span>
+                </TabsTrigger>
+                <TabsTrigger value="breakfast" className="gap-2">
+                  <Coffee className="h-4 w-4" />
+                  <span className="hidden sm:inline">Frokost</span>
                 </TabsTrigger>
                 <TabsTrigger value="base" className="gap-2">
                   <Soup className="h-4 w-4" />
-                  Base
+                  <span className="hidden sm:inline">Base</span>
                 </TabsTrigger>
                 <TabsTrigger value="diy" className="gap-2">
                   <ChefHat className="h-4 w-4" />
-                  DIY
+                  <span className="hidden sm:inline">DIY</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -161,7 +167,7 @@ const DinnerExplorer = () => {
                 />
               </div>
 
-              {["dinner", "base", "diy"].map((tab) => (
+              {["dinner", "breakfast", "base", "diy"].map((tab) => (
                 <TabsContent key={tab} value={tab}>
                   {filteredRecipes.length === 0 ? (
                     <Alert>

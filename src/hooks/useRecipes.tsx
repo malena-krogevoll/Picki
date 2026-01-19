@@ -21,7 +21,7 @@ export interface Recipe {
   prep_time: number | null;
   cook_time: number | null;
   category: string;
-  recipe_type: "dinner" | "base" | "diy";
+  recipe_type: "dinner" | "base" | "diy" | "breakfast";
   status: "draft" | "published";
   allergens: string[];
   diet_tags: string[];
@@ -64,7 +64,7 @@ export const useRecipes = () => {
 
         const recipesWithIngredients = recipesData.map(recipe => ({
           ...recipe,
-          recipe_type: recipe.recipe_type as "dinner" | "base" | "diy",
+          recipe_type: recipe.recipe_type as "dinner" | "base" | "diy" | "breakfast",
           status: recipe.status as "draft" | "published",
           allergens: recipe.allergens || [],
           diet_tags: recipe.diet_tags || [],
@@ -98,7 +98,7 @@ export const useRecipes = () => {
     fetchRecipes();
   }, []);
 
-  const getRecipesByType = (type: "dinner" | "base" | "diy") => {
+  const getRecipesByType = (type: "dinner" | "base" | "diy" | "breakfast") => {
     return recipes.filter(r => r.recipe_type === type);
   };
 
