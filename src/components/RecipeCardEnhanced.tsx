@@ -56,11 +56,21 @@ export const RecipeCardEnhanced = ({ recipe, onClick }: RecipeCardEnhancedProps)
 
   return (
     <Card
-      className={`cursor-pointer hover:shadow-lg transition-all duration-200 ${
+      className={`cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden ${
         hasWarnings ? "border-destructive/50 bg-destructive/5" : ""
       }`}
       onClick={onClick}
     >
+      {recipe.image_url && (
+        <div className="aspect-video overflow-hidden">
+          <img 
+            src={recipe.image_url} 
+            alt={recipe.title}
+            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+            loading="lazy"
+          />
+        </div>
+      )}
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
