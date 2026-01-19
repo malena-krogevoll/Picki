@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { RecipeCardEnhanced } from "@/components/RecipeCardEnhanced";
 import { RecipeDetailEnhanced } from "@/components/RecipeDetailEnhanced";
