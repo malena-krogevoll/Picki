@@ -73,15 +73,24 @@ const Dashboard = () => {
             <p className="text-sm md:text-base text-muted-foreground">Administrer dine handlelister</p>
           </div>
 
-          {/* Button to create new shopping list */}
-          <Button 
+          {/* Card to create new shopping list */}
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow border-primary/20 bg-primary/5"
             onClick={handleCreateNewList}
-            size="lg"
-            className="w-full py-6 text-base font-medium"
           >
-            <Plus className="h-5 w-5 mr-2" />
-            Ny handleliste
-          </Button>
+            <CardContent className="p-4 md:p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Plus className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm md:text-base">Ny handleliste</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground">Opprett en tom handleliste</p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </CardContent>
+          </Card>
 
           {/* Quick action for dinner explorer */}
           <Card 
