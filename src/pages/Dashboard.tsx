@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,13 @@ import { SwipeableCard } from "@/components/SwipeableCard";
 import { getStoreName } from "@/components/StoreSelectorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
-import TextInputShoppingList from "@/components/TextInputShoppingList";
-import { ShoppingCart, Clock, Copy, ChevronRight, Package, UtensilsCrossed, Trash2 } from "lucide-react";
+import { ShoppingCart, Clock, Copy, ChevronRight, Package, UtensilsCrossed, Trash2, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
-  const { lists, completedLists, loading: listLoading, duplicateList, deleteList, setActiveList, refetch } = useShoppingList(user?.id);
+  const { lists, completedLists, loading: listLoading, duplicateList, deleteList, setActiveList, createList } = useShoppingList(user?.id);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,8 +44,11 @@ const Dashboard = () => {
     }
   };
 
-  const handleListCreated = () => {
-    refetch();
+  const handleCreateNewList = async () => {
+    const result = await createList("Ny handleliste");
+    if (result?.data) {
+      navigate(`/list/${result.data.id}`);
+    }
   };
 
   if (authLoading || listLoading) {
@@ -71,8 +73,15 @@ const Dashboard = () => {
             <p className="text-sm md:text-base text-muted-foreground">Administrer dine handlelister</p>
           </div>
 
-          {/* Text input for creating new shopping list */}
-          <TextInputShoppingList onListCreated={handleListCreated} />
+          {/* Button to create new shopping list */}
+          <Button 
+            onClick={handleCreateNewList}
+            size="lg"
+            className="w-full py-6 text-base font-medium"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Ny handleliste
+          </Button>
 
           {/* Quick action for dinner explorer */}
           <Card 
@@ -248,7 +257,7 @@ const Dashboard = () => {
               <CardContent className="py-8 md:py-12 text-center">
                 <Package className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground text-sm md:text-base">Du har ingen handlelister ennå</p>
-                <p className="text-xs md:text-sm text-muted-foreground mt-2">Bruk tekstfeltet over til å opprette din første handleliste</p>
+                <p className="text-xs md:text-sm text-muted-foreground mt-2">Trykk på knappen over for å opprette din første handleliste</p>
               </CardContent>
             </Card>
           )}
