@@ -14,6 +14,140 @@ export type Database = {
   }
   public: {
     Tables: {
+      chains: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      offers: {
+        Row: {
+          chain_id: string
+          ean: string
+          id: string
+          last_seen_at: string
+          source: string | null
+        }
+        Insert: {
+          chain_id: string
+          ean: string
+          id?: string
+          last_seen_at?: string
+          source?: string | null
+        }
+        Update: {
+          chain_id?: string
+          ean?: string
+          id?: string
+          last_seen_at?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offers_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "chains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_sources: {
+        Row: {
+          brand: string | null
+          ean: string
+          fetched_at: string
+          id: string
+          image_url: string | null
+          ingredients_raw: string | null
+          name: string | null
+          payload: Json
+          source: Database["public"]["Enums"]["product_source_type"]
+          source_product_id: string | null
+        }
+        Insert: {
+          brand?: string | null
+          ean: string
+          fetched_at?: string
+          id?: string
+          image_url?: string | null
+          ingredients_raw?: string | null
+          name?: string | null
+          payload: Json
+          source: Database["public"]["Enums"]["product_source_type"]
+          source_product_id?: string | null
+        }
+        Update: {
+          brand?: string | null
+          ean?: string
+          fetched_at?: string
+          id?: string
+          image_url?: string | null
+          ingredients_raw?: string | null
+          name?: string | null
+          payload?: Json
+          source?: Database["public"]["Enums"]["product_source_type"]
+          source_product_id?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          brand: string | null
+          created_at: string
+          ean: string
+          id: string
+          image_url: string | null
+          ingredients_hash: string | null
+          ingredients_raw: string | null
+          name: string | null
+          nova_class: number | null
+          nova_confidence: number | null
+          nova_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          ean: string
+          id?: string
+          image_url?: string | null
+          ingredients_hash?: string | null
+          ingredients_raw?: string | null
+          name?: string | null
+          nova_class?: number | null
+          nova_confidence?: number | null
+          nova_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          ean?: string
+          id?: string
+          image_url?: string | null
+          ingredients_hash?: string | null
+          ingredients_raw?: string | null
+          name?: string | null
+          nova_class?: number | null
+          nova_confidence?: number | null
+          nova_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -266,7 +400,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      product_source_type: "EPD" | "KASSALAPP" | "MANUAL"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -393,6 +527,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      product_source_type: ["EPD", "KASSALAPP", "MANUAL"],
+    },
   },
 } as const
