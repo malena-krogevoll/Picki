@@ -1,22 +1,26 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { ProductSearchInput } from "@/components/ProductSearchInput";
-import { ShoppingListItem } from "@/components/ShoppingListItem";
-import { StoreSelectorDialog, getStoreName, getStoreIcon, getStoreColor } from "@/components/StoreSelectorDialog";
+import { StoreSelector } from "@/components/StoreSelector";
+import { ShoppingMode } from "@/components/ShoppingMode";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList, ProductData } from "@/hooks/useShoppingList";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Store, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Store, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
+
+type ViewMode = 'edit' | 'select-store' | 'shop';
 
 const ListEditor = () => {
   const { listId } = useParams<{ listId: string }>();
   const { user, loading: authLoading } = useAuth();
-  const { lists, loading: listLoading, addItem, removeItem, updateItemStatus, updateListStore, completeList, setActiveList } = useShoppingList(user?.id);
+  const { lists, loading: listLoading, addItem, removeItem, updateListStore, setActiveList } = useShoppingList(user?.id);
   const navigate = useNavigate();
-  const [showStoreSelector, setShowStoreSelector] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [view, setView] = useState<ViewMode>('edit');
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
@@ -36,33 +40,39 @@ const ListEditor = () => {
   useEffect(() => {
     if (currentList) {
       setActiveList(currentList);
+      // If store is already selected, go directly to shop mode
+      if (currentList.store_id) {
+        setView('shop');
+      }
     }
   }, [currentList, setActiveList]);
 
-  const handleAddProduct = async (name: string, productData?: ProductData) => {
-    if (!listId) return;
-    await addItem(listId, name, productData);
-    toast.success(productData ? "Produkt lagt til" : "Vare lagt til");
+  const handleAddItem = async () => {
+    if (!listId || !newItemName.trim()) return;
+    await addItem(listId, newItemName.trim());
+    setNewItemName("");
+    toast.success("Vare lagt til");
   };
 
-  const handleChangeStore = async (storeId: string) => {
+  const handleRemoveItem = async (itemId: string) => {
+    await removeItem(itemId);
+    toast.success("Vare fjernet");
+  };
+
+  const handleSelectStore = async (storeId: string) => {
     if (!listId) return;
     await updateListStore(listId, storeId);
-    toast.success(`Byttet til ${getStoreName(storeId)}`);
+    setView('shop');
+    toast.success("Butikk valgt - finner produkter...");
   };
 
-  const handleCompleteList = async () => {
-    if (!listId) return;
-    await completeList(listId);
-    toast.success("Handleliste fullført!");
-    navigate("/");
+  const handleBackFromStore = () => {
+    setView('edit');
   };
 
-  const allItemsInCart = items.length > 0 && items.every(item => item.in_cart);
-
-  const totalPrice = items.reduce((sum, item) => {
-    return sum + (item.product_data?.price || 0);
-  }, 0);
+  const handleBackFromShop = () => {
+    setView('select-store');
+  };
 
   if (authLoading || listLoading || !currentList) {
     return (
@@ -75,99 +85,127 @@ const ListEditor = () => {
     );
   }
 
-  const StoreIcon = currentList.store_id ? getStoreIcon(currentList.store_id) : Store;
+  // Shopping mode - show product suggestions
+  if (view === 'shop' && currentList.store_id) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
+          <ShoppingMode
+            storeId={currentList.store_id}
+            listId={listId!}
+            onBack={handleBackFromShop}
+          />
+        </main>
+      </div>
+    );
+  }
 
+  // Store selection mode
+  if (view === 'select-store') {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
+          <div className="mb-6">
+            <h1 className="text-xl font-bold mb-2">Velg butikk</h1>
+            <p className="text-muted-foreground text-sm">
+              Hvor skal du handle? Vi finner produkter og priser for deg.
+            </p>
+          </div>
+          <StoreSelector
+            onSelectStore={handleSelectStore}
+            onBack={handleBackFromStore}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Edit mode - manage free-text items
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
-        {/* Header with back button and store selector */}
+        {/* Header with back button */}
         <div className="flex items-center justify-between mb-6">
           <Button variant="ghost" onClick={() => navigate("/")} className="rounded-2xl">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Tilbake
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowStoreSelector(true)}
-            className="rounded-2xl"
-          >
-            <StoreIcon className={`h-4 w-4 mr-2 ${currentList.store_id ? getStoreColor(currentList.store_id) : ''}`} />
-            {currentList.store_id ? getStoreName(currentList.store_id) : 'Velg butikk'}
           </Button>
         </div>
 
         {/* List title */}
         <h1 className="text-xl font-bold mb-6">{currentList.name}</h1>
 
-        {/* Product search input */}
-        {currentList.store_id && (
-          <div className="mb-6">
-            <ProductSearchInput
-              storeId={currentList.store_id}
-              onAddProduct={handleAddProduct}
-            />
-          </div>
-        )}
+        {/* Add new item input */}
+        <div className="flex gap-2 mb-6">
+          <Input
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            placeholder="Legg til vare..."
+            className="rounded-2xl"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleAddItem();
+              }
+            }}
+          />
+          <Button 
+            onClick={handleAddItem} 
+            disabled={!newItemName.trim()}
+            className="rounded-2xl"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
 
-        {!currentList.store_id && (
-          <div className="text-center py-8 bg-secondary/30 rounded-2xl mb-6">
-            <Store className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-            <p className="text-muted-foreground">Velg en butikk for å begynne å legge til varer</p>
-            <Button className="mt-4 rounded-2xl" onClick={() => setShowStoreSelector(true)}>
-              Velg butikk
-            </Button>
-          </div>
-        )}
-
-        {/* Shopping list items */}
-        {items.length > 0 && (
-          <div className="space-y-3 mb-6">
-            <div className="flex items-center justify-between">
+        {/* Items list */}
+        {items.length > 0 ? (
+          <div className="space-y-2 mb-8">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-medium text-muted-foreground">
                 {items.length} {items.length === 1 ? 'vare' : 'varer'}
               </h2>
-              {totalPrice > 0 && (
-                <Badge variant="secondary" className="rounded-full">
-                  ca. {totalPrice.toFixed(0)} kr
-                </Badge>
-              )}
             </div>
             
             {items.map((item) => (
-              <ShoppingListItem
-                key={item.id}
-                id={item.id}
-                name={item.name}
-                inCart={item.in_cart}
-                productData={item.product_data}
-                onToggleCart={() => updateItemStatus(item.id, !item.in_cart)}
-                onRemove={() => removeItem(item.id)}
-                listId={listId!}
-                storeId={currentList.store_id || ''}
-              />
+              <Card key={item.id} className="border-2 border-border">
+                <CardContent className="p-3 flex items-center justify-between">
+                  <span className="text-sm font-medium">{item.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveItem(item.id)}
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
             ))}
           </div>
+        ) : (
+          <Card className="border-2 border-dashed border-border mb-8">
+            <CardContent className="py-8 text-center">
+              <ShoppingCart className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-muted-foreground">Ingen varer ennå</p>
+              <p className="text-xs text-muted-foreground mt-1">Bruk feltet over for å legge til varer</p>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Complete button */}
-        {items.length > 0 && allItemsInCart && (
+        {/* Continue to store selection */}
+        {items.length > 0 && (
           <Button
-            onClick={handleCompleteList}
+            onClick={() => setView('select-store')}
             className="w-full h-14 text-base rounded-2xl"
             size="lg"
           >
-            <CheckCircle2 className="h-5 w-5 mr-2" />
-            Fullfør handling
+            <Store className="h-5 w-5 mr-2" />
+            Velg butikk og finn produkter
           </Button>
         )}
-
-        {/* Store selector dialog */}
-        <StoreSelectorDialog
-          open={showStoreSelector}
-          onOpenChange={setShowStoreSelector}
-          onSelectStore={handleChangeStore}
-        />
       </main>
     </div>
   );
