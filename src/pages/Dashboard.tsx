@@ -73,41 +73,32 @@ const Dashboard = () => {
             <p className="text-sm md:text-base text-muted-foreground">Administrer dine handlelister</p>
           </div>
 
-          {/* Card to create new shopping list */}
+          {/* Quick action buttons */}
+          <div className="grid grid-cols-2 gap-3 md:gap-4">
             <Card 
               className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer"
               onClick={handleCreateNewList}
             >
-              <CardContent className="flex items-center justify-center py-6 md:py-8 px-4">
-                <div className="flex items-center gap-4">
-                  <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center">
-                    <Plus className="h-6 w-6 text-secondary-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Ny liste</h3>
-                    <p className="text-sm text-muted-foreground">Opprett en tom handleliste</p>
-                  </div>
+              <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-3">
+                <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+                  <Plus className="h-6 w-6 text-secondary-foreground" />
                 </div>
+                <h3 className="text-base font-semibold text-center">Ny liste</h3>
               </CardContent>
             </Card>
 
-          {/* Quick action for dinner explorer */}
-          <Card 
-            className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" 
-            onClick={() => navigate("/dinner-explorer")}
-          >
-            <CardContent className="flex items-center justify-center py-6 md:py-8 px-4">
-              <div className="flex items-center gap-4">
-                <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center">
+            <Card 
+              className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" 
+              onClick={() => navigate("/dinner-explorer")}
+            >
+              <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-3">
+                <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
                   <UtensilsCrossed className="h-6 w-6 text-secondary-foreground" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Middager</h3>
-                  <p className="text-sm text-muted-foreground">Oppskrifter med renvarer</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                <h3 className="text-base font-semibold text-center">Middager</h3>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Aktive handlelister */}
           {lists.length > 0 && (
