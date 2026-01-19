@@ -1,6 +1,8 @@
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, AlertTriangle, Leaf, ChefHat, Zap, Gauge } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, Users, AlertTriangle, Leaf, ChefHat, Zap, Heart } from "lucide-react";
 import { Recipe } from "@/hooks/useRecipes";
 
 interface RecipeCardEnhancedProps {
@@ -10,6 +12,8 @@ interface RecipeCardEnhancedProps {
     _hasWarnings?: boolean;
   };
   onClick: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (recipeId: string) => void;
 }
 
 type Difficulty = "lett" | "middels" | "vanskelig";
@@ -48,11 +52,21 @@ const DifficultyIndicator = ({ difficulty }: { difficulty: Difficulty }) => {
   );
 };
 
-export const RecipeCardEnhanced = ({ recipe, onClick }: RecipeCardEnhancedProps) => {
+export const RecipeCardEnhanced = ({ 
+  recipe, 
+  onClick, 
+  isFavorite = false, 
+  onToggleFavorite 
+}: RecipeCardEnhancedProps) => {
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const isQuickRecipe = totalTime > 0 && totalTime < 30;
   const hasWarnings = recipe._hasWarnings || false;
   const difficulty = getDifficulty(recipe);
+
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFavorite?.(recipe.id);
+  };
 
   return (
     <Card
@@ -84,9 +98,27 @@ export const RecipeCardEnhanced = ({ recipe, onClick }: RecipeCardEnhancedProps)
               {recipe.description}
             </CardDescription>
           </div>
-          {hasWarnings && (
-            <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
-          )}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {onToggleFavorite && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleFavoriteClick}
+              >
+                <Heart 
+                  className={`h-5 w-5 transition-colors ${
+                    isFavorite 
+                      ? "fill-red-500 text-red-500" 
+                      : "text-muted-foreground hover:text-red-500"
+                  }`} 
+                />
+              </Button>
+            )}
+            {hasWarnings && (
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

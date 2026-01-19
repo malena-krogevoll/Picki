@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2, Minus, Flame, Beef, Droplets, Wheat } from "lucide-react";
+import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2, Minus, Flame, Beef, Droplets, Wheat, Heart } from "lucide-react";
 import { Recipe, RecipeIngredient } from "@/hooks/useRecipes";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,9 +30,11 @@ interface RecipeDetailEnhancedProps {
     _hasWarnings?: boolean;
   };
   onBack: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (recipeId: string) => void;
 }
 
-export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedProps) => {
+export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onToggleFavorite }: RecipeDetailEnhancedProps) => {
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   
@@ -223,8 +225,24 @@ export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedPro
         )}
         
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-3 mb-2">
             <h1 className="text-4xl font-bold text-foreground">{recipe.title}</h1>
+            {onToggleFavorite && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => onToggleFavorite(recipe.id)}
+              >
+                <Heart 
+                  className={`h-6 w-6 transition-colors ${
+                    isFavorite 
+                      ? "fill-red-500 text-red-500" 
+                      : "text-muted-foreground hover:text-red-500"
+                  }`} 
+                />
+              </Button>
+            )}
           </div>
           <p className="text-lg text-muted-foreground mb-4">{recipe.description}</p>
           
