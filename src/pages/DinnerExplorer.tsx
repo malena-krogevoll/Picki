@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { RecipeCardEnhanced } from "@/components/RecipeCardEnhanced";
 import { RecipeDetailEnhanced } from "@/components/RecipeDetailEnhanced";
@@ -22,6 +22,14 @@ const DinnerExplorer = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showOnlyCompatible, setShowOnlyCompatible] = useState(false);
   const [showOnlyQuick, setShowOnlyQuick] = useState(false);
+
+  // Reset filters when tab changes
+  useEffect(() => {
+    setSelectedCategory(null);
+    setShowOnlyQuick(false);
+    setShowOnlyCompatible(false);
+    setSearchQuery("");
+  }, [activeTab]);
 
   const userPreferences = profile?.preferences ? {
     allergies: profile.preferences.allergies || [],
@@ -144,25 +152,19 @@ const DinnerExplorer = () => {
                 </TabsTrigger>
               </TabsList>
 
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {getTabDescription(activeTab)}
-                </p>
-
-                <RecipeFilters
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  selectedCategory={selectedCategory}
-                  onCategoryChange={setSelectedCategory}
-                  categories={categories}
-                  showOnlyCompatible={showOnlyCompatible}
-                  onCompatibleChange={setShowOnlyCompatible}
-                  hasPreferences={!!hasPreferences}
-                  showOnlyQuick={showOnlyQuick}
-                  onQuickChange={setShowOnlyQuick}
-                  activeTab={activeTab}
-                />
-              </div>
+              <RecipeFilters
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                categories={categories}
+                showOnlyCompatible={showOnlyCompatible}
+                onCompatibleChange={setShowOnlyCompatible}
+                hasPreferences={!!hasPreferences}
+                showOnlyQuick={showOnlyQuick}
+                onQuickChange={setShowOnlyQuick}
+                activeTab={activeTab}
+              />
 
               {["dinner", "breakfast", "base", "diy"].map((tab) => (
                 <TabsContent key={tab} value={tab}>
