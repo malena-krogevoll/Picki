@@ -60,6 +60,33 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Local Setup: Environment Variables
+
+This project requires environment variables to run locally.
+
+1. Copy the example file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Fill in the values in `.env`:
+   - `VITE_SUPABASE_PROJECT_ID` - Your Supabase project ID
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` - Your Supabase anon/public key
+   - `VITE_SUPABASE_URL` - Your Supabase project URL
+
+> **Note:** The Supabase anon key is a publishable key and safe for client-side use.
+> Never commit sensitive API keys to the repository.
+
+### Edge Function Secrets
+
+Edge functions require additional secrets configured in [Supabase Dashboard](https://supabase.com/dashboard/project/hoxoaubghdifiprzfcmq/settings/functions):
+
+| Secret | Purpose |
+|--------|---------|
+| `KASSALAPP_API_KEY` | Product search API |
+| `LOVABLE_API_KEY` | AI features |
+| `OPENAI_API_KEY` | Recipe parsing |
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/77e1798d-d04e-4b42-ad46-623dfc05ad1e) and click on Share -> Publish.
