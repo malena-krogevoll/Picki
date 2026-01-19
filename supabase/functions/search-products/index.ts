@@ -229,10 +229,25 @@ const searchSynonyms: Record<string, string[]> = {
   // === SAUSER OG DRESSINGER ===
   "ketchup": ["tomatketchup", "heinz", "idun"],
   "sennep": ["grov sennep", "dijon", "fransk sennep"],
-  "majones": ["mayonnaise", "mills", "hellmanns"],
+  "majones": ["mayonnaise", "mills majones", "hellmanns", "aioli", "mayo"],
   "dressing": ["salatdressing", "thousand island", "caesar dressing"],
   "soyasaus": ["soya", "soy sauce", "kikkoman"],
   "pesto": ["basilikumpesto", "grønn pesto", "rød pesto"],
+  
+  // === MYKE OSTER OG SMØRBARE PRODUKTER ===
+  "kremost": ["snøfrisk", "philadelphia", "philadelphia original", "creme bonjour", "buko", "ferskost", "smøreost"],
+  "ferskost": ["kremost", "snøfrisk", "philadelphia", "mozzarella", "cottage cheese"],
+  "smøreost": ["kremost", "snøfrisk", "kaviar", "jarlsberg smøreost", "norvegia smøreost"],
+  "mascarpone": ["mascarpone", "kremost", "tiramisu ost"],
+  "cottage cheese": ["kesam", "cottage", "kvarg", "hytteost"],
+  
+  // === PÅLEGG OG SMØRBARE ===
+  "peanøttsmør": ["peanut butter", "skippy", "nøttepålegg", "peanøttpålegg", "peanøtt"],
+  "nutella": ["nugatti", "sjokoladepålegg", "hasselnøttpålegg", "nøttepålegg"],
+  "nugatti": ["nutella", "sjokoladepålegg", "hasselnøttpålegg"],
+  "leverpostei": ["postei", "gilde leverpostei", "stabburet leverpostei", "grovpostei"],
+  "makrell i tomat": ["makrell", "stabburet makrell", "king oscar makrell", "makrellfilet"],
+  "kaviar": ["mills kaviar", "kalles kaviar", "rogn", "laks kaviar"],
 };
 
 // Utvid søkeord med synonymer og varianter

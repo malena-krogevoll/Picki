@@ -99,6 +99,24 @@ const COMMON_INTENTS: Record<string, Omit<ItemIntent, 'original'>> = {
   "sukker": { primaryProduct: "sukker", productCategory: "basisvarer", alternativeTerms: ["strøsukker", "melis"], excludePatterns: ["sukkerfri"], isGenericTerm: false },
   "ris": { primaryProduct: "ris", productCategory: "basisvarer", alternativeTerms: ["jasminris", "basmatiris"], excludePatterns: ["risotto", "rispudding", "riskaker"], isGenericTerm: true },
   "pasta": { primaryProduct: "pasta", productCategory: "basisvarer", alternativeTerms: ["spaghetti", "penne", "makaroni"], excludePatterns: ["pastasaus", "pastasalat"], isGenericTerm: true },
+  
+  // Myke oster og smørbare produkter
+  "kremost": { primaryProduct: "kremost", productCategory: "meieri", alternativeTerms: ["snøfrisk", "philadelphia", "ferskost", "smøreost"], excludePatterns: ["kremostdressing", "kremostsaus"], isGenericTerm: true },
+  "ferskost": { primaryProduct: "ferskost", productCategory: "meieri", alternativeTerms: ["kremost", "snøfrisk", "philadelphia"], excludePatterns: [], isGenericTerm: true },
+  "smøreost": { primaryProduct: "smøreost", productCategory: "meieri", alternativeTerms: ["kremost", "jarlsberg smøreost", "norvegia smøreost"], excludePatterns: [], isGenericTerm: true },
+  "philadelphia": { primaryProduct: "philadelphia kremost", productCategory: "meieri", alternativeTerms: ["kremost", "ferskost"], excludePatterns: [], isGenericTerm: false },
+  "snøfrisk": { primaryProduct: "snøfrisk", productCategory: "meieri", alternativeTerms: ["kremost", "ferskost"], excludePatterns: [], isGenericTerm: false },
+  "mascarpone": { primaryProduct: "mascarpone", productCategory: "meieri", alternativeTerms: ["kremost"], excludePatterns: [], isGenericTerm: false },
+  "cottage cheese": { primaryProduct: "cottage cheese", productCategory: "meieri", alternativeTerms: ["kesam", "kvarg", "hytteost"], excludePatterns: [], isGenericTerm: false },
+  
+  // Pålegg og smørbare
+  "peanøttsmør": { primaryProduct: "peanøttsmør", productCategory: "pålegg", alternativeTerms: ["peanut butter", "skippy", "nøttepålegg"], excludePatterns: [], isGenericTerm: true },
+  "nutella": { primaryProduct: "sjokoladepålegg", productCategory: "pålegg", alternativeTerms: ["nugatti", "hasselnøttpålegg"], excludePatterns: [], isGenericTerm: false },
+  "nugatti": { primaryProduct: "nugatti", productCategory: "pålegg", alternativeTerms: ["nutella", "sjokoladepålegg"], excludePatterns: [], isGenericTerm: false },
+  "leverpostei": { primaryProduct: "leverpostei", productCategory: "pålegg", alternativeTerms: ["postei", "gilde leverpostei", "stabburet leverpostei"], excludePatterns: [], isGenericTerm: true },
+  "makrell i tomat": { primaryProduct: "makrell i tomat", productCategory: "pålegg", alternativeTerms: ["stabburet makrell", "king oscar makrell"], excludePatterns: [], isGenericTerm: false },
+  "kaviar": { primaryProduct: "kaviar", productCategory: "pålegg", alternativeTerms: ["mills kaviar", "kalles kaviar", "rogn"], excludePatterns: [], isGenericTerm: true },
+  "majones": { primaryProduct: "majones", productCategory: "sauser", alternativeTerms: ["mayonnaise", "mills majones", "hellmanns", "aioli"], excludePatterns: [], isGenericTerm: true },
 };
 
 // Rate limiting
