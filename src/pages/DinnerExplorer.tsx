@@ -85,7 +85,7 @@ const DinnerExplorer = () => {
 
   const getTabDescription = (tab: string) => {
     switch (tab) {
-      case "dinner": return "Renvare-middager med enkle ingredienser";
+      case "dinner": return "";
       case "breakfast": return "Frokost- og lunsjoppskrifter for en god start på dagen";
       case "base": return "Grunnoppskrifter som buljong, pesto og sauser";
       case "diy": return "Hjemmelagde alternativer til ferdigprodukter";
@@ -119,12 +119,9 @@ const DinnerExplorer = () => {
         {!selectedRecipe ? (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-foreground mb-2">
+              <h1 className="text-3xl font-bold text-foreground">
                 Oppskrift-explorer
               </h1>
-              <p className="text-muted-foreground">
-                Oppskrifter laget med renvarer - enkle ingredienser uten tilsetningsstoffer
-              </p>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
