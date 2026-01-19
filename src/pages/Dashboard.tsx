@@ -74,23 +74,22 @@ const Dashboard = () => {
           </div>
 
           {/* Card to create new shopping list */}
-          <Card 
-            className="cursor-pointer hover:shadow-md transition-shadow border-primary/20 bg-primary/5"
-            onClick={handleCreateNewList}
-          >
-            <CardContent className="p-4 md:p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Plus className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+            <Card 
+              className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer"
+              onClick={handleCreateNewList}
+            >
+              <CardContent className="flex items-center justify-center py-6 md:py-8 px-4">
+                <div className="flex items-center gap-4">
+                  <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center">
+                    <Plus className="h-6 w-6 text-secondary-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Ny liste</h3>
+                    <p className="text-sm text-muted-foreground">Opprett en tom handleliste</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-medium text-sm md:text-base">Ny handleliste</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground">Opprett en tom handleliste</p>
-                </div>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
           {/* Quick action for dinner explorer */}
           <Card 
