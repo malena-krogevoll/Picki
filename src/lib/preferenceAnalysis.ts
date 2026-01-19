@@ -21,9 +21,9 @@ export interface UserPreferences {
   priority_order: string[];
 }
 
-// Dyrevernmerket brands and animal welfare keywords
+// High animal welfare: Dyrevernmerket, Debio-sertifisert, and premium welfare brands
 const animalWelfareBrands: { keywords: string[]; label: string }[] = [
-  // Dyrevernmerket brands (high welfare)
+  // === DYREVERNMERKET SERTIFISERTE ===
   { keywords: ["hovelsrud"], label: "Dyrevernmerket" },
   { keywords: ["jerseymeieriet"], label: "Dyrevernmerket" },
   { keywords: ["kolonihagen"], label: "Dyrevernmerket" },
@@ -34,14 +34,70 @@ const animalWelfareBrands: { keywords: string[]; label: string }[] = [
   { keywords: ["rørosmeieriet"], label: "Dyrevernmerket" },
   { keywords: ["homlagarden"], label: "Dyrevernmerket" },
   { keywords: ["tine setermjølk", "setermjølk"], label: "Setermelk" },
+  
+  // === DEBIO ØKOLOGISK SERTIFISERTE ===
+  { keywords: ["debio"], label: "Debio-sertifisert" },
+  { keywords: ["eu økologisk", "eu-økologisk"], label: "EU Økologisk" },
+  { keywords: ["demeter"], label: "Demeter Biodynamisk" },
+  
+  // === STOLT FJØRFE OG HØYT DYREVELFERD ===
+  { keywords: ["stolt fjørfe", "stoltfjørfe"], label: "Stolt Fjørfe" },
+  { keywords: ["hubbard kylling", "hubbard"], label: "Stolt Fjørfe" },
+  { keywords: ["liveche"], label: "Stolt Fjørfe" },
+  
+  // === REGIONALE GÅRDER MED HØYT DYREVELFERD ===
+  { keywords: ["grønne skoger gård", "grønne skoger"], label: "Småskala gård" },
+  { keywords: ["hokksund egg"], label: "Frittgående høner" },
+  { keywords: ["birkebeiner egg", "birkebeiner"], label: "Frittgående høner" },
+  { keywords: ["holte gård"], label: "Småskala gård" },
+  { keywords: ["sørby gård"], label: "Småskala gård" },
+  { keywords: ["kviberg gård"], label: "Småskala gård" },
+  { keywords: ["heimdal gård"], label: "Småskala gård" },
+  { keywords: ["stangeskovene"], label: "Viltkjøtt" },
+  { keywords: ["trøndermat"], label: "Regional kvalitet" },
+  { keywords: ["nortura prior", "prior"], label: "Prior" },
+  
+  // === MEIERIPRODUKTER MED HØYT DYREVELFERD ===
+  { keywords: ["brunost seter", "seterost"], label: "Setermjølk" },
+  { keywords: ["valdresmeieriet"], label: "Regional meieri" },
+  { keywords: ["hanen merket", "hanen-merket"], label: "Hanen-merket" },
+  { keywords: ["norsk gardsost"], label: "Gardsmeieri" },
+  { keywords: ["ostegården"], label: "Gardsmeieri" },
+  
+  // === KJØTT MED HØYT DYREVELFERD ===
+  { keywords: ["villsvin"], label: "Viltkjøtt" },
+  { keywords: ["elgkjøtt", "elg"], label: "Viltkjøtt" },
+  { keywords: ["reinsdyrkjøtt", "rein"], label: "Viltkjøtt" },
+  { keywords: ["hjortekjøtt", "hjort"], label: "Viltkjøtt" },
+  { keywords: ["lofotlam", "lofot lam"], label: "Utegangerlam" },
+  { keywords: ["gammalnorsk spælsau", "spælsau"], label: "Urfe" },
+  { keywords: ["villsau"], label: "Villsau" },
 ];
 
 const animalWelfareMediumKeywords = [
+  // === SERTIFISERINGER OG MERKINGER ===
   { keywords: ["økologisk", "organic", "øko"], label: "Økologisk" },
   { keywords: ["frittgående", "free range"], label: "Frittgående" },
   { keywords: ["frilandsegg", "friland"], label: "Frilandsegg" },
   { keywords: ["grasfôret", "grass fed", "gressfôret"], label: "Grasfôret" },
   { keywords: ["utegående"], label: "Utegående" },
+  { keywords: ["bærekraftig", "sustainable"], label: "Bærekraftig" },
+  { keywords: ["msc sertifisert", "msc-sertifisert", "msc"], label: "MSC Sertifisert" },
+  { keywords: ["asc sertifisert", "asc-sertifisert", "asc"], label: "ASC Sertifisert" },
+  
+  // === PRODUKSJONSMETODER ===
+  { keywords: ["utemarksbeite", "beite"], label: "Beitebasert" },
+  { keywords: ["løsdrift"], label: "Løsdrift" },
+  { keywords: ["saktevoksende"], label: "Saktevoksende" },
+  { keywords: ["naturlig fôr"], label: "Naturlig fôr" },
+  { keywords: ["gmo-fri", "uten gmo"], label: "GMO-fri" },
+  
+  // === REGIONALE MERKER MED MIDDELS VELFERD ===
+  { keywords: ["nyt norge", "nyt-norge"], label: "Nyt Norge" },
+  { keywords: ["spesialitet"], label: "Spesialitet" },
+  { keywords: ["tradisjonelt"], label: "Tradisjonelt" },
+  { keywords: ["kortreist"], label: "Kortreist" },
+  { keywords: ["småskala"], label: "Småskala" },
 ];
 
 // Allergen mapping for Norwegian products
