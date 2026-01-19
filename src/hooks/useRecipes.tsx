@@ -29,6 +29,10 @@ export interface Recipe {
   image_url: string | null;
   replaces: string | null;
   created_at: string;
+  calories_per_serving: number | null;
+  protein_per_serving: number | null;
+  fat_per_serving: number | null;
+  carbs_per_serving: number | null;
   ingredients?: RecipeIngredient[];
 }
 

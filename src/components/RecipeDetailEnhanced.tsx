@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2, Minus } from "lucide-react";
+import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2, Minus, Flame, Beef, Droplets, Wheat } from "lucide-react";
 import { Recipe, RecipeIngredient } from "@/hooks/useRecipes";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useAuth } from "@/hooks/useAuth";
@@ -394,6 +394,50 @@ export const RecipeDetailEnhanced = ({ recipe, onBack }: RecipeDetailEnhancedPro
             </ol>
           </CardContent>
         </Card>
+
+        {/* Nutrition Card */}
+        {(recipe.calories_per_serving || recipe.protein_per_serving || recipe.fat_per_serving || recipe.carbs_per_serving) && (
+          <Card className="bg-secondary/5 border-secondary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-orange-500" />
+                Næringsinnhold per porsjon
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {recipe.calories_per_serving && (
+                  <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                    <Flame className="h-6 w-6 text-orange-500 mb-2" />
+                    <span className="text-2xl font-bold">{recipe.calories_per_serving}</span>
+                    <span className="text-sm text-muted-foreground">kcal</span>
+                  </div>
+                )}
+                {recipe.protein_per_serving && (
+                  <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                    <Beef className="h-6 w-6 text-red-500 mb-2" />
+                    <span className="text-2xl font-bold">{recipe.protein_per_serving}g</span>
+                    <span className="text-sm text-muted-foreground">Protein</span>
+                  </div>
+                )}
+                {recipe.fat_per_serving && (
+                  <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                    <Droplets className="h-6 w-6 text-yellow-500 mb-2" />
+                    <span className="text-2xl font-bold">{recipe.fat_per_serving}g</span>
+                    <span className="text-sm text-muted-foreground">Fett</span>
+                  </div>
+                )}
+                {recipe.carbs_per_serving && (
+                  <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                    <Wheat className="h-6 w-6 text-amber-600 mb-2" />
+                    <span className="text-2xl font-bold">{recipe.carbs_per_serving}g</span>
+                    <span className="text-sm text-muted-foreground">Karbohydrater</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
