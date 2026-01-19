@@ -37,15 +37,21 @@ const ListEditor = () => {
     }
   }, [currentList, listId, listLoading, navigate]);
 
+  // Only set initial view based on store_id on first load
+  const [initialViewSet, setInitialViewSet] = useState(false);
+  
   useEffect(() => {
     if (currentList) {
       setActiveList(currentList);
-      // If store is already selected, go directly to shop mode
-      if (currentList.store_id) {
+      // Only auto-navigate to shop mode on initial load, not on every update
+      if (!initialViewSet && currentList.store_id) {
         setView('shop');
+        setInitialViewSet(true);
+      } else if (!initialViewSet) {
+        setInitialViewSet(true);
       }
     }
-  }, [currentList, setActiveList]);
+  }, [currentList, setActiveList, initialViewSet]);
 
   const handleAddItem = async () => {
     if (!listId || !newItemName.trim()) return;
