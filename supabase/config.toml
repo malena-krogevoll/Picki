@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.suggest-substitutions]
 verify_jwt = false
+
+[functions.recompute-master-product]
+verify_jwt = false
