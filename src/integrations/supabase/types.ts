@@ -223,14 +223,18 @@ export type Database = {
       recipes: {
         Row: {
           allergens: string[] | null
+          calories_per_serving: number | null
+          carbs_per_serving: number | null
           category: string
           cook_time: number | null
           created_at: string
           description: string | null
           diet_tags: string[] | null
+          fat_per_serving: number | null
           id: string
           image_url: string | null
           prep_time: number | null
+          protein_per_serving: number | null
           recipe_type: string
           replaces: string | null
           servings: number | null
@@ -241,14 +245,18 @@ export type Database = {
         }
         Insert: {
           allergens?: string[] | null
+          calories_per_serving?: number | null
+          carbs_per_serving?: number | null
           category: string
           cook_time?: number | null
           created_at?: string
           description?: string | null
           diet_tags?: string[] | null
+          fat_per_serving?: number | null
           id?: string
           image_url?: string | null
           prep_time?: number | null
+          protein_per_serving?: number | null
           recipe_type?: string
           replaces?: string | null
           servings?: number | null
@@ -259,14 +267,18 @@ export type Database = {
         }
         Update: {
           allergens?: string[] | null
+          calories_per_serving?: number | null
+          carbs_per_serving?: number | null
           category?: string
           cook_time?: number | null
           created_at?: string
           description?: string | null
           diet_tags?: string[] | null
+          fat_per_serving?: number | null
           id?: string
           image_url?: string | null
           prep_time?: number | null
+          protein_per_serving?: number | null
           recipe_type?: string
           replaces?: string | null
           servings?: number | null
