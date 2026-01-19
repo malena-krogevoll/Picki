@@ -8,7 +8,7 @@ import { SwipeableCard } from "@/components/SwipeableCard";
 import { getStoreName } from "@/components/StoreSelectorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
-import { ShoppingCart, Clock, Copy, ChevronRight, Package, UtensilsCrossed, Trash2, Plus } from "lucide-react";
+import { ShoppingCart, Clock, Copy, ChevronRight, Package, BookOpen, Trash2, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -93,9 +93,9 @@ const Dashboard = () => {
             >
               <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-3">
                 <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
-                  <UtensilsCrossed className="h-6 w-6 text-secondary-foreground" />
+                  <BookOpen className="h-6 w-6 text-secondary-foreground" />
                 </div>
-                <h3 className="text-base font-semibold text-center">Middager</h3>
+                <h3 className="text-base font-semibold text-center">Oppskrifter</h3>
               </CardContent>
             </Card>
           </div>
