@@ -313,7 +313,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     const suggestions = productData[item.id] || [];
     const selectedIndex = selectedProducts[item.id] ?? 0;
     const selectedProduct = suggestions[selectedIndex];
-    return sum + (selectedProduct?.price || 0);
+    return sum + (selectedProduct?.price || 0) * item.quantity;
   }, 0);
 
   // Group items by store layout categories
@@ -421,7 +421,17 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                             <div className="min-w-0 flex-1">
                               <p className="text-xs text-muted-foreground mb-1">Du søkte etter:</p>
                               <h3 className={`text-base md:text-lg font-semibold truncate ${item.in_cart ? "line-through text-muted-foreground" : ""}`}>
+                                {item.quantity > 1 && (
+                                  <Badge variant="secondary" className="mr-2 text-xs">
+                                    {item.quantity}x
+                                  </Badge>
+                                )}
                                 {item.name}
+                                {item.notes && (
+                                  <span className="text-xs text-muted-foreground font-normal ml-2">
+                                    ({item.notes})
+                                  </span>
+                                )}
                               </h3>
                               {item.in_cart && (
                                 <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 rounded-full mt-1 text-xs">
