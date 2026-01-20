@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { StoreSelector } from "@/components/StoreSelector";
 import { ShoppingMode } from "@/components/ShoppingMode";
+import { ItemSuggestions } from "@/components/ItemSuggestions";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList, ProductData } from "@/hooks/useShoppingList";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const ListEditor = () => {
   const navigate = useNavigate();
   const [newItemName, setNewItemName] = useState("");
   const [view, setView] = useState<ViewMode>('edit');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
@@ -53,10 +55,12 @@ const ListEditor = () => {
     }
   }, [currentList, setActiveList, initialViewSet]);
 
-  const handleAddItem = async () => {
-    if (!listId || !newItemName.trim()) return;
-    await addItem(listId, newItemName.trim());
+  const handleAddItem = async (itemName?: string) => {
+    const name = itemName || newItemName;
+    if (!listId || !name.trim()) return;
+    await addItem(listId, name.trim());
     setNewItemName("");
+    setShowSuggestions(false);
     toast.success("Vare lagt til");
   };
 
@@ -150,25 +154,39 @@ const ListEditor = () => {
         <h1 className="text-xl font-bold mb-6">{currentList.name}</h1>
 
         {/* Add new item input */}
-        <div className="flex gap-2 mb-6">
-          <Input
-            value={newItemName}
-            onChange={(e) => setNewItemName(e.target.value)}
-            placeholder="Legg til vare..."
-            className="rounded-2xl"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleAddItem();
-              }
-            }}
+        <div className="mb-6">
+          <div className="flex gap-2">
+            <Input
+              value={newItemName}
+              onChange={(e) => {
+                setNewItemName(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              placeholder="Legg til vare..."
+              className="rounded-2xl"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddItem();
+                }
+                if (e.key === 'Escape') {
+                  setShowSuggestions(false);
+                }
+              }}
+            />
+            <Button 
+              onClick={() => handleAddItem()} 
+              disabled={!newItemName.trim()}
+              className="rounded-2xl"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <ItemSuggestions 
+            query={newItemName}
+            onSelectSuggestion={(suggestion) => handleAddItem(suggestion)}
+            visible={showSuggestions}
           />
-          <Button 
-            onClick={handleAddItem} 
-            disabled={!newItemName.trim()}
-            className="rounded-2xl"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
         </div>
 
         {/* Items list */}
