@@ -29,8 +29,23 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: 'Du er en ekspert på norske matvarer. Din jobb er å gi generiske vareforslag UTEN merkenavn. Gi alltid 3-5 enkle, generiske forslag. Svar BARE med en kommaseparert liste, ingen annen tekst.' },
-          { role: 'user', content: `Bruker søker etter: "${query}". Gi 3-5 generiske vareforslag UTEN merkenavn. For eksempel, hvis brukeren skriver "melk", foreslå "helmelk", "lettmelk", "skummet melk". Hvis de skriver "kylling", foreslå "kyllingfilet", "kyllingvinger", "kyllinglår". ALDRI inkluder merkenavn som Tine, Q, Rørosmeiriet, osv. BARE generiske varenavn, kommaseparert, ingen annen tekst.` }
+          { role: 'system', content: 'Du er en ekspert på norske matvarer. Din jobb er å foreslå VARIANTER eller TYPER av samme produkt. IKKE foreslå produkter som brukes sammen med varen. Svar BARE med en kommaseparert liste, ingen annen tekst.' },
+          { role: 'user', content: `Bruker skriver: "${query}". Gi 3-5 spesifikke VARIANTER eller TYPER av dette produktet UTEN merkenavn.
+
+VIKTIG: Foreslå kun varianter av SAMME produktkategori, IKKE produkter som spises sammen med det.
+
+Eksempler på RIKTIG:
+- "melk" → helmelk, lettmelk, skummet melk, laktosefri melk
+- "kylling" → kyllingfilet, kyllingvinger, kyllinglår, hel kylling, strimlet kylling
+- "smør" → meierismør, lettsmør, usaltet smør, smør med salt
+- "ost" → gulost, brunost, hvitost, kremost, mozzarella
+- "brød" → grovbrød, loff, rundstykker, ciabatta, pitabrød
+
+Eksempler på FEIL (ikke gjør dette):
+- "smør" → brød, vaffel, kjeks (dette er ting man bruker smør PÅ, ikke typer smør)
+- "ost" → brødskive, kjeks (dette er ting man spiser ost MED)
+
+Svar KUN med kommaseparerte varianter av "${query}", ingen annen tekst.` }
         ],
       }),
     });
