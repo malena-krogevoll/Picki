@@ -315,11 +315,12 @@ export const useShoppingList = (userId: string | undefined) => {
   };
 
   // New function to cache product search results for an item
-  const cacheItemProducts = async (itemId: string, storeId: string, products: any[]) => {
+  const cacheItemProducts = async (itemId: string, storeId: string, products: any[], selectedIndex?: number) => {
     const cacheData = {
       storeId,
       cachedAt: new Date().toISOString(),
-      products: products.slice(0, 5) // Cache top 5 products
+      products: products.slice(0, 5), // Cache top 5 products
+      selectedIndex: selectedIndex ?? 0 // Store selected product index
     } as Json;
 
     const { error } = await supabase
@@ -329,6 +330,40 @@ export const useShoppingList = (userId: string | undefined) => {
 
     if (error) {
       console.error("Failed to cache product data:", error);
+    }
+  };
+
+  // Function to update just the selected index in cache
+  const updateCachedSelectedIndex = async (itemId: string, selectedIndex: number) => {
+    // First get the current cache data
+    const { data: item, error: fetchError } = await supabase
+      .from("shopping_list_items")
+      .select("product_data")
+      .eq("id", itemId)
+      .single();
+
+    if (fetchError || !item?.product_data) {
+      console.error("Failed to fetch item for cache update:", fetchError);
+      return;
+    }
+
+    try {
+      const currentCache = item.product_data as Record<string, any>;
+      const updatedCache = {
+        ...currentCache,
+        selectedIndex
+      } as Json;
+
+      const { error } = await supabase
+        .from("shopping_list_items")
+        .update({ product_data: updatedCache })
+        .eq("id", itemId);
+
+      if (error) {
+        console.error("Failed to update selected index in cache:", error);
+      }
+    } catch (e) {
+      console.error("Failed to parse cache data:", e);
     }
   };
 
@@ -557,6 +592,7 @@ export const useShoppingList = (userId: string | undefined) => {
     updateItemQuantity,
     updateItemProduct,
     cacheItemProducts,
+    updateCachedSelectedIndex,
     completeList,
     updateListStore,
     duplicateList,
