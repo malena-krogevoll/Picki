@@ -136,35 +136,74 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
   return results;
 }
 
+// Session-persistent cache to survive navigation (keyed by listId + storeId)
+const sessionProductCache = new Map<string, {
+  products: Record<string, ProductSuggestion[]>;
+  selections: Record<string, number>;
+  fetchedItems: Set<string>;
+}>();
+
 export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { lists, updateItemStatus, completeList, cacheItemProducts, updateCachedSelectedIndex } = useShoppingList(user?.id);
   const { profile } = useProfile(user?.id);
-  const [productData, setProductData] = useState<Record<string, ProductSuggestion[]>>({});
-  const [loading, setLoading] = useState(true);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
   
-  // Track if we've initialized from cache to prevent re-fetching
-  const initializedRef = useRef(false);
+  // Get cache key for this list+store combination
+  const cacheKey = `${listId}:${storeId}`;
+  
+  // Initialize from session cache if available
+  const sessionCache = sessionProductCache.get(cacheKey);
+  
+  const [productData, setProductData] = useState<Record<string, ProductSuggestion[]>>(
+    sessionCache?.products || {}
+  );
+  const [loading, setLoading] = useState(!sessionCache);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>(
+    sessionCache?.selections || {}
+  );
+  
+  // Track fetched items - initialize from session cache
+  const fetchedItemsRef = useRef<Set<string>>(sessionCache?.fetchedItems || new Set());
   const prevStoreIdRef = useRef(storeId);
-  const fetchedItemsRef = useRef<Set<string>>(new Set());
+  const prevCacheKeyRef = useRef(cacheKey);
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
 
-  // Reset only when store actually changes
+  // Persist to session cache whenever data changes
   useEffect(() => {
-    if (prevStoreIdRef.current !== storeId) {
-      setProductData({});
-      setSelectedProducts({});
-      setLoading(true);
-      initializedRef.current = false;
-      fetchedItemsRef.current = new Set();
+    if (Object.keys(productData).length > 0 || Object.keys(selectedProducts).length > 0) {
+      sessionProductCache.set(cacheKey, {
+        products: productData,
+        selections: selectedProducts,
+        fetchedItems: fetchedItemsRef.current
+      });
+    }
+  }, [productData, selectedProducts, cacheKey]);
+
+  // Reset only when cache key actually changes (different list or store)
+  useEffect(() => {
+    if (prevCacheKeyRef.current !== cacheKey) {
+      const existingCache = sessionProductCache.get(cacheKey);
+      if (existingCache) {
+        // Restore from session cache for this list+store
+        setProductData(existingCache.products);
+        setSelectedProducts(existingCache.selections);
+        fetchedItemsRef.current = existingCache.fetchedItems;
+        setLoading(false);
+      } else {
+        // New list+store combination - reset
+        setProductData({});
+        setSelectedProducts({});
+        fetchedItemsRef.current = new Set();
+        setLoading(true);
+      }
+      prevCacheKeyRef.current = cacheKey;
       prevStoreIdRef.current = storeId;
     }
-  }, [storeId]);
+  }, [cacheKey, storeId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -222,7 +261,6 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
         if (itemsNeedingFetch.length === 0) {
           if (isMounted) {
             setLoading(false);
-            initializedRef.current = true;
           }
           return;
         }
@@ -385,7 +423,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
             results[itemId] = products;
           });
           setProductData(prev => ({ ...prev, ...results }));
-          initializedRef.current = true;
+          // Session cache is updated via useEffect
         }
       } catch (error) {
         console.error('Error in fetchProducts:', error);
@@ -396,16 +434,13 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       }
     };
 
-    if (items.length > 0 && !initializedRef.current) {
+    // Check if we need to fetch - either first load or new items added
+    const hasDataForAllItems = items.length > 0 && items.every(
+      item => fetchedItemsRef.current.has(item.id) || productData[item.id]
+    );
+    
+    if (items.length > 0 && !hasDataForAllItems) {
       fetchProducts();
-    } else if (items.length > 0 && initializedRef.current) {
-      // Check if there are new items we haven't fetched yet
-      const newItems = items.filter(item => !fetchedItemsRef.current.has(item.id) && !productData[item.id]);
-      if (newItems.length > 0) {
-        fetchProducts();
-      } else {
-        setLoading(false);
-      }
     } else {
       setLoading(false);
     }
