@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { analyzeProductMatch, sortProductsByPreference, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 import { PreferenceIndicators, AllergyWarningBanner } from "@/components/PreferenceIndicators";
 import { groupItemsByCategory } from "@/lib/storeLayoutSort";
-import { useSessionPersistence, useClearSessionCache } from "@/hooks/useSessionPersistence";
+
 
 interface ItemIntent {
   original: string;
@@ -145,13 +145,6 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
   
-  // Session persistence for mobile sleep/wake
-  const sessionKey = `shopping-mode-${listId}-${storeId}`;
-  const cachedSessionData = useSessionPersistence<Record<string, ProductSuggestion[]>>(sessionKey, productData);
-  const clearSessionCache = useClearSessionCache(sessionKey);
-  
-  // Track if we've already used cached data
-  const usedCacheRef = useRef(false);
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
@@ -161,24 +154,13 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     setProductData({});
     setSelectedProducts({});
     setLoading(true);
-    usedCacheRef.current = false;
-    clearSessionCache();
-  }, [storeId, clearSessionCache]);
+  }, [storeId]);
 
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
 
     const fetchProducts = async () => {
-      // Check session cache first (for mobile wake from sleep)
-      if (!usedCacheRef.current && cachedSessionData && Object.keys(cachedSessionData).length > 0) {
-        console.log('Restoring product data from session cache');
-        setProductData(cachedSessionData);
-        setLoading(false);
-        usedCacheRef.current = true;
-        return;
-      }
-      
       setLoading(true);
 
       try {
@@ -394,7 +376,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       isMounted = false;
       abortController.abort();
     };
-  }, [items, storeId, profile, cachedSessionData, cacheItemProducts]);
+  }, [items, storeId, profile]);
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
@@ -421,7 +403,6 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
   const handleCompleteList = async () => {
     await completeList(listId);
-    clearSessionCache();
     toast.success("Handleliste fullført!", {
       description: "Listen er nå arkivert."
     });
