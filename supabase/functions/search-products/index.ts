@@ -283,8 +283,8 @@ function expandSearchQuery(query: string): string[] {
     }
   }
   
-  // Returner maks 3 søkeord for å balansere ytelse
-  return expandedQueries.slice(0, 3);
+  // Returner maks 2 søkeord for å unngå rate limiting
+  return expandedQueries.slice(0, 2);
 }
 
 serve(async (req) => {
@@ -318,21 +318,31 @@ serve(async (req) => {
       const searchQueries = expandSearchQuery(effectiveQuery);
       console.log(`Expanded search queries: ${searchQueries.join(", ")}`);
 
-      // Søk parallelt på alle utvidede søkeord
-      const searchPromises = searchQueries.map(q => 
-        searchKassalappAPI(q, effectiveStoreCode, kassalappApiKey)
-      );
-      const allResults = await Promise.all(searchPromises);
-      
-      // Kombiner alle resultater og fjern duplikater basert på EAN
+      // Søk sekvensielt for å unngå rate limiting - stopp tidlig hvis gode resultater
       const seenEANs = new Set<number>();
       let kassalappProducts: Product[] = [];
       
-      for (const results of allResults) {
-        for (const product of results) {
+      for (let i = 0; i < searchQueries.length; i++) {
+        const queryResults = await searchKassalappAPI(searchQueries[i], effectiveStoreCode, kassalappApiKey);
+        
+        // Legg til unike produkter
+        for (const product of queryResults) {
           if (product.EAN && seenEANs.has(product.EAN)) continue;
           if (product.EAN) seenEANs.add(product.EAN);
           kassalappProducts.push(product);
+        }
+        
+        console.log(`Query "${searchQueries[i]}": ${queryResults.length} products (total unique: ${kassalappProducts.length})`);
+        
+        // Smart stopp: Hvis første søk ga 10+ resultater, ikke kjør flere søk
+        if (i === 0 && kassalappProducts.length >= 10) {
+          console.log("Sufficient results from first query, skipping synonyms");
+          break;
+        }
+        
+        // Legg til delay mellom synonym-søk (500ms)
+        if (i < searchQueries.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
