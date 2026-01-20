@@ -88,28 +88,29 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
   }
 
   try {
-    // Use batch endpoint for efficiency
+    // Use batch endpoint for efficiency - send array directly to /classify-batch
     const batchPayload = productsWithIngredients.map(p => ({
       ingredients_text: p.ingredienser,
       product_category: p.category
     }));
 
     const response = await fetch(
-      `https://hoxoaubghdifiprzfcmq.supabase.co/functions/v1/classify-nova`,
+      `https://hoxoaubghdifiprzfcmq.supabase.co/functions/v1/classify-nova/classify-batch`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhveG9hdWJnaGRpZmlwcnpmY21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxNzkxMTUsImV4cCI6MjA4MDc1NTExNX0.ZDK6YAG_r7OH3vNjzj6Nh99rioFUILZgBjMkB3tr1Zk'
         },
-        body: JSON.stringify({ batch: batchPayload })
+        body: JSON.stringify(batchPayload) // Send array directly, not wrapped in object
       }
     );
 
     if (response.ok) {
       const data = await response.json();
-      if (data.results && Array.isArray(data.results)) {
-        data.results.forEach((result: any, idx: number) => {
+      // Response is an array directly, not wrapped in { results: [...] }
+      if (Array.isArray(data)) {
+        data.forEach((result: any, idx: number) => {
           const originalIdx = productsWithIngredients[idx].originalIndex;
           results.set(originalIdx, {
             novaScore: result.nova_group ?? null,
@@ -119,8 +120,7 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
         });
       }
     } else {
-      console.warn('Batch NOVA classification failed, falling back to individual calls');
-      // Fallback: set estimated values
+      console.warn('Batch NOVA classification failed, falling back to estimated values');
       productsWithIngredients.forEach(p => {
         results.set(p.originalIndex, { novaScore: 4, isEstimated: true, hasIngredients: true });
       });
