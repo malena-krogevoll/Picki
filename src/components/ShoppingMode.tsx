@@ -703,9 +703,11 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                           className={`${
                             selectedProduct.matchInfo.allergyWarnings.length > 0 
                               ? 'bg-destructive/5 border-destructive/30' 
-                              : selectedProduct.novaScore <= 2 
+                              : (selectedProduct.novaScore !== null && !selectedProduct.novaIsEstimated && selectedProduct.hasIngredients && selectedProduct.novaScore <= 2)
                                 ? 'bg-primary/5 border-primary/20' 
-                                : 'bg-secondary border-border'
+                                : (selectedProduct.novaScore !== null && !selectedProduct.novaIsEstimated && selectedProduct.novaScore >= 3)
+                                  ? 'bg-destructive/5 border-destructive/20'
+                                  : 'bg-secondary border-border'
                           } border-2 p-3 md:p-4 rounded-xl cursor-pointer active:scale-[0.98] transition-all`}
                         >
                           <div className="flex gap-3">
