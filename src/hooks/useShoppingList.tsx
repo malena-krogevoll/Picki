@@ -314,6 +314,24 @@ export const useShoppingList = (userId: string | undefined) => {
     return { error: null };
   };
 
+  // New function to cache product search results for an item
+  const cacheItemProducts = async (itemId: string, storeId: string, products: any[]) => {
+    const cacheData = {
+      storeId,
+      cachedAt: new Date().toISOString(),
+      products: products.slice(0, 5) // Cache top 5 products
+    } as Json;
+
+    const { error } = await supabase
+      .from("shopping_list_items")
+      .update({ product_data: cacheData })
+      .eq("id", itemId);
+
+    if (error) {
+      console.error("Failed to cache product data:", error);
+    }
+  };
+
   const removeItem = async (itemId: string) => {
     const { error } = await supabase
       .from("shopping_list_items")
@@ -538,6 +556,7 @@ export const useShoppingList = (userId: string | undefined) => {
     updateItemStatus,
     updateItemQuantity,
     updateItemProduct,
+    cacheItemProducts,
     completeList,
     updateListStore,
     duplicateList,

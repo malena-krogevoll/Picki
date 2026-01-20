@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { analyzeProductMatch, sortProductsByPreference, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 import { PreferenceIndicators, AllergyWarningBanner } from "@/components/PreferenceIndicators";
 import { groupItemsByCategory } from "@/lib/storeLayoutSort";
+import { useSessionPersistence, useClearSessionCache } from "@/hooks/useSessionPersistence";
 
 interface ItemIntent {
   original: string;
@@ -39,6 +40,12 @@ interface ProductSuggestion {
   matchInfo: MatchInfo;
 }
 
+interface CachedItemData {
+  storeId: string;
+  cachedAt: string;
+  products: ProductSuggestion[];
+}
+
 interface ShoppingModeProps {
   storeId: string;
   listId: string;
@@ -60,15 +67,91 @@ const getNovaLabel = (score: number | null, hasIngredients: boolean = true) => {
   return "Sterkt bearbeidet";
 };
 
+// Helper to batch classify NOVA for multiple products at once
+async function batchClassifyNova(products: { ingredienser: string; category: string }[]): Promise<Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>> {
+  const results = new Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>();
+  
+  // Filter out products without ingredients to save API calls
+  const productsWithIngredients = products
+    .map((p, idx) => ({ ...p, originalIndex: idx }))
+    .filter(p => p.ingredienser && p.ingredienser.trim().length > 0);
+  
+  // Set defaults for products without ingredients
+  products.forEach((p, idx) => {
+    if (!p.ingredienser || p.ingredienser.trim().length === 0) {
+      results.set(idx, { novaScore: null, isEstimated: true, hasIngredients: false });
+    }
+  });
+  
+  if (productsWithIngredients.length === 0) {
+    return results;
+  }
+
+  try {
+    // Use batch endpoint for efficiency
+    const batchPayload = productsWithIngredients.map(p => ({
+      ingredients_text: p.ingredienser,
+      product_category: p.category
+    }));
+
+    const response = await fetch(
+      `https://hoxoaubghdifiprzfcmq.supabase.co/functions/v1/classify-nova`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhveG9hdWJnaGRpZmlwcnpmY21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxNzkxMTUsImV4cCI6MjA4MDc1NTExNX0.ZDK6YAG_r7OH3vNjzj6Nh99rioFUILZgBjMkB3tr1Zk'
+        },
+        body: JSON.stringify({ batch: batchPayload })
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.results && Array.isArray(data.results)) {
+        data.results.forEach((result: any, idx: number) => {
+          const originalIdx = productsWithIngredients[idx].originalIndex;
+          results.set(originalIdx, {
+            novaScore: result.nova_group ?? null,
+            isEstimated: result.is_estimated ?? false,
+            hasIngredients: result.has_ingredients ?? true
+          });
+        });
+      }
+    } else {
+      console.warn('Batch NOVA classification failed, falling back to individual calls');
+      // Fallback: set estimated values
+      productsWithIngredients.forEach(p => {
+        results.set(p.originalIndex, { novaScore: 4, isEstimated: true, hasIngredients: true });
+      });
+    }
+  } catch (err) {
+    console.error('Batch NOVA classification error:', err);
+    productsWithIngredients.forEach(p => {
+      results.set(p.originalIndex, { novaScore: 4, isEstimated: true, hasIngredients: true });
+    });
+  }
+
+  return results;
+}
+
 export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { lists, updateItemStatus, completeList } = useShoppingList(user?.id);
+  const { lists, updateItemStatus, completeList, cacheItemProducts } = useShoppingList(user?.id);
   const { profile } = useProfile(user?.id);
   const [productData, setProductData] = useState<Record<string, ProductSuggestion[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
+  
+  // Session persistence for mobile sleep/wake
+  const sessionKey = `shopping-mode-${listId}-${storeId}`;
+  const cachedSessionData = useSessionPersistence<Record<string, ProductSuggestion[]>>(sessionKey, productData);
+  const clearSessionCache = useClearSessionCache(sessionKey);
+  
+  // Track if we've already used cached data
+  const usedCacheRef = useRef(false);
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
@@ -78,18 +161,67 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     setProductData({});
     setSelectedProducts({});
     setLoading(true);
-  }, [storeId]);
+    usedCacheRef.current = false;
+    clearSessionCache();
+  }, [storeId, clearSessionCache]);
 
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
 
     const fetchProducts = async () => {
+      // Check session cache first (for mobile wake from sleep)
+      if (!usedCacheRef.current && cachedSessionData && Object.keys(cachedSessionData).length > 0) {
+        console.log('Restoring product data from session cache');
+        setProductData(cachedSessionData);
+        setLoading(false);
+        usedCacheRef.current = true;
+        return;
+      }
+      
       setLoading(true);
 
       try {
-        // Step 1: Batch analyze all item names with AI
-        const itemNames = items.map(i => i.name);
+        // Check for cached product data in database
+        const itemsNeedingFetch: typeof items = [];
+        const cachedResults: Record<string, ProductSuggestion[]> = {};
+        
+        for (const item of items) {
+          // Check if item has cached product data for the same store
+          if (item.product_data) {
+            try {
+              const cached = item.product_data as unknown as CachedItemData;
+              if (cached.storeId === storeId && cached.products && Array.isArray(cached.products)) {
+                // Check if cache is fresh (less than 24 hours old)
+                const cacheAge = Date.now() - new Date(cached.cachedAt).getTime();
+                const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+                
+                if (cacheAge < maxCacheAge) {
+                  console.log(`Using cached products for: ${item.name}`);
+                  cachedResults[item.id] = cached.products;
+                  continue;
+                }
+              }
+            } catch (e) {
+              // Invalid cache format, need to fetch
+            }
+          }
+          itemsNeedingFetch.push(item);
+        }
+
+        // Apply cached results immediately
+        if (Object.keys(cachedResults).length > 0 && isMounted) {
+          setProductData(prev => ({ ...prev, ...cachedResults }));
+        }
+        
+        // If all items were cached, we're done
+        if (itemsNeedingFetch.length === 0) {
+          if (isMounted) setLoading(false);
+          return;
+        }
+
+        // Step 1: Batch analyze all item names with AI (only for items needing fetch)
+        const itemNames = itemsNeedingFetch.map(i => i.name);
         let intentMap: Map<string, ItemIntent> = new Map();
         
         try {
@@ -105,7 +237,6 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
               estimatedCost: intentData.estimatedCost
             });
             
-            // Create a map from item name to intent
             for (const intent of intentData.intents as ItemIntent[]) {
               intentMap.set(intent.original.toLowerCase(), intent);
             }
@@ -114,12 +245,11 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
           }
         } catch (intentErr) {
           console.error("Intent analysis error:", intentErr);
-          // Continue with basic search if AI fails
         }
 
         // Step 2: Search products with AI intent data (staggered to avoid rate limiting)
-        const BATCH_SIZE = 3; // Process 3 items at a time
-        const DELAY_BETWEEN_BATCHES = 500; // 500ms between batches
+        const BATCH_SIZE = 3;
+        const DELAY_BETWEEN_BATCHES = 400; // Reduced delay
         
         const allResults: { itemId: string; products: ProductSuggestion[] }[] = [];
         
@@ -127,10 +257,9 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
         const processItem = async (item: typeof items[0]) => {
           try {
             const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Request timeout')), 15000); // Increased timeout
+              setTimeout(() => reject(new Error('Request timeout')), 15000);
             });
 
-            // Get intent for this item (if available)
             const intent = intentMap.get(item.name.toLowerCase());
 
             const fetchPromise = supabase.functions.invoke('search-products', {
@@ -138,7 +267,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                 query: item.name,
                 storeId,
                 userPreferences: profile?.preferences,
-                intent // Pass AI intent to search-products
+                intent
               }
             });
 
@@ -148,68 +277,58 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
               console.error('Error fetching products for', item.name, error);
               return { itemId: item.id, products: [] as ProductSuggestion[] };
             } else if (data?.results && data.results.length > 0) {
-              // Transform API response and get real NOVA classification for each product
-              const productsWithNova: ProductSuggestion[] = await Promise.all(
-                data.results
-                  .filter((r: any) => r.product && r.score > -50) // Filter out heavily penalized products
-                  .map(async (r: any) => {
-                    const ingredienser = r.product.Ingrediensliste || '';
-                    const allergener = r.product["Allergener/Kosthold"] || '';
-                    
-                    let productNovaScore: number | null = null;
-                    let productNovaIsEstimated = false;
-                    let productHasIngredients = !!ingredienser;
-                    
-                    try {
-                      const { data: novaData, error: novaError } = await supabase.functions.invoke('classify-nova', {
-                        body: { 
-                          ingredients_text: ingredienser || '',
-                          product_category: r.product.Kategori || ''
-                        }
-                      });
-                      
-                      if (!novaError && novaData) {
-                        productNovaScore = novaData.nova_group;
-                        productNovaIsEstimated = novaData.is_estimated || false;
-                        productHasIngredients = novaData.has_ingredients;
-                      } else {
-                        console.warn('NOVA classification returned no data for:', r.product.Produktnavn);
-                      }
-                    } catch (err) {
-                      console.error('NOVA classification failed for product:', r.product.Produktnavn, err);
-                    }
-                    
-                    const productName = r.product.Produktnavn || '';
-                    const brand = r.product.Merke || '';
-                    
-                    // Analyze product match against user preferences
-                    const matchInfo = analyzeProductMatch(
-                      { name: productName, brand, allergener, ingredienser },
-                      profile?.preferences as UserPreferences | null
-                    );
-                    
-                    return {
-                      ean: r.product.EAN || '',
-                      brand,
-                      name: productName,
-                      image: r.product.Produktbilde_URL || '',
-                      price: parseFloat(r.product.Pris) || null,
-                      store: r.product.StoreCode || storeId,
-                      novaScore: productNovaScore,
-                      novaIsEstimated: productNovaIsEstimated,
-                      hasIngredients: productHasIngredients,
-                      allergener,
-                      ingredienser,
-                      matchInfo
-                    };
-                  })
-              );
+              // Filter and prepare products for batch NOVA classification
+              const filteredResults = data.results
+                .filter((r: any) => r.product && r.score > -50)
+                .slice(0, 5); // Limit to top 5 products
+              
+              // Prepare batch for NOVA classification
+              const productsForNova = filteredResults.map((r: any) => ({
+                ingredienser: r.product.Ingrediensliste || '',
+                category: r.product.Kategori || ''
+              }));
+              
+              // Batch classify NOVA
+              const novaResults = await batchClassifyNova(productsForNova);
+              
+              // Build final product list with NOVA scores
+              const productsWithNova: ProductSuggestion[] = filteredResults.map((r: any, idx: number) => {
+                const ingredienser = r.product.Ingrediensliste || '';
+                const allergener = r.product["Allergener/Kosthold"] || '';
+                const novaData = novaResults.get(idx) || { novaScore: null, isEstimated: true, hasIngredients: false };
+                
+                const productName = r.product.Produktnavn || '';
+                const brand = r.product.Merke || '';
+                
+                const matchInfo = analyzeProductMatch(
+                  { name: productName, brand, allergener, ingredienser },
+                  profile?.preferences as UserPreferences | null
+                );
+                
+                return {
+                  ean: r.product.EAN || '',
+                  brand,
+                  name: productName,
+                  image: r.product.Produktbilde_URL || '',
+                  price: parseFloat(r.product.Pris) || null,
+                  store: r.product.StoreCode || storeId,
+                  novaScore: novaData.novaScore,
+                  novaIsEstimated: novaData.isEstimated,
+                  hasIngredients: novaData.hasIngredients,
+                  allergener,
+                  ingredienser,
+                  matchInfo
+                };
+              });
               
               // Sort products by preference match, then NOVA, then price
               const sortedProducts = sortProductsByPreference(
                 productsWithNova, 
                 profile?.preferences as UserPreferences | null
               );
+              
+              // Cache products in background (fire and forget)
+              cacheItemProducts(item.id, storeId, sortedProducts);
               
               return { itemId: item.id, products: sortedProducts };
             } else {
@@ -221,11 +340,11 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
           }
         };
 
-        // Process items in batches to avoid rate limiting
-        for (let i = 0; i < items.length; i += BATCH_SIZE) {
+        // Process items in batches
+        for (let i = 0; i < itemsNeedingFetch.length; i += BATCH_SIZE) {
           if (!isMounted) break;
           
-          const batch = items.slice(i, i + BATCH_SIZE);
+          const batch = itemsNeedingFetch.slice(i, i + BATCH_SIZE);
           const batchResults = await Promise.all(batch.map(processItem));
           allResults.push(...batchResults);
           
@@ -241,16 +360,16 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
           }
           
           // Wait between batches (except for the last one)
-          if (i + BATCH_SIZE < items.length) {
+          if (i + BATCH_SIZE < itemsNeedingFetch.length) {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
           }
         }
 
         if (!isMounted) return;
 
-        // Final update with all results
+        // Final update with all results (including cached)
         if (isMounted) {
-          const results: Record<string, ProductSuggestion[]> = {};
+          const results: Record<string, ProductSuggestion[]> = { ...cachedResults };
           allResults.forEach(({ itemId, products }) => {
             results[itemId] = products;
           });
@@ -275,7 +394,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       isMounted = false;
       abortController.abort();
     };
-  }, [items, storeId, profile]);
+  }, [items, storeId, profile, cachedSessionData, cacheItemProducts]);
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
@@ -287,8 +406,9 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     setExpandedItems(newExpanded);
   };
 
-  const handleToggleCart = async (itemId: string, currentStatus: boolean) => {
-    await updateItemStatus(itemId, !currentStatus);
+  // Optimized: Fire-and-forget for instant checkbox response
+  const handleToggleCart = (itemId: string, currentStatus: boolean) => {
+    updateItemStatus(itemId, !currentStatus);
   };
 
   const handleSelectProduct = (itemId: string, productIndex: number) => {
@@ -301,6 +421,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
   const handleCompleteList = async () => {
     await completeList(listId);
+    clearSessionCache();
     toast.success("Handleliste fullført!", {
       description: "Listen er nå arkivert."
     });
@@ -326,7 +447,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     });
   }, [items, productData, selectedProducts]);
 
-  if (loading) {
+  if (loading && Object.keys(productData).length === 0) {
     return (
       <div className="flex flex-col min-h-[calc(100vh-60px)] md:min-h-0">
         {/* Sticky header */}
@@ -594,11 +715,15 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                       </div>
                     ) : (
                       <div className="px-4 pb-4 md:px-5 md:pb-5">
-                        <div className="bg-secondary/50 p-4 rounded-xl border border-border">
-                          <p className="text-sm text-muted-foreground">
-                            Ingen produkter funnet for "{item.name}"
-                          </p>
-                        </div>
+                        {loading ? (
+                          <Skeleton className="h-24 w-full rounded-xl" />
+                        ) : (
+                          <div className="bg-secondary/50 p-4 rounded-xl border border-border">
+                            <p className="text-sm text-muted-foreground">
+                              Ingen produkter funnet for "{item.name}"
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
