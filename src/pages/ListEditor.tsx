@@ -8,10 +8,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList, ProductData } from "@/hooks/useShoppingList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus, ClipboardPaste } from "lucide-react";
 import { toast } from "sonner";
+import { parseShoppingListText, ParsedItem } from "@/lib/textParser";
 
 type ViewMode = 'edit' | 'select-store' | 'shop';
 
@@ -23,6 +33,9 @@ const ListEditor = () => {
   const [newItemName, setNewItemName] = useState("");
   const [view, setView] = useState<ViewMode>('edit');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showPasteDialog, setShowPasteDialog] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
@@ -87,6 +100,25 @@ const ListEditor = () => {
 
   const handleBackFromShop = () => {
     setView('select-store');
+  };
+
+  const handlePasteTextChange = (text: string) => {
+    setPasteText(text);
+    const items = parseShoppingListText(text);
+    setParsedItems(items);
+  };
+
+  const handleAddPastedItems = async () => {
+    if (!listId || parsedItems.length === 0) return;
+    
+    for (const item of parsedItems) {
+      await addItem(listId, item.product_name, undefined, item.quantity, item.notes);
+    }
+    
+    toast.success(`${parsedItems.length} varer lagt til`);
+    setShowPasteDialog(false);
+    setPasteText("");
+    setParsedItems([]);
   };
 
   if (authLoading || listLoading || !currentList) {
@@ -181,6 +213,14 @@ const ListEditor = () => {
             >
               <Plus className="h-4 w-4" />
             </Button>
+            <Button 
+              variant="outline"
+              onClick={() => setShowPasteDialog(true)}
+              className="rounded-2xl"
+              title="Lim inn ingrediensliste"
+            >
+              <ClipboardPaste className="h-4 w-4" />
+            </Button>
           </div>
           <ItemSuggestions 
             query={newItemName}
@@ -269,6 +309,63 @@ const ListEditor = () => {
             Velg butikk og finn produkter
           </Button>
         )}
+
+        {/* Paste ingredients dialog */}
+        <Dialog open={showPasteDialog} onOpenChange={setShowPasteDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Lim inn ingrediensliste</DialogTitle>
+              <DialogDescription>
+                Lim inn en liste med ingredienser fra en oppskrift. Hver linje eller kommaseparert vare blir en egen vare.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Textarea
+                value={pasteText}
+                onChange={(e) => handlePasteTextChange(e.target.value)}
+                placeholder="Eksempel:
+2 dl melk
+3 egg
+1 pose gjær
+500g hvetemel"
+                rows={6}
+                className="resize-none"
+              />
+              {parsedItems.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {parsedItems.length} varer gjenkjent:
+                  </p>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                    {parsedItems.map((item, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {item.quantity > 1 && `${item.quantity}x `}
+                        {item.product_name}
+                        {item.notes && ` (${item.notes})`}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowPasteDialog(false);
+                setPasteText("");
+                setParsedItems([]);
+              }}>
+                Avbryt
+              </Button>
+              <Button 
+                onClick={handleAddPastedItems}
+                disabled={parsedItems.length === 0}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Legg til {parsedItems.length} varer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
