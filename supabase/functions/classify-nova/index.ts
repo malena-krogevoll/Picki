@@ -133,10 +133,27 @@ interface ClassificationResult {
 // High-risk categories that are typically NOVA 4 (ultra-processed)
 const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon'];
 
+// Phrases that indicate missing ingredient data (from Kassalapp API or similar)
+const NO_INGREDIENTS_PHRASES = [
+  'ingen ingrediensinformasjon tilgjengelig',
+  'ingen ingrediensinformasjon',
+  'ingredienser ikke tilgjengelig',
+  'not available',
+  'n/a',
+  'ingen data',
+  'mangler ingredienser',
+  'ukjent',
+];
+
 function classifyNova(input: ClassificationInput): ClassificationResult {
   const { ingredients_text, additives = [], product_category } = input;
   
-  if (!ingredients_text || ingredients_text.trim().length === 0) {
+  const normalizedInput = (ingredients_text || '').trim().toLowerCase();
+  const isMissingIngredients = !ingredients_text || 
+    ingredients_text.trim().length === 0 ||
+    NO_INGREDIENTS_PHRASES.some(phrase => normalizedInput.includes(phrase));
+  
+  if (isMissingIngredients) {
     const categoryLower = (product_category || '').toLowerCase();
     const isHighRiskCategory = HIGH_RISK_CATEGORIES.some(cat => categoryLower.includes(cat));
     
@@ -149,7 +166,7 @@ function classifyNova(input: ClassificationInput): ClassificationResult {
         ? `Ingrediensliste mangler. Basert på produktkategori (${product_category}) anslås produktet som sterkt bearbeidet (NOVA 4), men dette er usikkert.`
         : 'Ingen ingrediensinformasjon tilgjengelig. Klassifisering ikke mulig uten ingrediensliste.',
       signals: [],
-      debug: { ingredients_count: 0, has_e_numbers: false, e_numbers: [], strong_hits: 0, weak_hits: 0, real_food_hits: 0, normalized_text_sample: "" },
+      debug: { ingredients_count: 0, has_e_numbers: false, e_numbers: [], strong_hits: 0, weak_hits: 0, real_food_hits: 0, normalized_text_sample: normalizedInput.substring(0, 100) },
       version: VERSION, timestamp: new Date().toISOString()
     };
   }
