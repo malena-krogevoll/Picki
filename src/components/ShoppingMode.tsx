@@ -248,8 +248,8 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
         }
 
         // Step 2: Search products with AI intent data (staggered to avoid rate limiting)
-        const BATCH_SIZE = 1; // Process one item at a time to avoid rate limiting
-        const DELAY_BETWEEN_BATCHES = 800; // Increased delay to respect API limits
+        const BATCH_SIZE = 3;
+        const DELAY_BETWEEN_BATCHES = 400;
         
         const allResults: { itemId: string; products: ProductSuggestion[] }[] = [];
         
