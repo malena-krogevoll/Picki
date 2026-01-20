@@ -4,12 +4,61 @@ export interface ParsedItem {
   notes?: string;
 }
 
+// Norwegian units to strip from ingredient names
+const UNITS_TO_STRIP = [
+  'stk', 'stykk', 'stykker',
+  'g', 'gram',
+  'kg', 'kilo',
+  'dl', 'desiliter',
+  'l', 'liter',
+  'ml', 'milliliter',
+  'cl', 'centiliter',
+  'ss', 'spiseskje', 'spiseskjeer',
+  'ts', 'teskje', 'teskjeer',
+  'kopp', 'kopper',
+  'neve', 'never',
+  'klype', 'klyper',
+  'dråpe', 'dråper',
+  'pk', 'pakke', 'pakker',
+  'boks', 'bokser',
+  'pose', 'poser',
+  'beger', 'begre',
+  'flaske', 'flasker',
+  'bunt', 'bunter',
+  'skive', 'skiver',
+  'fedd',
+];
+
+// Preparation methods and descriptions to strip (usually at the end)
+const PREP_PATTERNS = [
+  /\s+i\s+(terninger|biter|skiver|strimler|ringer|båter)$/i,
+  /\s+(hakket|hakkede|raspet|revet|skivet|kuttet|delt|knust|most|presset)$/i,
+  /\s+(finhakket|finhakkede|grovhakket|grovhakkede)$/i,
+  /\s+(tørket|tørkede|fersk|ferske|frossen|frosne|hermetisk|hermetiske)$/i,
+  /\s+(rå|rått|kokt|kokte|stekt|stekte|bakt|bakte|grillet|grillede)$/i,
+  /\s+(hel|hele|halv|halve|kvart)$/i,
+  /\s+(stor|store|liten|små|medium|middels)$/i,
+  /\s+(fin|fine|grov|grove|tykk|tykke|tynn|tynne)$/i,
+  /\s+(romtemperert|romtempererte|avkjølt|avkjølte|oppvarmet|oppvarmede)$/i,
+  /\s+(uten\s+skall|med\s+skall|uten\s+skinn|med\s+skinn)$/i,
+  /\s+(renset|rensede|vasket|vaskede)$/i,
+  /\s+til\s+(steking|koking|servering|pynt)$/i,
+  /\s+etter\s+smak$/i,
+  /\s+ca\.?$/i,
+  /\s+eller\s+mer$/i,
+];
+
+// Words that should be stripped when they appear alone after a unit
+const FILLER_WORDS = ['av', 'med', 'til', 'fra', 'på', 'i'];
+
 /**
  * Parses free text input into shopping list items
  * Supports formats like:
  * - "milk, eggs, bread"
  * - "2 bananas, 1 liter milk, eggs"
  * - "3x apples, bread (whole grain)"
+ * - "200 g tørket pasta" -> "pasta"
+ * - "2 stk paprika i terninger" -> "paprika"
  */
 export function parseShoppingListText(text: string): ParsedItem[] {
   if (!text.trim()) return [];
@@ -43,42 +92,40 @@ function parseIndividualItem(item: string): ParsedItem | null {
     cleanItem = cleanItem.replace(/\([^)]+\)/, '').trim();
   }
 
-  // Pattern matching for quantities
-  const patterns = [
-    // "2 bananas", "3 eggs", "1 liter milk"
-    /^(\d+(?:[.,]\d+)?)\s*(?:x\s*)?(.+)/i,
-    // "2x apples", "3x bread"
-    /^(\d+(?:[.,]\d+)?)\s*x\s*(.+)/i,
-    // Just the product name
-    /^(.+)$/
-  ];
-
-  for (const pattern of patterns) {
-    const match = cleanItem.match(pattern);
-    if (match) {
-      if (match.length === 3) {
-        // Has quantity
-        const quantityStr = match[1].replace(',', '.');
-        const parsedQuantity = parseFloat(quantityStr);
-        if (!isNaN(parsedQuantity)) {
-          quantity = Math.max(1, Math.floor(parsedQuantity));
-        }
-        cleanItem = match[2].trim();
-      } else {
-        // Just product name
-        cleanItem = match[1].trim();
-      }
-      break;
+  // Extract quantity from the beginning
+  // Pattern: number followed by optional unit
+  const quantityMatch = cleanItem.match(/^(\d+(?:[.,]\d+)?)\s*/);
+  if (quantityMatch) {
+    const quantityStr = quantityMatch[1].replace(',', '.');
+    const parsedQuantity = parseFloat(quantityStr);
+    if (!isNaN(parsedQuantity) && parsedQuantity > 0) {
+      quantity = Math.max(1, Math.floor(parsedQuantity));
     }
+    cleanItem = cleanItem.slice(quantityMatch[0].length).trim();
+  }
+
+  // Remove unit if present at the start
+  const unitPattern = new RegExp(`^(${UNITS_TO_STRIP.join('|')})\\.?\\s+`, 'i');
+  cleanItem = cleanItem.replace(unitPattern, '').trim();
+
+  // Also handle "Xx" pattern like "2x apples"
+  cleanItem = cleanItem.replace(/^x\s*/i, '').trim();
+
+  // Remove filler words at the start
+  const fillerPattern = new RegExp(`^(${FILLER_WORDS.join('|')})\\s+`, 'i');
+  cleanItem = cleanItem.replace(fillerPattern, '').trim();
+
+  // Apply preparation pattern removals (from end)
+  for (const pattern of PREP_PATTERNS) {
+    cleanItem = cleanItem.replace(pattern, '').trim();
   }
 
   // Clean up the product name
   const productName = cleanItem
-    .replace(/^\d+\s*x?\s*/i, '') // Remove any remaining quantity prefixes
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim();
 
-  if (!productName) return null;
+  if (!productName || productName.length < 2) return null;
 
   return {
     product_name: productName,
