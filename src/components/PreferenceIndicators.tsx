@@ -89,10 +89,16 @@ export const PreferenceIndicators = ({
               ? 'bg-primary text-primary-foreground' 
               : matchInfo.animalWelfareLevel === 'medium'
                 ? 'bg-yellow-500 text-white'
-                : 'bg-muted text-muted-foreground'
+                : matchInfo.animalWelfareReason  
+                  ? 'bg-destructive text-destructive-foreground'  // Explicit low welfare = RED
+                  : 'bg-muted text-muted-foreground'  // Standard/unknown = gray
           }`}
         >
-          <Heart className="h-3 w-3 mr-1" />
+          {matchInfo.animalWelfareLevel === 'low' && matchInfo.animalWelfareReason ? (
+            <AlertTriangle className="h-3 w-3 mr-1" />
+          ) : (
+            <Heart className="h-3 w-3 mr-1" />
+          )}
           {matchInfo.animalWelfareReason || (
             matchInfo.animalWelfareLevel === 'high' ? 'God dyrevelferd' :
             matchInfo.animalWelfareLevel === 'medium' ? 'Bedre dyrevelferd' :

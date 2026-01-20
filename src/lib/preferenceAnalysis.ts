@@ -104,6 +104,33 @@ const animalWelfareMediumKeywords = [
   { keywords: ["småskala"], label: "Småskala" },
 ];
 
+// === DÅRLIG DYREVELFERD DATABASE ===
+// Brands and terms associated with industrial/low welfare production
+const animalWelfareLowKeywords: { keywords: string[]; label: string }[] = [
+  // === BURHØNS OG INDUSTRIELT FJØRFE ===
+  { keywords: ["burhøns", "buregg", "burfugl"], label: "Burdrift" },
+  { keywords: ["livskraft"], label: "Industrikylling" },
+  { keywords: ["den stolte hane"], label: "Burhøns" },
+  
+  // === LAVPRIS EMV (EIGENMERKER) MED UKJENT OPPRINNELSE ===
+  { keywords: ["first price"], label: "Lavpris import" },
+  { keywords: ["eldorado"], label: "Lavpris import" },
+  { keywords: ["x-tra"], label: "Lavpris EMV" },
+  { keywords: ["landlord"], label: "Industriproduksjon" },
+  { keywords: ["euroshopper"], label: "Lavpris import" },
+  
+  // === INTENSIV PRODUKSJON ===
+  { keywords: ["hurtigvoksende"], label: "Hurtigvoksende" },
+  { keywords: ["fikseringsbur"], label: "Burdrift" },
+  
+  // === BILLIG IMPORT ===
+  { keywords: ["utenlandsk kjøtt"], label: "Import" },
+  { keywords: ["importert kjøtt"], label: "Import" },
+  { keywords: ["brasil kylling", "brasiliansk kylling"], label: "Brasil import" },
+  { keywords: ["polsk kylling", "fra polen"], label: "Polsk import" },
+  { keywords: ["thai kylling", "fra thailand"], label: "Thai import" },
+];
+
 // === LOKALMAT DATABASE ===
 // Norwegian brands, certifications, and regional producers
 const localFoodHighKeywords: { keywords: string[]; label: string }[] = [
@@ -395,7 +422,7 @@ function checkAnimalWelfare(
 ): { level: 'high' | 'medium' | 'low' | 'unknown'; reason?: string } {
   const combinedText = `${productName} ${brand} ${ingredienser}`.toLowerCase();
   
-  // Check for high welfare brands first
+  // Check for high welfare brands first (priority)
   for (const item of animalWelfareBrands) {
     if (containsAny(combinedText, item.keywords)) {
       return { level: 'high', reason: item.label };
@@ -409,11 +436,19 @@ function checkAnimalWelfare(
     }
   }
   
-  // Check if it's an animal product category
-  const animalProductKeywords = ["melk", "ost", "egg", "kjøtt", "kylling", "svin", "storfe", "lam", "fløte", "smør", "yoghurt", "rømme"];
+  // Check for EXPLICIT low welfare brands/terms (industrial, imports, cage systems)
+  for (const item of animalWelfareLowKeywords) {
+    if (containsAny(combinedText, item.keywords)) {
+      return { level: 'low', reason: item.label };
+    }
+  }
+  
+  // Check if it's an animal product category without any welfare marking
+  const animalProductKeywords = ["melk", "ost", "egg", "kjøtt", "kylling", "svin", "storfe", "lam", "fløte", "smør", "yoghurt", "rømme", "bacon", "skinke", "pølse"];
   const isAnimalProduct = containsAny(combinedText, animalProductKeywords);
   
   if (isAnimalProduct) {
+    // No specific welfare marking = standard/unknown, not explicitly bad
     return { level: 'low', reason: undefined };
   }
   
