@@ -700,12 +700,15 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
 
                         <div
                           onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                          data-has-ingredients={String(selectedProduct.hasIngredients)}
+                          data-nova-score={String(selectedProduct.novaScore)}
+                          data-nova-estimated={String(selectedProduct.novaIsEstimated)}
                           className={`${
                             selectedProduct.matchInfo.allergyWarnings.length > 0 
                               ? 'bg-destructive/5 border-destructive/30' 
-                              : (selectedProduct.novaScore !== null && !selectedProduct.novaIsEstimated && selectedProduct.hasIngredients && selectedProduct.novaScore <= 2)
+                              : (selectedProduct.hasIngredients === true && selectedProduct.novaIsEstimated === false && selectedProduct.novaScore !== null && selectedProduct.novaScore <= 2)
                                 ? 'bg-primary/5 border-primary/20' 
-                                : (selectedProduct.novaScore !== null && !selectedProduct.novaIsEstimated && selectedProduct.hasIngredients && selectedProduct.novaScore >= 3)
+                                : (selectedProduct.hasIngredients === true && selectedProduct.novaIsEstimated === false && selectedProduct.novaScore !== null && selectedProduct.novaScore >= 3)
                                   ? 'bg-destructive/5 border-destructive/20'
                                   : 'bg-secondary border-border'
                           } border-2 p-3 md:p-4 rounded-xl cursor-pointer active:scale-[0.98] transition-all`}
