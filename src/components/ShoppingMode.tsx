@@ -497,6 +497,23 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
             )}
           </div>
         </div>
+        {/* Loading progress indicator */}
+        {loading && items.length > 0 && (
+          <div className="max-w-2xl mx-auto mt-2 px-4 md:px-0">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span>
+                Laster produkter ({Object.keys(productData).length}/{items.length})
+              </span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-1.5 mt-1.5">
+              <div 
+                className="bg-primary h-1.5 rounded-full transition-all duration-300" 
+                style={{ width: `${(Object.keys(productData).length / items.length) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main content - scrollable */}
@@ -520,6 +537,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                 const selectedProduct = suggestions[selectedIndex];
                 const alternatives = suggestions.filter((_, idx) => idx !== selectedIndex);
                 const isExpanded = expandedItems.has(item.id);
+                const isItemLoading = loading && !productData[item.id];
                 
                 // Check if ALL products have allergen warnings (no safe alternatives)
                 const allHaveAllergyWarnings = suggestions.length > 0 && 
@@ -536,6 +554,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                           checked={item.in_cart}
                           onCheckedChange={() => handleToggleCart(item.id, item.in_cart)}
                           className="mt-1 h-6 w-6 md:h-5 md:w-5 rounded-md touch-target"
+                          disabled={isItemLoading}
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-3">
@@ -561,7 +580,12 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                                 </Badge>
                               )}
                             </div>
-                            {selectedProduct && (
+                            {isItemLoading ? (
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                <span className="text-xs text-muted-foreground">Søker...</span>
+                              </div>
+                            ) : selectedProduct ? (
                               <Badge className={`${getNovaColor(selectedProduct.novaScore, selectedProduct.novaIsEstimated)} rounded-full px-2 md:px-3 py-1 text-xs flex-shrink-0`}>
                                 {!selectedProduct.hasIngredients ? (
                                   <><HelpCircle className="h-3 w-3 mr-1" />Ukjent</>
@@ -569,13 +593,27 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                                   <>NOVA {selectedProduct.novaScore}</>
                                 )}
                               </Badge>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {selectedProduct ? (
+                    {/* Loading skeleton for item */}
+                    {isItemLoading && (
+                      <div className="px-4 pb-4 md:px-5 md:pb-5 space-y-3">
+                        <div className="flex gap-3">
+                          <Skeleton className="h-16 w-16 md:h-20 md:w-20 rounded-xl flex-shrink-0" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                            <Skeleton className="h-5 w-20" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isItemLoading && selectedProduct ? (
                       <div className="px-4 pb-4 md:px-5 md:pb-5 space-y-3">
                         {/* Show allergen warning if ALL products have allergen warnings */}
                         {allHaveAllergyWarnings && (
@@ -713,19 +751,15 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                           </div>
                         )}
                       </div>
-                    ) : (
+                    ) : !isItemLoading ? (
                       <div className="px-4 pb-4 md:px-5 md:pb-5">
-                        {loading ? (
-                          <Skeleton className="h-24 w-full rounded-xl" />
-                        ) : (
-                          <div className="bg-secondary/50 p-4 rounded-xl border border-border">
-                            <p className="text-sm text-muted-foreground">
-                              Ingen produkter funnet for "{item.name}"
-                            </p>
-                          </div>
-                        )}
+                        <div className="bg-secondary/50 p-4 rounded-xl border border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Ingen produkter funnet for "{item.name}"
+                          </p>
+                        </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}
