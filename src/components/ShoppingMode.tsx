@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +44,7 @@ interface CachedItemData {
   storeId: string;
   cachedAt: string;
   products: ProductSuggestion[];
+  selectedIndex?: number; // Store selected product index in cache
 }
 
 interface ShoppingModeProps {
@@ -138,22 +139,31 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
 export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { lists, updateItemStatus, completeList, cacheItemProducts } = useShoppingList(user?.id);
+  const { lists, updateItemStatus, completeList, cacheItemProducts, updateCachedSelectedIndex } = useShoppingList(user?.id);
   const { profile } = useProfile(user?.id);
   const [productData, setProductData] = useState<Record<string, ProductSuggestion[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
   
+  // Track if we've initialized from cache to prevent re-fetching
+  const initializedRef = useRef(false);
+  const prevStoreIdRef = useRef(storeId);
+  const fetchedItemsRef = useRef<Set<string>>(new Set());
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
 
-  // Reset product data when store changes
+  // Reset only when store actually changes
   useEffect(() => {
-    setProductData({});
-    setSelectedProducts({});
-    setLoading(true);
+    if (prevStoreIdRef.current !== storeId) {
+      setProductData({});
+      setSelectedProducts({});
+      setLoading(true);
+      initializedRef.current = false;
+      fetchedItemsRef.current = new Set();
+      prevStoreIdRef.current = storeId;
+    }
   }, [storeId]);
 
   useEffect(() => {
@@ -161,14 +171,18 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     const abortController = new AbortController();
 
     const fetchProducts = async () => {
-      setLoading(true);
-
       try {
         // Check for cached product data in database
         const itemsNeedingFetch: typeof items = [];
         const cachedResults: Record<string, ProductSuggestion[]> = {};
+        const cachedSelections: Record<string, number> = {};
         
         for (const item of items) {
+          // Skip if we've already fetched this item in this session
+          if (fetchedItemsRef.current.has(item.id) && productData[item.id]) {
+            continue;
+          }
+          
           // Check if item has cached product data for the same store
           if (item.product_data) {
             try {
@@ -181,6 +195,11 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
                 if (cacheAge < maxCacheAge) {
                   console.log(`Using cached products for: ${item.name}`);
                   cachedResults[item.id] = cached.products;
+                  fetchedItemsRef.current.add(item.id);
+                  // Restore selected product index from cache
+                  if (typeof cached.selectedIndex === 'number') {
+                    cachedSelections[item.id] = cached.selectedIndex;
+                  }
                   continue;
                 }
               }
@@ -191,16 +210,24 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
           itemsNeedingFetch.push(item);
         }
 
-        // Apply cached results immediately
+        // Apply cached results and selections immediately
         if (Object.keys(cachedResults).length > 0 && isMounted) {
           setProductData(prev => ({ ...prev, ...cachedResults }));
+          if (Object.keys(cachedSelections).length > 0) {
+            setSelectedProducts(prev => ({ ...prev, ...cachedSelections }));
+          }
         }
         
-        // If all items were cached, we're done
+        // If all items were cached or already fetched, we're done
         if (itemsNeedingFetch.length === 0) {
-          if (isMounted) setLoading(false);
+          if (isMounted) {
+            setLoading(false);
+            initializedRef.current = true;
+          }
           return;
         }
+
+        setLoading(true);
 
         // Step 1: Batch analyze all item names with AI (only for items needing fetch)
         const itemNames = itemsNeedingFetch.map(i => i.name);
@@ -311,9 +338,11 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
               
               // Cache products in background (fire and forget)
               cacheItemProducts(item.id, storeId, sortedProducts);
+              fetchedItemsRef.current.add(item.id);
               
               return { itemId: item.id, products: sortedProducts };
             } else {
+              fetchedItemsRef.current.add(item.id);
               return { itemId: item.id, products: [] as ProductSuggestion[] };
             }
           } catch (err) {
@@ -355,7 +384,8 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
           allResults.forEach(({ itemId, products }) => {
             results[itemId] = products;
           });
-          setProductData(results);
+          setProductData(prev => ({ ...prev, ...results }));
+          initializedRef.current = true;
         }
       } catch (error) {
         console.error('Error in fetchProducts:', error);
@@ -366,8 +396,16 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       }
     };
 
-    if (items.length > 0) {
+    if (items.length > 0 && !initializedRef.current) {
       fetchProducts();
+    } else if (items.length > 0 && initializedRef.current) {
+      // Check if there are new items we haven't fetched yet
+      const newItems = items.filter(item => !fetchedItemsRef.current.has(item.id) && !productData[item.id]);
+      if (newItems.length > 0) {
+        fetchProducts();
+      } else {
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }
@@ -376,7 +414,7 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       isMounted = false;
       abortController.abort();
     };
-  }, [items, storeId, profile]);
+  }, [listId, storeId, items.length]); // Use stable dependencies
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
@@ -398,6 +436,8 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
       ...prev,
       [itemId]: productIndex
     }));
+    // Persist selected product index to cache in background
+    updateCachedSelectedIndex(itemId, productIndex);
     toast.success("Produkt byttet");
   };
 
