@@ -19,7 +19,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus, ClipboardPaste } from "lucide-react";
+import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus, ClipboardPaste, Pencil, Check } from "lucide-react";
 import { toast } from "sonner";
 import { parseShoppingListText, ParsedItem } from "@/lib/textParser";
 
@@ -28,7 +28,7 @@ type ViewMode = 'edit' | 'select-store' | 'shop';
 const ListEditor = () => {
   const { listId } = useParams<{ listId: string }>();
   const { user, loading: authLoading } = useAuth();
-  const { lists, loading: listLoading, addItem, removeItem, updateListStore, updateItemQuantity, setActiveList } = useShoppingList(user?.id);
+  const { lists, loading: listLoading, addItem, removeItem, updateListStore, updateListName, updateItemQuantity, setActiveList } = useShoppingList(user?.id);
   const navigate = useNavigate();
   const [newItemName, setNewItemName] = useState("");
   const [view, setView] = useState<ViewMode>('edit');
@@ -36,6 +36,8 @@ const ListEditor = () => {
   const [showPasteDialog, setShowPasteDialog] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
@@ -182,8 +184,54 @@ const ListEditor = () => {
           </Button>
         </div>
 
-        {/* List title */}
-        <h1 className="text-xl font-bold mb-6">{currentList.name}</h1>
+        {/* Editable list title */}
+        <div className="flex items-center gap-2 mb-6">
+          {isEditingName ? (
+            <>
+              <Input
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                className="text-xl font-bold h-10 rounded-2xl"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    updateListName(listId!, editedName);
+                    setIsEditingName(false);
+                  }
+                  if (e.key === 'Escape') {
+                    setIsEditingName(false);
+                  }
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full h-10 w-10"
+                onClick={() => {
+                  updateListName(listId!, editedName);
+                  setIsEditingName(false);
+                }}
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold">{currentList.name}</h1>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setEditedName(currentList.name);
+                  setIsEditingName(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
 
         {/* Add new item input */}
         <div className="mb-6">

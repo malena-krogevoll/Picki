@@ -471,6 +471,35 @@ export const useShoppingList = (userId: string | undefined) => {
     return { error: null };
   };
 
+  const updateListName = async (listId: string, name: string) => {
+    if (!name.trim()) return { error: { message: "Navn kan ikke være tomt" } };
+
+    // Optimistic update
+    setLists(prev => prev.map(list => 
+      list.id === listId ? { ...list, name: name.trim() } : list
+    ));
+    if (activeList?.id === listId) {
+      setActiveList({ ...activeList, name: name.trim() });
+    }
+
+    const { error } = await supabase
+      .from("shopping_lists")
+      .update({ name: name.trim() })
+      .eq("id", listId);
+
+    if (error) {
+      toast({
+        title: "Feil ved oppdatering av navn",
+        description: error.message,
+        variant: "destructive",
+      });
+      await fetchLists();
+      return { error };
+    }
+
+    return { error: null };
+  };
+
   const duplicateList = async (listId: string) => {
     if (!userId) return { error: { message: "Ingen bruker" } };
 
@@ -595,6 +624,7 @@ export const useShoppingList = (userId: string | undefined) => {
     updateCachedSelectedIndex,
     completeList,
     updateListStore,
+    updateListName,
     duplicateList,
     deleteList,
     setActiveList,
