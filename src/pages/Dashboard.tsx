@@ -45,7 +45,8 @@ const Dashboard = () => {
   };
 
   const handleCreateNewList = async () => {
-    const result = await createList("Ny handleliste");
+    const defaultName = format(new Date(), "d. MMMM yyyy", { locale: nb });
+    const result = await createList(defaultName);
     if (result?.data) {
       navigate(`/list/${result.data.id}`);
     }
