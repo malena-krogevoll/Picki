@@ -6,7 +6,7 @@ export interface MatchInfo {
   dietWarnings: string[];
   dietMatches: string[];
   organicMatch: boolean;
-  animalWelfareLevel: 'high' | 'medium' | 'low' | 'unknown';
+  animalWelfareLevel: 'high' | 'medium' | 'low' | 'unknown' | 'not_applicable';
   animalWelfareReason?: string;
   localFoodMatch: boolean;
   localFoodReason?: string;
@@ -419,8 +419,34 @@ function checkAnimalWelfare(
   productName: string,
   brand: string,
   ingredienser: string
-): { level: 'high' | 'medium' | 'low' | 'unknown'; reason?: string } {
+): { level: 'high' | 'medium' | 'low' | 'unknown' | 'not_applicable'; reason?: string } {
   const combinedText = `${productName} ${brand} ${ingredienser}`.toLowerCase();
+  
+  // FIRST: Check if this is an animal product at all
+  // Expanded list of animal-derived product keywords
+  const animalProductKeywords = [
+    // Dairy
+    "melk", "ost", "fløte", "smør", "yoghurt", "rømme", "kesam", "kremost", "cottage", "ricotta", "mozzarella", "parmesan", "brie", "camembert", "feta", "brunost",
+    // Eggs
+    "egg", "eggehvite", "eggeplomme", "majones",
+    // Meat
+    "kjøtt", "kylling", "svin", "storfe", "lam", "bacon", "skinke", "pølse", "kjøttdeig", "biff", "entrecôte", "indrefilet", "ytrefilet", "koteletter", "ribbe", "pinnekjøtt", "fenalår", "spekemat", "salami", "servelat", "leverpostei", "sylte", "medisterkake", "karbonader",
+    // Poultry
+    "kalkun", "and", "gås", "høne", "fjærkre",
+    // Fish and seafood
+    "fisk", "laks", "torsk", "sei", "hyse", "ørret", "makrell", "sild", "sardiner", "tunfisk", "reker", "krabbe", "hummer", "blåskjell", "kamskjell", "østers", "akkar", "blekksprut",
+    // Other animal products
+    "lever", "hjerte", "tunge", "innmat", "gelatin", "honning"
+  ];
+  
+  const isAnimalProduct = containsAny(combinedText, animalProductKeywords);
+  
+  // If not an animal product, animal welfare is not applicable
+  if (!isAnimalProduct) {
+    return { level: 'not_applicable', reason: undefined };
+  }
+  
+  // NOW: Check welfare level for animal products
   
   // Check for high welfare brands first (priority)
   for (const item of animalWelfareBrands) {
@@ -443,15 +469,7 @@ function checkAnimalWelfare(
     }
   }
   
-  // Check if it's an animal product category without any welfare marking
-  const animalProductKeywords = ["melk", "ost", "egg", "kjøtt", "kylling", "svin", "storfe", "lam", "fløte", "smør", "yoghurt", "rømme", "bacon", "skinke", "pølse"];
-  const isAnimalProduct = containsAny(combinedText, animalProductKeywords);
-  
-  if (isAnimalProduct) {
-    // No specific welfare marking = standard/unknown, not explicitly bad
-    return { level: 'low', reason: undefined };
-  }
-  
+  // Animal product without any welfare marking = unknown/standard
   return { level: 'unknown', reason: undefined };
 }
 

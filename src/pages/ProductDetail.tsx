@@ -392,8 +392,8 @@ export default function ProductDetail() {
           </Card>
         )}
 
-        {/* Animal Welfare */}
-        {userPreferences?.other_preferences?.animal_welfare && matchInfo && matchInfo.animalWelfareLevel !== 'unknown' && (
+        {/* Animal Welfare - only show for animal products */}
+        {userPreferences?.other_preferences?.animal_welfare && matchInfo && matchInfo.animalWelfareLevel !== 'unknown' && matchInfo.animalWelfareLevel !== 'not_applicable' && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">

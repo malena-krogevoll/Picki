@@ -77,9 +77,10 @@ export const PreferenceIndicators = ({
         </Badge>
       )}
 
-      {/* Animal welfare indicator - always show "Dyrevelferd" with color coding */}
+      {/* Animal welfare indicator - only show for animal products with known welfare level */}
       {userPreferences.other_preferences?.animal_welfare && 
        matchInfo.animalWelfareLevel !== 'unknown' && 
+       matchInfo.animalWelfareLevel !== 'not_applicable' &&
        !(matchInfo.organicMatch && matchInfo.animalWelfareReason === 'Økologisk') && (
         <Badge 
           className={`text-xs px-2 py-0.5 rounded-full ${
