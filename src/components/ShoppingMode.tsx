@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle, Home, Pencil, Store } from "lucide-react";
+import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle, Home, Pencil, Store, ChefHat } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useProfile } from "@/hooks/useProfile";
@@ -15,6 +15,8 @@ import { analyzeProductMatch, sortProductsByPreference, MatchInfo, UserPreferenc
 import { PreferenceIndicators, AllergyWarningBanner } from "@/components/PreferenceIndicators";
 import { groupItemsByCategory } from "@/lib/storeLayoutSort";
 import { StoreSelectorDialog, getStoreName, getStoreIcon, getStoreColor } from "@/components/StoreSelectorDialog";
+import { useDiyAlternatives, DiyRecipe } from "@/hooks/useDiyAlternatives";
+import { DiyAlternativeDialog } from "@/components/DiyAlternativeDialog";
 
 interface ItemIntent {
   original: string;
@@ -152,10 +154,16 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
 export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: ShoppingModeProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { lists, updateItemStatus, completeList, cacheItemProducts, updateCachedSelectedIndex } = useShoppingList(user?.id);
+  const { lists, updateItemStatus, completeList, cacheItemProducts, updateCachedSelectedIndex, addItem, removeItem } = useShoppingList(user?.id);
   const { profile } = useProfile(user?.id);
+  const { findDiyAlternative } = useDiyAlternatives();
   
   const [showStoreDialog, setShowStoreDialog] = useState(false);
+  const [diyDialogOpen, setDiyDialogOpen] = useState(false);
+  const [selectedDiyRecipe, setSelectedDiyRecipe] = useState<DiyRecipe | null>(null);
+  const [selectedDiyItemId, setSelectedDiyItemId] = useState<string | null>(null);
+  const [selectedDiyItemName, setSelectedDiyItemName] = useState<string>("");
+  const [dismissedDiyItems, setDismissedDiyItems] = useState<Set<string>>(new Set());
   
   // Get cache key for this list+store combination
   const cacheKey = `${listId}:${storeId}`;
@@ -484,6 +492,46 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     toast.success("Produkt byttet");
   };
 
+  // DIY Alternative handlers
+  const handleShowDiyAlternative = (itemId: string, itemName: string, recipe: DiyRecipe) => {
+    setSelectedDiyItemId(itemId);
+    setSelectedDiyItemName(itemName);
+    setSelectedDiyRecipe(recipe);
+    setDiyDialogOpen(true);
+  };
+
+  const handleAddDiyIngredients = async (ingredients: { name: string; quantity: string | null; unit: string | null }[]) => {
+    if (!selectedDiyItemId) return;
+    
+    // Remove the original item
+    await removeItem(selectedDiyItemId);
+    
+    // Add all DIY ingredients
+    for (const ing of ingredients) {
+      const ingredientName = ing.name;
+      await addItem(listId, ingredientName);
+    }
+    
+    // Mark this item as handled so we don't show the prompt again
+    setDismissedDiyItems(prev => new Set(prev).add(selectedDiyItemId));
+    
+    toast.success("Byttet til hjemmelaget", {
+      description: `${ingredients.length} ingredienser lagt til`
+    });
+    
+    // Reset state
+    setSelectedDiyItemId(null);
+    setSelectedDiyRecipe(null);
+  };
+
+  const handleDismissDiy = () => {
+    if (selectedDiyItemId) {
+      setDismissedDiyItems(prev => new Set(prev).add(selectedDiyItemId));
+    }
+    setSelectedDiyItemId(null);
+    setSelectedDiyRecipe(null);
+  };
+
   const handleCompleteList = async () => {
     await completeList(listId);
     toast.success("Handleliste fullført!", {
@@ -640,6 +688,11 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 const commonAllergyWarnings = allHaveAllergyWarnings && selectedProduct
                   ? selectedProduct.matchInfo.allergyWarnings
                   : [];
+
+                // Check for DIY alternative
+                const diyAlternative = !dismissedDiyItems.has(item.id) && !item.in_cart 
+                  ? findDiyAlternative(item.name) 
+                  : null;
 
                 return (
                   <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
@@ -850,6 +903,29 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                             )}
                           </div>
                         )}
+
+                        {/* DIY Alternative suggestion */}
+                        {diyAlternative && (
+                          <div 
+                            onClick={() => handleShowDiyAlternative(item.id, item.name, diyAlternative)}
+                            className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-2 border-amber-200 dark:border-amber-800 p-3 rounded-xl cursor-pointer hover:border-amber-300 dark:hover:border-amber-700 transition-all active:scale-[0.98]"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="bg-amber-100 dark:bg-amber-900 p-2 rounded-full flex-shrink-0">
+                                <ChefHat className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-foreground">Lag selv: {diyAlternative.title}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {diyAlternative.ingredients.length} ingredienser • Erstatter {item.name.toLowerCase()}
+                                </p>
+                              </div>
+                              <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 rounded-full text-xs flex-shrink-0">
+                                DIY
+                              </Badge>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : !isItemLoading ? (
                       <div className="px-4 pb-4 md:px-5 md:pb-5">
@@ -913,6 +989,18 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         onSelectStore={onChangeStore}
         currentStoreId={storeId}
       />
+
+      {/* DIY Alternative Dialog */}
+      {selectedDiyRecipe && (
+        <DiyAlternativeDialog
+          open={diyDialogOpen}
+          onOpenChange={setDiyDialogOpen}
+          recipe={selectedDiyRecipe}
+          originalItemName={selectedDiyItemName}
+          onAddIngredients={handleAddDiyIngredients}
+          onCancel={handleDismissDiy}
+        />
+      )}
     </div>
   );
 };
