@@ -81,14 +81,16 @@ export const PreferenceIndicators = ({
         </Badge>
       )}
 
-      {/* Animal welfare indicator */}
-      {userPreferences.other_preferences?.animal_welfare && matchInfo.animalWelfareLevel !== 'unknown' && (
+      {/* Animal welfare indicator - skip if reason is purely "Økologisk" and we already show organic badge */}
+      {userPreferences.other_preferences?.animal_welfare && 
+       matchInfo.animalWelfareLevel !== 'unknown' && 
+       !(matchInfo.organicMatch && matchInfo.animalWelfareReason === 'Økologisk') && (
         <Badge 
           className={`text-xs px-2 py-0.5 rounded-full ${
             matchInfo.animalWelfareLevel === 'high' 
               ? 'bg-primary text-primary-foreground' 
               : matchInfo.animalWelfareLevel === 'medium'
-                ? 'bg-yellow-500 text-white'
+                ? 'bg-primary text-primary-foreground'  // Changed from yellow to green - better welfare is positive
                 : matchInfo.animalWelfareReason  
                   ? 'bg-destructive text-destructive-foreground'  // Explicit low welfare = RED
                   : 'bg-muted text-muted-foreground'  // Standard/unknown = gray
