@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { Check, X } from 'lucide-react';
 import pickiLogo from '@/assets/picki-logo-auth.png';
+
+interface PasswordRequirement {
+  label: string;
+  test: (password: string) => boolean;
+}
+
+const passwordRequirements: PasswordRequirement[] = [
+  { label: 'Minst 6 tegn', test: (p) => p.length >= 6 },
+  { label: 'Inneholder en stor bokstav', test: (p) => /[A-Z]/.test(p) },
+  { label: 'Inneholder en liten bokstav', test: (p) => /[a-z]/.test(p) },
+  { label: 'Inneholder et tall', test: (p) => /[0-9]/.test(p) },
+];
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -15,6 +28,15 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const { signUp, signIn } = useAuth();
   const { toast } = useToast();
+
+  const passwordValidation = useMemo(() => {
+    return passwordRequirements.map(req => ({
+      ...req,
+      met: req.test(password)
+    }));
+  }, [password]);
+
+  const allRequirementsMet = passwordValidation.every(req => req.met);
   const navigate = useNavigate();
 
   const handleSubmit = async (isSignUp: boolean) => {
@@ -120,10 +142,28 @@ const Auth = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Velg et sterkt passord"
                 />
+                {/* Password requirements */}
+                {password.length > 0 && (
+                  <div className="mt-3 p-3 bg-muted/50 rounded-lg space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Passordkrav:</p>
+                    {passwordValidation.map((req, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        {req.met ? (
+                          <Check className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <X className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                        <span className={`text-xs ${req.met ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {req.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <Button 
                 onClick={() => handleSubmit(true)}
-                disabled={loading}
+                disabled={loading || !allRequirementsMet}
                 className="w-full"
               >
                 {loading ? 'Oppretter konto...' : 'Opprett konto'}
