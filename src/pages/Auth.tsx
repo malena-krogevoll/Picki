@@ -25,6 +25,7 @@ const passwordRequirements: PasswordRequirement[] = [
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp, signIn } = useAuth();
   const { toast } = useToast();
@@ -37,6 +38,7 @@ const Auth = () => {
   }, [password]);
 
   const allRequirementsMet = passwordValidation.every(req => req.met);
+  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
   const navigate = useNavigate();
 
   const handleSubmit = async (isSignUp: boolean) => {
@@ -161,9 +163,31 @@ const Auth = () => {
                   </div>
                 )}
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-confirm-password">Bekreft passord</Label>
+                <Input
+                  id="signup-confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Skriv passordet på nytt"
+                />
+                {confirmPassword.length > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {passwordsMatch ? (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    ) : (
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                    )}
+                    <span className={`text-xs ${passwordsMatch ? 'text-foreground' : 'text-destructive'}`}>
+                      {passwordsMatch ? 'Passordene er like' : 'Passordene er ikke like'}
+                    </span>
+                  </div>
+                )}
+              </div>
               <Button 
                 onClick={() => handleSubmit(true)}
-                disabled={loading || !allRequirementsMet}
+                disabled={loading || !allRequirementsMet || !passwordsMatch}
                 className="w-full"
               >
                 {loading ? 'Oppretter konto...' : 'Opprett konto'}
