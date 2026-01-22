@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle } from "lucide-react";
+import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle, Home, Pencil, Store } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useProfile } from "@/hooks/useProfile";
@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { analyzeProductMatch, sortProductsByPreference, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 import { PreferenceIndicators, AllergyWarningBanner } from "@/components/PreferenceIndicators";
 import { groupItemsByCategory } from "@/lib/storeLayoutSort";
-
+import { StoreSelectorDialog, getStoreName, getStoreIcon, getStoreColor } from "@/components/StoreSelectorDialog";
 
 interface ItemIntent {
   original: string;
@@ -50,8 +50,21 @@ interface CachedItemData {
 interface ShoppingModeProps {
   storeId: string;
   listId: string;
-  onBack: () => void;
+  onEditList: () => void;
+  onChangeStore: (newStoreId: string) => void;
 }
+
+// Export session cache for external cache invalidation
+export const sessionProductCache = new Map<string, {
+  products: Record<string, ProductSuggestion[]>;
+  selections: Record<string, number>;
+  fetchedItems: Set<string>;
+}>();
+
+export const clearSessionCache = (listId: string, storeId: string) => {
+  const cacheKey = `${listId}:${storeId}`;
+  sessionProductCache.delete(cacheKey);
+};
 
 const getNovaColor = (score: number | null, isEstimated: boolean = false) => {
   if (score === null) return "bg-muted text-muted-foreground border-dashed border";
@@ -136,18 +149,13 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
   return results;
 }
 
-// Session-persistent cache to survive navigation (keyed by listId + storeId)
-const sessionProductCache = new Map<string, {
-  products: Record<string, ProductSuggestion[]>;
-  selections: Record<string, number>;
-  fetchedItems: Set<string>;
-}>();
-
-export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => {
+export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: ShoppingModeProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { lists, updateItemStatus, completeList, cacheItemProducts, updateCachedSelectedIndex } = useShoppingList(user?.id);
   const { profile } = useProfile(user?.id);
+  
+  const [showStoreDialog, setShowStoreDialog] = useState(false);
   
   // Get cache key for this list+store combination
   const cacheKey = `${listId}:${storeId}`;
@@ -503,19 +511,33 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     });
   }, [items, productData, selectedProducts]);
 
+  const StoreIconComponent = getStoreIcon(storeId);
+
   if (loading && Object.keys(productData).length === 0) {
     return (
       <div className="flex flex-col min-h-[calc(100vh-60px)] md:min-h-0">
         {/* Sticky header */}
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 md:px-0 md:py-0 md:border-0 md:bg-transparent md:backdrop-blur-none md:static">
-          <div className="flex items-center justify-between max-w-2xl mx-auto">
-            <Button variant="outline" onClick={onBack} className="rounded-2xl h-11 touch-target">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Tilbake
+          <div className="flex items-center justify-between max-w-2xl mx-auto gap-2">
+            <Button variant="outline" onClick={() => navigate("/")} className="rounded-2xl h-11 touch-target">
+              <Home className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Hjem</span>
             </Button>
-            <Badge variant="outline" className="text-base px-4 py-2 rounded-full">
-              {storeId.toUpperCase()}
-            </Badge>
+            <Button
+              variant="outline"
+              onClick={() => setShowStoreDialog(true)}
+              className="rounded-2xl h-11 touch-target flex-1 max-w-[180px] justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <StoreIconComponent className={`h-4 w-4 ${getStoreColor(storeId)}`} />
+                <span className="text-sm font-medium truncate">{getStoreName(storeId)}</span>
+              </div>
+              <ChevronDown className="h-4 w-4 ml-1 opacity-50" />
+            </Button>
+            <Button variant="outline" onClick={onEditList} className="rounded-2xl h-11 touch-target">
+              <Pencil className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Rediger</span>
+            </Button>
           </div>
         </div>
         
@@ -528,6 +550,13 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
             </div>
           ))}
         </div>
+
+        <StoreSelectorDialog
+          open={showStoreDialog}
+          onOpenChange={setShowStoreDialog}
+          onSelectStore={onChangeStore}
+          currentStoreId={storeId}
+        />
       </div>
     );
   }
@@ -536,22 +565,32 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
     <div className="flex flex-col min-h-[calc(100vh-60px)] md:min-h-0">
       {/* Sticky header for mobile */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 md:px-0 md:py-0 md:border-0 md:bg-transparent md:backdrop-blur-none md:static">
-        <div className="flex items-center justify-between max-w-2xl mx-auto">
-          <Button variant="outline" onClick={onBack} className="rounded-2xl h-11 touch-target">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Tilbake</span>
+        <div className="flex items-center justify-between max-w-2xl mx-auto gap-2">
+          <Button variant="outline" onClick={() => navigate("/")} className="rounded-2xl h-11 touch-target">
+            <Home className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Hjem</span>
           </Button>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-sm md:text-base px-3 md:px-4 py-2 rounded-full">
-              {storeId.toUpperCase()}
-            </Badge>
-            {allItemsInCart && (
-              <Button onClick={handleCompleteList} className="bg-primary hover:bg-primary/90 rounded-2xl h-11 touch-target hidden sm:flex">
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Fullfør
-              </Button>
-            )}
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowStoreDialog(true)}
+            className="rounded-2xl h-11 touch-target flex-1 max-w-[180px] justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <StoreIconComponent className={`h-4 w-4 ${getStoreColor(storeId)}`} />
+              <span className="text-sm font-medium truncate">{getStoreName(storeId)}</span>
+            </div>
+            <ChevronDown className="h-4 w-4 ml-1 opacity-50" />
+          </Button>
+          <Button variant="outline" onClick={onEditList} className="rounded-2xl h-11 touch-target">
+            <Pencil className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Rediger</span>
+          </Button>
+          {allItemsInCart && (
+            <Button onClick={handleCompleteList} className="bg-primary hover:bg-primary/90 rounded-2xl h-11 touch-target hidden sm:flex">
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Fullfør
+            </Button>
+          )}
         </div>
         {/* Loading progress indicator */}
         {loading && items.length > 0 && (
@@ -867,6 +906,13 @@ export const ShoppingMode = ({ storeId, listId, onBack }: ShoppingModeProps) => 
           </div>
         </div>
       )}
+
+      <StoreSelectorDialog
+        open={showStoreDialog}
+        onOpenChange={setShowStoreDialog}
+        onSelectStore={onChangeStore}
+        currentStoreId={storeId}
+      />
     </div>
   );
 };

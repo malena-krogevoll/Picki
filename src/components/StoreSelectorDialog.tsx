@@ -1,4 +1,4 @@
-import { Store, ShoppingBag, ShoppingCart, Package, Beef, Tag, Building2, Building, Home, Warehouse } from "lucide-react";
+import { Store, ShoppingBag, ShoppingCart, Package, Beef, Tag, Building2, Building, Home, Warehouse, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LucideIcon } from "lucide-react";
 
@@ -19,11 +19,14 @@ interface StoreSelectorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectStore: (storeId: string) => void;
+  currentStoreId?: string;
 }
 
-export const StoreSelectorDialog = ({ open, onOpenChange, onSelectStore }: StoreSelectorDialogProps) => {
+export const StoreSelectorDialog = ({ open, onOpenChange, onSelectStore, currentStoreId }: StoreSelectorDialogProps) => {
   const handleSelectStore = (storeId: string) => {
-    onSelectStore(storeId);
+    if (storeId !== currentStoreId) {
+      onSelectStore(storeId);
+    }
     onOpenChange(false);
   };
 
@@ -37,16 +40,24 @@ export const StoreSelectorDialog = ({ open, onOpenChange, onSelectStore }: Store
         <div className="space-y-2 py-4">
           {stores.map((store) => {
             const IconComponent = store.icon;
+            const isSelected = store.id === currentStoreId;
             return (
               <button
                 key={store.id}
-                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-primary hover:bg-secondary/30 transition-all"
+                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${
+                  isSelected 
+                    ? "border-primary bg-primary/5" 
+                    : "border-border hover:border-primary hover:bg-secondary/30"
+                }`}
                 onClick={() => handleSelectStore(store.id)}
               >
                 <div className="bg-primary/10 p-3 rounded-xl">
                   <IconComponent className={`h-5 w-5 ${store.color}`} />
                 </div>
-                <span className="text-base font-semibold">{store.name}</span>
+                <span className="text-base font-semibold flex-1 text-left">{store.name}</span>
+                {isSelected && (
+                  <Check className="h-5 w-5 text-primary" />
+                )}
               </button>
             );
           })}

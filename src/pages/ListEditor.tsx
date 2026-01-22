@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { StoreSelector } from "@/components/StoreSelector";
-import { ShoppingMode } from "@/components/ShoppingMode";
+import { ShoppingMode, clearSessionCache } from "@/components/ShoppingMode";
+import { StoreSelectorDialog } from "@/components/StoreSelectorDialog";
 import { ItemSuggestions } from "@/components/ItemSuggestions";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList, ProductData } from "@/hooks/useShoppingList";
@@ -19,11 +19,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus, ClipboardPaste, Pencil, Check } from "lucide-react";
+import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus, ClipboardPaste, Pencil, Check, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { parseShoppingListText, ParsedItem } from "@/lib/textParser";
 
-type ViewMode = 'edit' | 'select-store' | 'shop';
+type ViewMode = 'edit' | 'shop';
 
 const ListEditor = () => {
   const { listId } = useParams<{ listId: string }>();
@@ -33,6 +33,7 @@ const ListEditor = () => {
   const [newItemName, setNewItemName] = useState("");
   const [view, setView] = useState<ViewMode>('edit');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showStoreDialog, setShowStoreDialog] = useState(false);
   const [showPasteDialog, setShowPasteDialog] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
@@ -91,17 +92,18 @@ const ListEditor = () => {
 
   const handleSelectStore = async (storeId: string) => {
     if (!listId) return;
+    // Clear session cache for old store if we're changing stores
+    if (currentList?.store_id && currentList.store_id !== storeId) {
+      clearSessionCache(listId, currentList.store_id);
+    }
     await updateListStore(listId, storeId);
+    setShowStoreDialog(false);
     setView('shop');
     toast.success("Butikk valgt - finner produkter...");
   };
 
-  const handleBackFromStore = () => {
+  const handleEditList = () => {
     setView('edit');
-  };
-
-  const handleBackFromShop = () => {
-    setView('select-store');
   };
 
   const handlePasteTextChange = (text: string) => {
@@ -143,28 +145,8 @@ const ListEditor = () => {
           <ShoppingMode
             storeId={currentList.store_id}
             listId={listId!}
-            onBack={handleBackFromShop}
-          />
-        </main>
-      </div>
-    );
-  }
-
-  // Store selection mode
-  if (view === 'select-store') {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
-          <div className="mb-6">
-            <h1 className="text-xl font-bold mb-2">Velg butikk</h1>
-            <p className="text-muted-foreground text-sm">
-              Hvor skal du handle? Vi finner produkter og priser for deg.
-            </p>
-          </div>
-          <StoreSelector
-            onSelectStore={handleSelectStore}
-            onBack={handleBackFromStore}
+            onEditList={handleEditList}
+            onChangeStore={handleSelectStore}
           />
         </main>
       </div>
@@ -349,14 +331,23 @@ const ListEditor = () => {
         {/* Continue to store selection */}
         {items.length > 0 && (
           <Button
-            onClick={() => setView('select-store')}
+            onClick={() => setShowStoreDialog(true)}
             className="w-full h-14 text-base rounded-2xl"
             size="lg"
           >
             <Store className="h-5 w-5 mr-2" />
             Velg butikk og finn produkter
+            <ChevronRight className="h-5 w-5 ml-auto" />
           </Button>
         )}
+
+        {/* Store selector dialog */}
+        <StoreSelectorDialog
+          open={showStoreDialog}
+          onOpenChange={setShowStoreDialog}
+          onSelectStore={handleSelectStore}
+          currentStoreId={currentList.store_id || undefined}
+        />
 
         {/* Paste ingredients dialog */}
         <Dialog open={showPasteDialog} onOpenChange={setShowPasteDialog}>
