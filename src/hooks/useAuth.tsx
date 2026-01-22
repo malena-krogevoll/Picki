@@ -28,11 +28,14 @@ export const useAuth = () => {
   }, []);
 
   const signUp = async (email: string, password: string) => {
+    // Use production URL to avoid localhost redirect issues
+    const redirectUrl = 'https://picki.lovable.app/';
+    
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`
+        emailRedirectTo: redirectUrl
       }
     });
 
