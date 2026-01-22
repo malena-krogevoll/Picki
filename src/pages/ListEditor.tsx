@@ -328,17 +328,29 @@ const ListEditor = () => {
           </Card>
         )}
 
-        {/* Continue to store selection */}
+        {/* Continue to shopping or store selection */}
         {items.length > 0 && (
-          <Button
-            onClick={() => setShowStoreDialog(true)}
-            className="w-full h-14 text-base rounded-2xl"
-            size="lg"
-          >
-            <Store className="h-5 w-5 mr-2" />
-            Velg butikk og finn produkter
-            <ChevronRight className="h-5 w-5 ml-auto" />
-          </Button>
+          currentList.store_id ? (
+            <Button
+              onClick={() => setView('shop')}
+              className="w-full h-14 text-base rounded-2xl"
+              size="lg"
+            >
+              <ShoppingCart className="h-5 w-5 mr-2" />
+              Tilbake til handlemodus
+              <ChevronRight className="h-5 w-5 ml-auto" />
+            </Button>
+          ) : (
+            <Button
+              onClick={() => setShowStoreDialog(true)}
+              className="w-full h-14 text-base rounded-2xl"
+              size="lg"
+            >
+              <Store className="h-5 w-5 mr-2" />
+              Velg butikk og finn produkter
+              <ChevronRight className="h-5 w-5 ml-auto" />
+            </Button>
+          )
         )}
 
         {/* Store selector dialog */}
