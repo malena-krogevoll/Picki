@@ -67,17 +67,13 @@ export const PreferenceIndicators = ({
         </Badge>
       ))}
 
-      {/* Organic indicator */}
-      {userPreferences.other_preferences?.organic && (
+      {/* Organic indicator - only show when product IS organic */}
+      {userPreferences.other_preferences?.organic && matchInfo.organicMatch && (
         <Badge 
-          className={`text-xs px-2 py-0.5 rounded-full ${
-            matchInfo.organicMatch 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted text-muted-foreground'
-          }`}
+          className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full"
         >
           <Leaf className="h-3 w-3 mr-1" />
-          {matchInfo.organicMatch ? 'Økologisk' : 'Ikke øko'}
+          Økologisk
         </Badge>
       )}
 
