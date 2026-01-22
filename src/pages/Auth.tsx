@@ -94,7 +94,7 @@ const Auth = () => {
     setLoading(true);
     
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth?reset=true`,
+      redirectTo: 'https://picki.lovable.app/auth?reset=true',
     });
 
     if (error) {
