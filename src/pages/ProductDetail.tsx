@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Leaf, AlertCircle, HelpCircle } from "lucide-react";
+import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart } from "lucide-react";
+import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -63,12 +66,37 @@ const getNovaDescription = (score: number) => {
 export default function ProductDetail() {
   const { ean } = useParams<{ ean: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
   const searchParams = new URLSearchParams(window.location.search);
   const listId = searchParams.get('listId');
   const storeId = searchParams.get('storeId');
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [novaData, setNovaData] = useState<NovaClassification | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Convert profile preferences to UserPreferences format
+  const userPreferences: UserPreferences | null = profile?.preferences ? {
+    allergies: profile.preferences.allergies || [],
+    diets: profile.preferences.diets || [],
+    other_preferences: {
+      organic: profile.preferences.other_preferences?.organic || false,
+      lowest_price: profile.preferences.other_preferences?.lowest_price || false,
+      animal_welfare: profile.preferences.other_preferences?.animal_welfare || false,
+    },
+    priority_order: profile.preferences.priority_order || [],
+  } : null;
+
+  // Analyze product for animal welfare
+  const matchInfo = product ? analyzeProductMatch(
+    {
+      name: product.name,
+      brand: product.brand || '',
+      allergener: '',
+      ingredienser: product.ingredients || '',
+    },
+    userPreferences
+  ) : null;
 
   const handleBack = () => {
     if (listId && storeId) {
@@ -359,6 +387,60 @@ export default function ProductDetail() {
                   Allergeninformasjon er hentet automatisk fra ingredienslisten og kan inneholde feil. 
                   Sjekk alltid produktets emballasje før bruk. Picki kan ikke garantere at produkter er fri for allergener.
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Animal Welfare */}
+        {userPreferences?.other_preferences?.animal_welfare && matchInfo && matchInfo.animalWelfareLevel !== 'unknown' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Dyrevelferd</CardTitle>
+                <Badge 
+                  className={`rounded-full px-4 py-2 ${
+                    matchInfo.animalWelfareLevel === 'high' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : matchInfo.animalWelfareLevel === 'medium'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-destructive text-destructive-foreground'
+                  }`}
+                >
+                  {matchInfo.animalWelfareLevel === 'high' ? 'God' : matchInfo.animalWelfareLevel === 'medium' ? 'Middels' : 'Lav'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={`p-4 rounded-xl ${
+                matchInfo.animalWelfareLevel === 'high' 
+                  ? 'bg-primary/10 border border-primary/20' 
+                  : matchInfo.animalWelfareLevel === 'medium'
+                    ? 'bg-yellow-500/10 border border-yellow-500/20'
+                    : 'bg-destructive/10 border border-destructive/20'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <Heart className={`h-5 w-5 flex-shrink-0 mt-1 ${
+                    matchInfo.animalWelfareLevel === 'high' 
+                      ? 'text-primary' 
+                      : matchInfo.animalWelfareLevel === 'medium'
+                        ? 'text-yellow-500'
+                        : 'text-destructive'
+                  }`} />
+                  <div>
+                    <h3 className="font-semibold mb-1">
+                      {matchInfo.animalWelfareReason || 'Standardproduksjon'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {matchInfo.animalWelfareLevel === 'high' 
+                        ? 'Dette produktet har indikatorer på god dyrevelferd, som sertifiseringer eller produksjonsmetoder som prioriterer dyrenes trivsel.'
+                        : matchInfo.animalWelfareLevel === 'medium'
+                          ? 'Dette produktet har noen positive indikatorer for dyrevelferd, men ikke fullstendige sertifiseringer.'
+                          : 'Dette produktet har indikatorer som tyder på lavere standard for dyrevelferd.'
+                      }
+                    </p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

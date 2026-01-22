@@ -81,19 +81,19 @@ export const PreferenceIndicators = ({
         </Badge>
       )}
 
-      {/* Animal welfare indicator - skip if reason is purely "Økologisk" and we already show organic badge */}
+      {/* Animal welfare indicator - always show "Dyrevelferd" with color coding */}
       {userPreferences.other_preferences?.animal_welfare && 
        matchInfo.animalWelfareLevel !== 'unknown' && 
        !(matchInfo.organicMatch && matchInfo.animalWelfareReason === 'Økologisk') && (
         <Badge 
           className={`text-xs px-2 py-0.5 rounded-full ${
             matchInfo.animalWelfareLevel === 'high' 
-              ? 'bg-primary text-primary-foreground' 
+              ? 'bg-primary text-primary-foreground'  // Green = good welfare
               : matchInfo.animalWelfareLevel === 'medium'
-                ? 'bg-primary text-primary-foreground'  // Changed from yellow to green - better welfare is positive
+                ? 'bg-yellow-500 text-white'  // Yellow = medium welfare
                 : matchInfo.animalWelfareReason  
-                  ? 'bg-destructive text-destructive-foreground'  // Explicit low welfare = RED
-                  : 'bg-muted text-muted-foreground'  // Standard/unknown = gray
+                  ? 'bg-destructive text-destructive-foreground'  // Red = low welfare
+                  : 'bg-muted text-muted-foreground'
           }`}
         >
           {matchInfo.animalWelfareLevel === 'low' && matchInfo.animalWelfareReason ? (
@@ -101,11 +101,7 @@ export const PreferenceIndicators = ({
           ) : (
             <Heart className="h-3 w-3 mr-1" />
           )}
-          {matchInfo.animalWelfareReason || (
-            matchInfo.animalWelfareLevel === 'high' ? 'God dyrevelferd' :
-            matchInfo.animalWelfareLevel === 'medium' ? 'Bedre dyrevelferd' :
-            'Standard'
-          )}
+          Dyrevelferd
         </Badge>
       )}
 
