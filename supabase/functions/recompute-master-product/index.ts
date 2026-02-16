@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, validateAuth, unauthorizedResponse } from "../_shared/auth.ts";
 
 // Initialize Supabase client with service role for DB writes
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -292,28 +288,15 @@ async function recomputeMasterProduct(ean: string): Promise<{
   };
 }
 
-const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth check
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error: authError } = await authClient.auth.getUser();
-  if (authError || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  try {
+    await validateAuth(req);
+  } catch {
+    return unauthorizedResponse();
   }
 
   try {
