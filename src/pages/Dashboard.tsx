@@ -20,7 +20,15 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [dismissedBanner, setDismissedBanner] = useState(false);
 
-  const showProfileBanner = !profileLoading && profile && !profile.preferences && !dismissedBanner;
+  const hasConfiguredProfile = profile?.preferences && (
+    (profile.preferences.allergies?.length > 0) ||
+    (profile.preferences.diets?.length > 0) ||
+    profile.preferences.other_preferences?.organic ||
+    profile.preferences.other_preferences?.animal_welfare ||
+    profile.preferences.other_preferences?.local_food ||
+    (profile.preferences.household_size && profile.preferences.household_size > 0)
+  );
+  const showProfileBanner = !profileLoading && !hasConfiguredProfile && !dismissedBanner;
 
   useEffect(() => {
     if (!authLoading && !user) {
