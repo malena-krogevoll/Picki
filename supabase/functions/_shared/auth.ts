@@ -20,7 +20,8 @@ export async function validateAuth(req: Request) {
     global: { headers: { Authorization: authHeader } },
   });
 
-  const { data: { user }, error } = await supabaseClient.auth.getUser();
+  const token = authHeader.replace("Bearer ", "");
+  const { data: { user }, error } = await supabaseClient.auth.getUser(token);
   if (error || !user) {
     throw new Error("Invalid or expired token");
   }
