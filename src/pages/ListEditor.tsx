@@ -6,6 +6,7 @@ import { StoreSelectorDialog } from "@/components/StoreSelectorDialog";
 import { ItemSuggestions } from "@/components/ItemSuggestions";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList, ProductData } from "@/hooks/useShoppingList";
+import { useFrequentItems } from "@/hooks/useFrequentItems";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus, ClipboardPaste, Pencil, Check, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, X, Store, ShoppingCart, Minus, ClipboardPaste, Pencil, Check, ChevronRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { parseShoppingListText, ParsedItem } from "@/lib/textParser";
 
@@ -42,6 +43,8 @@ const ListEditor = () => {
 
   const currentList = lists.find(l => l.id === listId);
   const items = currentList?.items || [];
+  const { suggestions: frequentItems } = useFrequentItems(user?.id, items.map(i => i.name));
+  const visibleSuggestions = frequentItems.slice(0, 3);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -257,6 +260,24 @@ const ListEditor = () => {
             onSelectSuggestion={(suggestion) => handleAddItem(suggestion)}
             visible={showSuggestions}
           />
+
+          {/* Frequent item quick-add suggestions */}
+          {visibleSuggestions.length > 0 && !newItemName.trim() && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <Sparkles className="h-4 w-4 text-muted-foreground mt-0.5" />
+              {visibleSuggestions.map((item) => (
+                <Badge
+                  key={item.name}
+                  variant="outline"
+                  className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 transition-colors text-xs py-1 px-3"
+                  onClick={() => handleAddItem(item.name)}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  {item.name}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Items list */}
