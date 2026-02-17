@@ -102,21 +102,13 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
             product_category: r.product?.Kategori || '',
           }));
           
-          // Call classify-nova batch endpoint directly
-          const response = await fetch(
-            'https://hoxoaubghdifiprzfcmq.supabase.co/functions/v1/classify-nova/classify-batch',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhveG9hdWJnaGRpZmlwcnpmY21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxNzkxMTUsImV4cCI6MjA4MDc1NTExNX0.ZDK6YAG_r7OH3vNjzj6Nh99rioFUILZgBjMkB3tr1Zk',
-              },
-              body: JSON.stringify(batchInput),
-            }
-          );
+          // Use supabase.functions.invoke to include user JWT automatically
+          const { data: novaData, error: novaError } = await supabase.functions.invoke('classify-nova/classify-batch', {
+            body: batchInput,
+          });
           
-          if (response.ok) {
-            novaResults = await response.json();
+          if (!novaError && Array.isArray(novaData)) {
+            novaResults = novaData;
           }
         } catch (e) {
           console.warn('Failed to fetch NOVA scores:', e);
