@@ -89,26 +89,33 @@ const Dashboard = () => {
 
           {/* Profile setup banner */}
           {showProfileBanner && (
-            <Card className="border-2 border-primary/30 bg-primary/5 relative">
-              <button
-                onClick={() => setDismissedBanner(true)}
-                className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+            <SwipeableCard onDelete={() => setDismissedBanner(true)}>
+              <Card
+                className="border-2 border-primary/30 bg-primary/5 cursor-pointer"
+                onClick={() => navigate("/profile")}
               >
-                <X className="h-4 w-4" />
-              </button>
-              <CardContent className="flex items-center gap-4 py-4 px-4 md:px-6">
-                <div className="bg-primary/10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <UserCog className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">Sett opp profilen din</p>
-                  <p className="text-xs text-muted-foreground">Legg til allergier og preferanser for bedre anbefalinger</p>
-                </div>
-                <Button size="sm" onClick={() => navigate("/profile")} className="flex-shrink-0">
-                  Sett opp
-                </Button>
-              </CardContent>
-            </Card>
+                <CardContent className="flex items-center gap-4 py-4 px-4 md:px-6">
+                  <div className="bg-primary/10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <UserCog className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">Sett opp profilen din</p>
+                    <p className="text-xs text-muted-foreground">Legg til allergier og preferanser for bedre anbefalinger</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button size="sm" onClick={(e) => { e.stopPropagation(); navigate("/profile"); }}>
+                      Sett opp
+                    </Button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDismissedBanner(true); }}
+                      className="hidden md:flex text-muted-foreground hover:text-foreground p-1"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            </SwipeableCard>
           )}
 
           {/* Quick action buttons */}
