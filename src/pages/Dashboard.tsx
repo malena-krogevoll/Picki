@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -7,15 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import { SwipeableCard } from "@/components/SwipeableCard";
 import { getStoreName } from "@/components/StoreSelectorDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useShoppingList } from "@/hooks/useShoppingList";
-import { ShoppingCart, Clock, Copy, ChevronRight, Package, BookOpen, Trash2, Plus } from "lucide-react";
+import { ShoppingCart, Clock, Copy, ChevronRight, Package, BookOpen, Trash2, Plus, UserCog, X } from "lucide-react";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile(user?.id);
   const { lists, completedLists, loading: listLoading, duplicateList, deleteList, setActiveList, createList } = useShoppingList(user?.id);
   const navigate = useNavigate();
+  const [dismissedBanner, setDismissedBanner] = useState(false);
+
+  const showProfileBanner = !profileLoading && profile && !profile.preferences && !dismissedBanner;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -73,6 +78,30 @@ const Dashboard = () => {
             <h1 className="text-2xl md:text-3xl font-bold">Mine handlelister</h1>
             <p className="text-sm md:text-base text-muted-foreground">Administrer dine handlelister</p>
           </div>
+
+          {/* Profile setup banner */}
+          {showProfileBanner && (
+            <Card className="border-2 border-primary/30 bg-primary/5 relative">
+              <button
+                onClick={() => setDismissedBanner(true)}
+                className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <CardContent className="flex items-center gap-4 py-4 px-4 md:px-6">
+                <div className="bg-primary/10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <UserCog className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">Sett opp profilen din</p>
+                  <p className="text-xs text-muted-foreground">Legg til allergier og preferanser for bedre anbefalinger</p>
+                </div>
+                <Button size="sm" onClick={() => navigate("/profile")} className="flex-shrink-0">
+                  Sett opp
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick action buttons */}
           <div className="grid grid-cols-2 gap-3 md:gap-4">
