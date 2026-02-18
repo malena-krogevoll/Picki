@@ -141,11 +141,13 @@ const Profile = () => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      setPriorityOrder((items) => {
-        const oldIndex = items.indexOf(active.id as string);
-        const newIndex = items.indexOf(over.id as string);
-        return arrayMove(items, oldIndex, newIndex);
-      });
+      // Work with the currently displayed list, not priorityOrder directly
+      const currentList = getActivePreferences().map(p => p.id);
+      const oldIndex = currentList.indexOf(active.id as string);
+      const newIndex = currentList.indexOf(over.id as string);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        setPriorityOrder(arrayMove(currentList, oldIndex, newIndex));
+      }
     }
   };
 
