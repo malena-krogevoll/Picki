@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -42,35 +42,38 @@ interface SortablePreferenceItemProps {
   index: number;
 }
 
-const SortablePreferenceItem = ({ id, label, index }: SortablePreferenceItemProps) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+const SortablePreferenceItem = forwardRef<HTMLDivElement, SortablePreferenceItemProps>(
+  ({ id, label, index }, _ref) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-2 p-3 rounded-md bg-background border border-border hover:border-primary/50 transition-colors cursor-move"
-      {...attributes}
-      {...listeners}
-    >
-      <GripVertical className="h-4 w-4 text-muted-foreground" />
-      <span className="font-medium">{index}. {label}</span>
-    </div>
-  );
-};
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="flex items-center gap-2 p-3 rounded-md bg-background border border-border hover:border-primary/50 transition-colors cursor-move"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium">{index}. {label}</span>
+      </div>
+    );
+  }
+);
+SortablePreferenceItem.displayName = "SortablePreferenceItem";
 
 const Profile = () => {
   const { user, loading: authLoading } = useAuth();
