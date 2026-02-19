@@ -1,23 +1,55 @@
 
-# Snarvei til profiloppsett for nye brukere
+# Unit-tester for Picki
 
-## Problemet
-Nye brukere som registrerer seg ser Dashboard-siden uten noen indikasjon på at de bør sette opp profilen sin (allergier, dietter, preferanser). Profilpreferansene er viktige for at appen skal gi riktige produktanbefalinger.
+## Oversikt
+Sette opp testrammeverk (Vitest) og skrive unit-tester for de fire viktigste utility-modulene i prosjektet.
 
-## Losningen
-Legge til en synlig banner/kort pa Dashboard-siden som vises nar brukeren ikke har satt opp profilen sin enna. Banneret vil ha en tydelig knapp som tar brukeren direkte til `/profile`.
+## Hva blir testet
 
-## Teknisk plan
+### 1. `src/lib/textParser.ts` - Parsing av handleliste-tekst
+- Parsing av enkle varer ("melk, egg, brød")
+- Mengder ("2 bananer", "3x epler")
+- Norske enheter fjernes ("200 g pasta" blir "pasta")
+- Tilberedningsmåter fjernes ("paprika i terninger" blir "paprika")
+- Notater i parentes bevares
+- Tomme og ugyldige input
+- `formatParsedItem` formattering
 
-### 1. Sjekk profilstatus i Dashboard
-- Bruk `useProfile`-hooken som allerede finnes for a hente brukerens profil
-- Sjekk om `profile?.preferences` er tom/mangler
+### 2. `src/utils/ingredientUtils.ts` - Fjerning av enheter fra ingredienser
+- "800g tomater" blir "tomater"
+- "2 ss olivenolje" blir "olivenolje"
+- "1 dl melk" blir "melk"
+- Ingredienser uten enheter forblir uendret
 
-### 2. Vis profilbanner
-- Legg til et fremhevet kort rett under overskriften "Mine handlelister" (for knappene "Ny liste" og "Oppskrifter")
-- Banneret vises kun nar preferanser ikke er satt opp
-- Inneholder en kort beskrivelse og en "Sett opp profil"-knapp som navigerer til `/profile`
-- Banneret kan avvises med et X-ikon (valgfritt - men brukeren kan alltid na profilen via menyen)
+### 3. `src/lib/storeLayoutSort.ts` - Butikk-kategorisering
+- Produkter kategoriseres riktig (melk = Meieriprodukter, laks = Fisk og sjomat)
+- Ukjente produkter far "Annet"-kategori
+- `groupItemsByCategory` grupperer og sorterer riktig
 
-### 3. Filer som endres
-- `src/pages/Dashboard.tsx` - Importere `useProfile`, legge til profilsjekk og banner-komponent
+### 4. `src/lib/preferenceAnalysis.ts` - Preferanseanalyse
+- Allergensjekk (gluten, melk, egg osv.)
+- Diettkontroll (vegan, vegetar)
+- Dyrevelferd-matching
+- Lokalmat-matching
+- Match-score beregning
+
+## Teknisk oppsett
+
+### Nye filer
+| Fil | Beskrivelse |
+|-----|-------------|
+| `vitest.config.ts` | Vitest-konfigurasjon med jsdom og path aliases |
+| `src/test/setup.ts` | Test setup med matchMedia mock |
+| `src/lib/textParser.test.ts` | ~15 tester |
+| `src/utils/ingredientUtils.test.ts` | ~6 tester |
+| `src/lib/storeLayoutSort.test.ts` | ~8 tester |
+| `src/lib/preferenceAnalysis.test.ts` | ~10 tester |
+
+### Endringer i eksisterende filer
+- `tsconfig.app.json`: Legg til `"vitest/globals"` i `types`
+
+### Avhengigheter (devDependencies)
+- `@testing-library/jest-dom`
+- `@testing-library/react`
+- `jsdom`
+- `vitest`
