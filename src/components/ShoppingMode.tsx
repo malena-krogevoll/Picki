@@ -953,17 +953,19 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                       {items.filter(i => i.in_cart).length} av {items.length} varer i kurv
                     </p>
                   </div>
-                  {allItemsInCart && (
-                    <Button
-                      onClick={handleCompleteList}
-                      size="lg"
-                      className="h-12 md:h-14 px-4 md:px-8 text-sm md:text-base rounded-2xl bg-primary hover:bg-primary/90 touch-target flex-shrink-0"
-                    >
-                      <CheckCircle2 className="mr-2 h-5 w-5" />
-                      <span className="hidden sm:inline">Fullfør handleliste</span>
-                      <span className="sm:hidden">Fullfør</span>
-                    </Button>
-                  )}
+                  <Button
+                    onClick={handleCompleteList}
+                    size="lg"
+                    className={`h-12 md:h-14 px-4 md:px-8 text-sm md:text-base rounded-2xl touch-target flex-shrink-0 ${
+                      allItemsInCart 
+                        ? 'bg-primary hover:bg-primary/90' 
+                        : 'bg-muted-foreground/20 text-foreground hover:bg-muted-foreground/30'
+                    }`}
+                  >
+                    <CheckCircle2 className="mr-2 h-5 w-5" />
+                    <span className="hidden sm:inline">Fullfør handleliste</span>
+                    <span className="sm:hidden">Fullfør</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
