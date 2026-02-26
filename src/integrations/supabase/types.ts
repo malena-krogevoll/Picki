@@ -371,12 +371,16 @@ export type Database = {
       }
       user_cookbook: {
         Row: {
+          calories_per_serving: number | null
+          carbs_per_serving: number | null
           cook_time: number | null
           created_at: string
           description: string | null
+          fat_per_serving: number | null
           id: string
           image_url: string | null
           prep_time: number | null
+          protein_per_serving: number | null
           servings: number | null
           source_recipe_id: string | null
           steps: string[] | null
@@ -385,12 +389,16 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          calories_per_serving?: number | null
+          carbs_per_serving?: number | null
           cook_time?: number | null
           created_at?: string
           description?: string | null
+          fat_per_serving?: number | null
           id?: string
           image_url?: string | null
           prep_time?: number | null
+          protein_per_serving?: number | null
           servings?: number | null
           source_recipe_id?: string | null
           steps?: string[] | null
@@ -399,12 +407,16 @@ export type Database = {
           user_id: string
         }
         Update: {
+          calories_per_serving?: number | null
+          carbs_per_serving?: number | null
           cook_time?: number | null
           created_at?: string
           description?: string | null
+          fat_per_serving?: number | null
           id?: string
           image_url?: string | null
           prep_time?: number | null
+          protein_per_serving?: number | null
           servings?: number | null
           source_recipe_id?: string | null
           steps?: string[] | null

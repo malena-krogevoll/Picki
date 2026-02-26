@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { BookOpen, Plus, Clock, Users, Pencil, Trash2, ArrowLeft, AlertCircle, ChefHat, Heart } from "lucide-react";
+import { BookOpen, Plus, Clock, Users, Pencil, Trash2, ArrowLeft, AlertCircle, ChefHat, Heart, Minus, Flame, Beef, Droplets, Wheat } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 type View = "list" | "create" | "edit" | "detail";
@@ -315,9 +315,33 @@ const CookbookRecipeDetail = ({
   const { lists, addItem } = useShoppingList(user?.id);
   const { toast } = useToast();
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
+  const originalServings = recipe.servings || 4;
+  const [servings, setServings] = useState<number>(originalServings);
+  const scaleFactor = servings / originalServings;
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(
     new Set(recipe.ingredients?.map(i => i.name) || [])
   );
+
+  const scaleQuantity = (quantity: string | null): string => {
+    if (!quantity) return "";
+    const numMatch = quantity.match(/^([\d.,\/]+)\s*(.*)$/);
+    if (!numMatch) return quantity;
+    let numPart = numMatch[1];
+    const textPart = numMatch[2];
+    if (numPart.includes("/")) {
+      const [numerator, denominator] = numPart.split("/").map(n => parseFloat(n.replace(",", ".")));
+      const scaledValue = (numerator / denominator) * scaleFactor;
+      return scaledValue === Math.floor(scaledValue)
+        ? `${scaledValue}${textPart ? " " + textPart : ""}`
+        : `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
+    }
+    const num = parseFloat(numPart.replace(",", "."));
+    if (isNaN(num)) return quantity;
+    const scaledValue = num * scaleFactor;
+    return scaledValue === Math.floor(scaledValue)
+      ? `${scaledValue}${textPart ? " " + textPart : ""}`
+      : `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
+  };
 
   const toggleIngredient = (name: string) => {
     const next = new Set(selectedIngredients);
@@ -374,10 +398,31 @@ const CookbookRecipeDetail = ({
             </span>
           )}
           {recipe.servings && (
-            <span className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              {recipe.servings} porsjoner
-            </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setServings(Math.max(1, servings - 1))}
+                disabled={servings <= 1}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="font-medium min-w-[3ch] text-center">{servings}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setServings(Math.min(20, servings + 1))}
+                disabled={servings >= 20}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+              <span>porsjoner</span>
+            </div>
           )}
         </div>
       </div>
@@ -396,7 +441,7 @@ const CookbookRecipeDetail = ({
                     onCheckedChange={() => toggleIngredient(ing.name)}
                   />
                   <label htmlFor={`cb-ing-${i}`} className="cursor-pointer">
-                    {ing.quantity && <span className="font-medium">{ing.quantity} </span>}
+                    {ing.quantity && <span className="font-medium">{scaleQuantity(ing.quantity)} </span>}
                     {ing.unit && <span>{ing.unit} </span>}
                     <span>{ing.name}</span>
                   </label>
@@ -429,6 +474,48 @@ const CookbookRecipeDetail = ({
                 </li>
               ))}
             </ol>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Nutrition Card */}
+      {(recipe.calories_per_serving || recipe.protein_per_serving || recipe.fat_per_serving || recipe.carbs_per_serving) && (
+        <Card className="bg-secondary/5 border-secondary/20">
+          <CardContent className="pt-6">
+            <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
+              <Flame className="h-5 w-5 text-orange-500" />
+              Næringsinnhold per porsjon
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {recipe.calories_per_serving && (
+                <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                  <Flame className="h-5 w-5 text-orange-500 mb-1" />
+                  <span className="text-lg font-bold">{Math.round(recipe.calories_per_serving * scaleFactor)}</span>
+                  <span className="text-xs text-muted-foreground">kcal</span>
+                </div>
+              )}
+              {recipe.protein_per_serving && (
+                <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                  <Beef className="h-5 w-5 text-red-500 mb-1" />
+                  <span className="text-lg font-bold">{(recipe.protein_per_serving * scaleFactor).toFixed(1)}g</span>
+                  <span className="text-xs text-muted-foreground">Protein</span>
+                </div>
+              )}
+              {recipe.fat_per_serving && (
+                <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                  <Droplets className="h-5 w-5 text-yellow-500 mb-1" />
+                  <span className="text-lg font-bold">{(recipe.fat_per_serving * scaleFactor).toFixed(1)}g</span>
+                  <span className="text-xs text-muted-foreground">Fett</span>
+                </div>
+              )}
+              {recipe.carbs_per_serving && (
+                <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
+                  <Wheat className="h-5 w-5 text-amber-600 mb-1" />
+                  <span className="text-lg font-bold">{(recipe.carbs_per_serving * scaleFactor).toFixed(1)}g</span>
+                  <span className="text-xs text-muted-foreground">Karbo</span>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

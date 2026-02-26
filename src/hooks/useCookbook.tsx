@@ -23,6 +23,10 @@ export interface CookbookRecipe {
   steps: string[];
   image_url: string | null;
   source_recipe_id: string | null;
+  calories_per_serving: number | null;
+  protein_per_serving: number | null;
+  fat_per_serving: number | null;
+  carbs_per_serving: number | null;
   created_at: string;
   updated_at: string;
   ingredients?: CookbookIngredient[];
@@ -37,6 +41,10 @@ export interface CookbookRecipeInput {
   steps?: string[];
   image_url?: string;
   source_recipe_id?: string;
+  calories_per_serving?: number;
+  protein_per_serving?: number;
+  fat_per_serving?: number;
+  carbs_per_serving?: number;
   ingredients?: Array<{
     name: string;
     quantity?: string;
@@ -214,6 +222,10 @@ export const useCookbook = (userId: string | undefined) => {
     cook_time?: number | null;
     steps?: string[];
     image_url?: string | null;
+    calories_per_serving?: number | null;
+    protein_per_serving?: number | null;
+    fat_per_serving?: number | null;
+    carbs_per_serving?: number | null;
     ingredients?: Array<{ name: string; quantity?: string | null; unit?: string | null; is_optional?: boolean }>;
   }): Promise<string | null> => {
     return addRecipe({
@@ -225,6 +237,10 @@ export const useCookbook = (userId: string | undefined) => {
       steps: recipe.steps || [],
       image_url: recipe.image_url || undefined,
       source_recipe_id: recipe.id,
+      calories_per_serving: recipe.calories_per_serving || undefined,
+      protein_per_serving: recipe.protein_per_serving || undefined,
+      fat_per_serving: recipe.fat_per_serving || undefined,
+      carbs_per_serving: recipe.carbs_per_serving || undefined,
       ingredients: recipe.ingredients?.map((ing, idx) => ({
         name: ing.name,
         quantity: ing.quantity || undefined,
