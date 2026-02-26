@@ -232,6 +232,10 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
                 cook_time: recipe.cook_time,
                 steps: recipe.steps,
                 image_url: recipe.image_url,
+                calories_per_serving: recipe.calories_per_serving,
+                protein_per_serving: recipe.protein_per_serving,
+                fat_per_serving: recipe.fat_per_serving,
+                carbs_per_serving: recipe.carbs_per_serving,
                 ingredients: recipe.ingredients?.map(i => ({
                   name: i.name,
                   quantity: i.quantity,
