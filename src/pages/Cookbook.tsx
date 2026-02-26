@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCookbook, CookbookRecipe, CookbookRecipeInput } from "@/hooks/useCookbook";
 import { useFavoriteRecipes } from "@/hooks/useFavoriteRecipes";
 import { useRecipes, Recipe } from "@/hooks/useRecipes";
+import { RecipeDetailEnhanced } from "@/components/RecipeDetailEnhanced";
 import { CookbookRecipeForm } from "@/components/CookbookRecipeForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +37,7 @@ const Cookbook = () => {
   const [selectedRecipe, setSelectedRecipe] = useState<CookbookRecipe | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("mine");
+  const [selectedFavorite, setSelectedFavorite] = useState<Recipe | null>(null);
 
   const favoriteRecipes = useMemo(() => {
     return allRecipes.filter(r => favorites.includes(r.id));
@@ -97,7 +99,14 @@ const Cookbook = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        {view === "list" && (
+        {selectedFavorite ? (
+          <RecipeDetailEnhanced
+            recipe={selectedFavorite as any}
+            onBack={() => setSelectedFavorite(null)}
+            isFavorite={isFavorite(selectedFavorite.id)}
+            onToggleFavorite={toggleFavorite}
+          />
+        ) : view === "list" && (
           <>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -212,7 +221,7 @@ const Cookbook = () => {
                       <Card
                         key={recipe.id}
                         className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
-                        onClick={() => navigate("/dinner-explorer")}
+                        onClick={() => setSelectedFavorite(recipe)}
                       >
                         <div className="flex">
                           {recipe.image_url && (
