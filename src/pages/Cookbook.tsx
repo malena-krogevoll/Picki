@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
+import { useShoppingList } from "@/hooks/useShoppingList";
+import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCookbook, CookbookRecipe, CookbookRecipeInput } from "@/hooks/useCookbook";
 import { useFavoriteRecipes } from "@/hooks/useFavoriteRecipes";
 import { useRecipes, Recipe } from "@/hooks/useRecipes";
@@ -308,7 +311,32 @@ const CookbookRecipeDetail = ({
   onEdit: () => void;
   onDelete: () => void;
 }) => {
+  const { user } = useAuth();
+  const { lists, addItem } = useShoppingList(user?.id);
+  const { toast } = useToast();
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
+  const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(
+    new Set(recipe.ingredients?.map(i => i.name) || [])
+  );
+
+  const toggleIngredient = (name: string) => {
+    const next = new Set(selectedIngredients);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setSelectedIngredients(next);
+  };
+
+  const handleAddToList = async () => {
+    if (lists.length === 0) {
+      toast({ title: "Ingen handleliste", description: "Opprett en handleliste først", variant: "destructive" });
+      return;
+    }
+    const activeList = lists[0];
+    for (const name of selectedIngredients) {
+      await addItem(activeList.id, name);
+    }
+    toast({ title: "Lagt til", description: `${selectedIngredients.size} ingredienser lagt til handlelisten` });
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -358,16 +386,31 @@ const CookbookRecipeDetail = ({
         <Card>
           <CardContent className="pt-6">
             <h2 className="font-semibold text-lg mb-3">Ingredienser</h2>
+            <p className="text-sm text-muted-foreground mb-3">Huk av ingredienser du allerede har</p>
             <ul className="space-y-2">
               {recipe.ingredients.map((ing, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                  {ing.quantity && <span className="font-medium">{ing.quantity}</span>}
-                  {ing.unit && <span>{ing.unit}</span>}
-                  <span>{ing.name}</span>
+                <li key={i} className="flex items-center gap-3 text-sm">
+                  <Checkbox
+                    id={`cb-ing-${i}`}
+                    checked={selectedIngredients.has(ing.name)}
+                    onCheckedChange={() => toggleIngredient(ing.name)}
+                  />
+                  <label htmlFor={`cb-ing-${i}`} className="cursor-pointer">
+                    {ing.quantity && <span className="font-medium">{ing.quantity} </span>}
+                    {ing.unit && <span>{ing.unit} </span>}
+                    <span>{ing.name}</span>
+                  </label>
                 </li>
               ))}
             </ul>
+            <Button
+              onClick={handleAddToList}
+              className="w-full mt-4"
+              disabled={selectedIngredients.size === 0}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Legg til {selectedIngredients.size} ingredienser i handlelisten
+            </Button>
           </CardContent>
         </Card>
       )}
