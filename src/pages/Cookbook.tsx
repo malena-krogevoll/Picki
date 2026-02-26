@@ -214,13 +214,18 @@ const Cookbook = () => {
                   </div>
                 ) : favoriteRecipes.length === 0 ? (
                   <Card className="border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-                      <Heart className="h-10 w-10 text-muted-foreground mb-3" />
-                      <h3 className="text-base font-medium mb-1">Ingen favoritter</h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Trykk hjertet på oppskrifter for å lagre dem.
+                    <CardContent className="flex flex-col items-center justify-center py-10 text-center px-6">
+                      <Heart className="h-12 w-12 text-primary/60 mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Dine favorittoppskrifter</h3>
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Her dukker oppskriftene du liker best opp.
                       </p>
-                      <Button variant="outline" size="sm" onClick={() => navigate("/dinner-explorer")}>
+                      <ul className="text-sm text-muted-foreground text-left space-y-1.5 my-3">
+                        <li>❤️ Trykk på hjertet i oppskrift-exploreren for å lagre</li>
+                        <li>📋 Finn dem raskt igjen her i kokeboken</li>
+                        <li>🛒 Legg ingredienser rett i handlelisten</li>
+                      </ul>
+                      <Button variant="outline" size="sm" onClick={() => navigate("/dinner-explorer")} className="mt-2">
                         Utforsk oppskrifter
                       </Button>
                     </CardContent>
