@@ -9,7 +9,7 @@ import { getStoreName } from "@/components/StoreSelectorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useShoppingList } from "@/hooks/useShoppingList";
-import { ShoppingCart, Clock, Copy, ChevronRight, Package, BookOpen, Trash2, Plus, UserCog, X } from "lucide-react";
+import { ShoppingCart, Clock, Copy, ChevronRight, Package, BookOpen, Trash2, Plus, UserCog, X, ChefHat } from "lucide-react";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -119,16 +119,28 @@ const Dashboard = () => {
           )}
 
           {/* Quick action buttons */}
+          <Card 
+            className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer"
+            onClick={handleCreateNewList}
+          >
+            <CardContent className="flex items-center justify-center gap-3 py-4 md:py-5 px-4">
+              <div className="bg-secondary/10 w-10 h-10 rounded-full flex items-center justify-center">
+                <Plus className="h-5 w-5 text-secondary-foreground" />
+              </div>
+              <h3 className="text-base font-semibold">Ny handleliste</h3>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             <Card 
               className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer"
-              onClick={handleCreateNewList}
+              onClick={() => navigate("/cookbook")}
             >
               <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-3">
                 <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
-                  <Plus className="h-6 w-6 text-secondary-foreground" />
+                  <ChefHat className="h-6 w-6 text-secondary-foreground" />
                 </div>
-                <h3 className="text-base font-semibold text-center">Ny liste</h3>
+                <h3 className="text-base font-semibold text-center">Kokebok</h3>
               </CardContent>
             </Card>
 
