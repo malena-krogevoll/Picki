@@ -1,13 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
 import { useCookbook, CookbookRecipe, CookbookRecipeInput } from "@/hooks/useCookbook";
+import { useFavoriteRecipes } from "@/hooks/useFavoriteRecipes";
+import { useRecipes, Recipe } from "@/hooks/useRecipes";
 import { CookbookRecipeForm } from "@/components/CookbookRecipeForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { BookOpen, Plus, Clock, Users, Pencil, Trash2, ArrowLeft, AlertCircle, ChefHat } from "lucide-react";
+import { BookOpen, Plus, Clock, Users, Pencil, Trash2, ArrowLeft, AlertCircle, ChefHat, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 type View = "list" | "create" | "edit" | "detail";
@@ -26,10 +29,17 @@ type View = "list" | "create" | "edit" | "detail";
 const Cookbook = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { recipes, loading, addRecipe, updateRecipe, deleteRecipe } = useCookbook(user?.id);
+  const { recipes, loading, addRecipe, updateRecipe, deleteRecipe, saveExistingRecipe } = useCookbook(user?.id);
+  const { favorites, isFavorite, toggleFavorite } = useFavoriteRecipes();
+  const { recipes: allRecipes, loading: recipesLoading } = useRecipes();
   const [view, setView] = useState<View>("list");
   const [selectedRecipe, setSelectedRecipe] = useState<CookbookRecipe | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("mine");
+
+  const favoriteRecipes = useMemo(() => {
+    return allRecipes.filter(r => favorites.includes(r.id));
+  }, [allRecipes, favorites]);
 
   if (!user) {
     return (
@@ -100,68 +110,142 @@ const Cookbook = () => {
               </Button>
             </div>
 
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40" />)}
-              </div>
-            ) : recipes.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <ChefHat className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Kokeboken er tom</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Opprett egne oppskrifter eller lagre oppskrifter fra exploreren.
-                  </p>
-                  <Button onClick={() => setView("create")}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Opprett din første oppskrift
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {recipes.map(recipe => (
-                  <Card
-                    key={recipe.id}
-                    className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
-                    onClick={() => openDetail(recipe)}
-                  >
-                    <div className="flex">
-                      {recipe.image_url && (
-                        <img
-                          src={recipe.image_url}
-                          alt={recipe.title}
-                          className="w-28 h-full object-cover flex-shrink-0"
-                        />
-                      )}
-                      <CardContent className="p-4 flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{recipe.title}</h3>
-                        {recipe.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{recipe.description}</p>
-                        )}
-                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                          {(recipe.prep_time || recipe.cook_time) && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {(recipe.prep_time || 0) + (recipe.cook_time || 0)} min
-                            </span>
-                          )}
-                          {recipe.servings && (
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {recipe.servings} pers
-                            </span>
-                          )}
-                          {recipe.source_recipe_id && (
-                            <Badge variant="outline" className="text-xs py-0">Fra explorer</Badge>
-                          )}
-                        </div>
-                      </CardContent>
-                    </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+              <TabsList className="grid w-full grid-cols-2 max-w-xs">
+                <TabsTrigger value="mine" className="gap-2">
+                  <ChefHat className="h-4 w-4" />
+                  Mine oppskrifter
+                </TabsTrigger>
+                <TabsTrigger value="favoritter" className="gap-2">
+                  <Heart className="h-4 w-4" />
+                  Favoritter
+                  {favorites.length > 0 && (
+                    <span className="ml-1 text-xs bg-primary/20 px-1.5 py-0.5 rounded-full">
+                      {favorites.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="mine">
+                {loading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40" />)}
+                  </div>
+                ) : recipes.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                      <ChefHat className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Kokeboken er tom</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Opprett egne oppskrifter eller lagre oppskrifter fra exploreren.
+                      </p>
+                      <Button onClick={() => setView("create")}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Opprett din første oppskrift
+                      </Button>
+                    </CardContent>
                   </Card>
-                ))}
-              </div>
-            )}
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {recipes.map(recipe => (
+                      <Card
+                        key={recipe.id}
+                        className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
+                        onClick={() => openDetail(recipe)}
+                      >
+                        <div className="flex">
+                          {recipe.image_url && (
+                            <img src={recipe.image_url} alt={recipe.title} className="w-28 h-full object-cover flex-shrink-0" />
+                          )}
+                          <CardContent className="p-4 flex-1 min-w-0">
+                            <h3 className="font-semibold text-foreground truncate">{recipe.title}</h3>
+                            {recipe.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{recipe.description}</p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                              {(recipe.prep_time || recipe.cook_time) && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {(recipe.prep_time || 0) + (recipe.cook_time || 0)} min
+                                </span>
+                              )}
+                              {recipe.servings && (
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {recipe.servings} pers
+                                </span>
+                              )}
+                              {recipe.source_recipe_id && (
+                                <Badge variant="outline" className="text-xs py-0">Fra explorer</Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="favoritter">
+                {recipesLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-40" />)}
+                  </div>
+                ) : favoriteRecipes.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                      <Heart className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Ingen favoritter</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Trykk på hjertet på oppskrifter i exploreren for å lagre dem her.
+                      </p>
+                      <Button variant="outline" onClick={() => navigate("/dinner-explorer")}>
+                        Gå til oppskrift-explorer
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {favoriteRecipes.map(recipe => (
+                      <Card
+                        key={recipe.id}
+                        className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
+                        onClick={() => navigate("/dinner-explorer")}
+                      >
+                        <div className="flex">
+                          {recipe.image_url && (
+                            <img src={recipe.image_url} alt={recipe.title} className="w-28 h-full object-cover flex-shrink-0" />
+                          )}
+                          <CardContent className="p-4 flex-1 min-w-0">
+                            <h3 className="font-semibold text-foreground truncate">{recipe.title}</h3>
+                            {recipe.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{recipe.description}</p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                              {((recipe.prep_time || 0) + (recipe.cook_time || 0)) > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {(recipe.prep_time || 0) + (recipe.cook_time || 0)} min
+                                </span>
+                              )}
+                              {recipe.servings && (
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {recipe.servings} pers
+                                </span>
+                              )}
+                              <Heart className="h-3 w-3 fill-red-500 text-red-500" />
+                            </div>
+                          </CardContent>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </>
         )}
 
