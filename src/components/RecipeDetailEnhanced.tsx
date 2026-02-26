@@ -1,4 +1,10 @@
 import React, { useState, useMemo } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -52,8 +58,9 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
   const [substitutions, setSubstitutions] = useState<Substitution[]>([]);
   const [loadingSubstitutions, setLoadingSubstitutions] = useState(false);
   const [appliedSubstitutions, setAppliedSubstitutions] = useState<Map<string, string>>(new Map());
-  const { lists, addItem } = useShoppingList(user?.id);
+  const { lists, addItem, createList } = useShoppingList(user?.id);
   const { toast } = useToast();
+  const [showListPicker, setShowListPicker] = useState(false);
   const { saveExistingRecipe, isInCookbook } = useCookbook(user?.id);
   const [savingToCookbook, setSavingToCookbook] = useState(false);
   
@@ -177,28 +184,17 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
     return { name: ingredient.name, isSubstituted: false };
   };
 
-  const handleAddToList = async () => {
-    if (lists.length === 0) {
-      toast({
-        title: "Ingen handleliste",
-        description: "Opprett en handleliste først",
-        variant: "destructive",
-      });
-      return;
-    }
+  const activeLists = lists.filter(l => l.status === "active");
 
-    const activeList = lists[0];
-
+  const addIngredientsToList = async (listId: string) => {
     try {
       for (const ingredientName of selectedIngredients) {
-        await addItem(activeList.id, ingredientName);
+        await addItem(listId, ingredientName);
       }
-
       toast({
         title: "Ingredienser lagt til",
         description: `${selectedIngredients.size} ingredienser er lagt til handlelisten`,
       });
-
       onBack();
     } catch (error) {
       toast({
@@ -207,6 +203,28 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
         variant: "destructive",
       });
     }
+  };
+
+  const handleAddToList = async () => {
+    if (selectedIngredients.size === 0) return;
+
+    if (activeLists.length === 0) {
+      const now = new Date();
+      const name = now.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+      const result = await createList(name);
+      if (result?.data) {
+        await addIngredientsToList(result.data.id);
+      }
+    } else if (activeLists.length === 1) {
+      await addIngredientsToList(activeLists[0].id);
+    } else {
+      setShowListPicker(true);
+    }
+  };
+
+  const handlePickList = async (listId: string) => {
+    setShowListPicker(false);
+    await addIngredientsToList(listId);
   };
 
   return (
@@ -506,6 +524,32 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
           </Card>
         )}
       </div>
+
+      {/* List picker dialog */}
+      <Dialog open={showListPicker} onOpenChange={setShowListPicker}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Velg handleliste</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {activeLists.map(list => (
+              <Button
+                key={list.id}
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => handlePickList(list.id)}
+              >
+                {list.name}
+                {list.items && (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {list.items.length} varer
+                  </span>
+                )}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
