@@ -140,7 +140,7 @@ const Dashboard = () => {
                 <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
                   <ChefHat className="h-6 w-6 text-secondary-foreground" />
                 </div>
-                <h3 className="text-base font-semibold text-center">Kokebok</h3>
+                <h3 className="text-base font-semibold text-center">Min kokebok</h3>
               </CardContent>
             </Card>
 
