@@ -147,15 +147,21 @@ const Cookbook = () => {
                   </div>
                 ) : recipes.length === 0 ? (
                   <Card className="border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-                      <ChefHat className="h-10 w-10 text-muted-foreground mb-3" />
-                      <h3 className="text-base font-medium mb-1">Ingen oppskrifter</h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Opprett egne eller lagre fra exploreren.
+                    <CardContent className="flex flex-col items-center justify-center py-10 text-center px-6">
+                      <ChefHat className="h-12 w-12 text-primary/60 mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Velkommen til din kokebok!</h3>
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Her samler du alle oppskriftene dine på ett sted.
                       </p>
-                      <Button size="sm" onClick={() => setView("create")}>
+                      <ul className="text-sm text-muted-foreground text-left space-y-1.5 my-3">
+                        <li>✍️ Lag egne oppskrifter med ingredienser og fremgangsmåte</li>
+                        <li>📥 Lagre oppskrifter du finner i exploreren</li>
+                        <li>✏️ Tilpass ingredienser og porsjoner etter eget ønske</li>
+                        <li>🛒 Legg ingredienser rett i handlelisten</li>
+                      </ul>
+                      <Button size="sm" onClick={() => setView("create")} className="mt-2">
                         <Plus className="h-4 w-4 mr-1" />
-                        Opprett oppskrift
+                        Lag din første oppskrift
                       </Button>
                     </CardContent>
                   </Card>
