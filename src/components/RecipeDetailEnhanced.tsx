@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2, Minus, Flame, Beef, Droplets, Wheat, Heart } from "lucide-react";
+import { ArrowLeft, Clock, Users, Plus, AlertTriangle, Leaf, Wand2, Loader2, Minus, Flame, Beef, Droplets, Wheat, Heart, BookOpen } from "lucide-react";
 import { Recipe, RecipeIngredient } from "@/hooks/useRecipes";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useCookbook } from "@/hooks/useCookbook";
 
 interface Substitution {
   original_ingredient: string;
@@ -53,6 +54,8 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
   const [appliedSubstitutions, setAppliedSubstitutions] = useState<Map<string, string>>(new Map());
   const { lists, addItem } = useShoppingList(user?.id);
   const { toast } = useToast();
+  const { saveExistingRecipe, isInCookbook } = useCookbook(user?.id);
+  const [savingToCookbook, setSavingToCookbook] = useState(false);
   
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const hasWarnings = recipe._hasWarnings || false;
@@ -208,10 +211,42 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
 
   return (
     <div className="max-w-4xl mx-auto">
-      <Button variant="ghost" onClick={onBack} className="mb-6">
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Tilbake til oppskrifter
-      </Button>
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Tilbake til oppskrifter
+        </Button>
+        {user && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={savingToCookbook || isInCookbook(recipe.id)}
+            onClick={async () => {
+              setSavingToCookbook(true);
+              await saveExistingRecipe({
+                id: recipe.id,
+                title: recipe.title,
+                description: recipe.description,
+                servings: recipe.servings,
+                prep_time: recipe.prep_time,
+                cook_time: recipe.cook_time,
+                steps: recipe.steps,
+                image_url: recipe.image_url,
+                ingredients: recipe.ingredients?.map(i => ({
+                  name: i.name,
+                  quantity: i.quantity,
+                  unit: i.unit,
+                  is_optional: i.is_optional,
+                })),
+              });
+              setSavingToCookbook(false);
+            }}
+          >
+            <BookOpen className="h-4 w-4 mr-2" />
+            {isInCookbook(recipe.id) ? "I kokeboken" : savingToCookbook ? "Lagrer..." : "Lagre i kokebok"}
+          </Button>
+        )}
+      </div>
 
       <div className="space-y-6">
         {recipe.image_url && (

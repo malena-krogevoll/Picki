@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import Dashboard from "./pages/Dashboard";
 import ListEditor from "./pages/ListEditor";
 import DinnerExplorer from "./pages/DinnerExplorer";
+import Cookbook from "./pages/Cookbook";
 import ProductDetail from "./pages/ProductDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/list/:listId" element={<ListEditor />} />
             <Route path="/dinner-explorer" element={<DinnerExplorer />} />
+            <Route path="/cookbook" element={<Cookbook />} />
             <Route path="/product/:ean" element={<ProductDetail />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/auth" element={<Auth />} />
