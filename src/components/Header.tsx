@@ -1,4 +1,4 @@
-import { User, LogOut, Menu } from "lucide-react";
+import { User, LogOut, Menu, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,15 @@ export const Header = () => {
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => navigate("/cookbook")}
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+              >
+                <BookOpen className="h-4 w-4 mr-2" />
+                Kokebok
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => navigate("/profile")}
                 className="text-primary-foreground hover:bg-primary-foreground/10"
               >
@@ -77,6 +86,14 @@ export const Header = () => {
                   <SheetTitle className="text-left">Meny</SheetTitle>
                 </SheetHeader>
                 <nav className="mt-8 flex flex-col gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleNavigate("/cookbook")}
+                    className="justify-start h-14 text-base touch-target"
+                  >
+                    <BookOpen className="h-5 w-5 mr-3" />
+                    Min kokebok
+                  </Button>
                   <Button
                     variant="ghost"
                     onClick={() => handleNavigate("/profile")}

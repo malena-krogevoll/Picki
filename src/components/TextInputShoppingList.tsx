@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { parseShoppingListText, formatParsedItem, ParsedItem } from '@/lib/textParser';
-import { FileText, Plus, X } from 'lucide-react';
+import { useCookbook } from '@/hooks/useCookbook';
+import { FileText, Plus, X, BookOpen } from 'lucide-react';
 
 interface Props {
   onListCreated: () => void;
@@ -23,6 +24,8 @@ const TextInputShoppingList = ({ onListCreated }: Props) => {
   const [listName, setListName] = useState('');
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingToCookbook, setSavingToCookbook] = useState(false);
+  const { addRecipe } = useCookbook(user?.id);
 
   const handleTextChange = (text: string) => {
     setTextInput(text);
@@ -179,14 +182,38 @@ melk, brød, 2 bananer
           </div>
         )}
 
-        <Button 
-          onClick={createListWithItems} 
-          disabled={loading || parsedItems.length === 0 || !listName.trim()} 
-          className="w-full rounded-xl h-12"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {loading ? 'Oppretter...' : `Opprett liste med ${parsedItems.length} varer`}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={createListWithItems} 
+            disabled={loading || parsedItems.length === 0 || !listName.trim()} 
+            className="flex-1 rounded-xl h-12"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {loading ? 'Oppretter...' : `Opprett liste med ${parsedItems.length} varer`}
+          </Button>
+          {user && parsedItems.length > 0 && (
+            <Button
+              variant="outline"
+              className="rounded-xl h-12"
+              disabled={savingToCookbook || !listName.trim()}
+              onClick={async () => {
+                setSavingToCookbook(true);
+                await addRecipe({
+                  title: listName.trim() || 'Uten tittel',
+                  ingredients: parsedItems.map((item, idx) => ({
+                    name: item.product_name,
+                    quantity: item.quantity > 1 ? item.quantity.toString() : undefined,
+                    sort_order: idx,
+                  })),
+                });
+                setSavingToCookbook(false);
+              }}
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              {savingToCookbook ? 'Lagrer...' : 'Kokebok'}
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

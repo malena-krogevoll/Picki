@@ -369,6 +369,100 @@ export type Database = {
         }
         Relationships: []
       }
+      user_cookbook: {
+        Row: {
+          cook_time: number | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          prep_time: number | null
+          servings: number | null
+          source_recipe_id: string | null
+          steps: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cook_time?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          prep_time?: number | null
+          servings?: number | null
+          source_recipe_id?: string | null
+          steps?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cook_time?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          prep_time?: number | null
+          servings?: number | null
+          source_recipe_id?: string | null
+          steps?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_cookbook_source_recipe_id_fkey"
+            columns: ["source_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_cookbook_ingredients: {
+        Row: {
+          cookbook_recipe_id: string
+          created_at: string
+          id: string
+          is_optional: boolean | null
+          name: string
+          quantity: string | null
+          sort_order: number | null
+          unit: string | null
+        }
+        Insert: {
+          cookbook_recipe_id: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean | null
+          name: string
+          quantity?: string | null
+          sort_order?: number | null
+          unit?: string | null
+        }
+        Update: {
+          cookbook_recipe_id?: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean | null
+          name?: string
+          quantity?: string | null
+          sort_order?: number | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_cookbook_ingredients_cookbook_recipe_id_fkey"
+            columns: ["cookbook_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "user_cookbook"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_favorite_recipes: {
         Row: {
           created_at: string
