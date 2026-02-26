@@ -101,7 +101,7 @@ const Cookbook = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <main className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
         {selectedFavorite ? (
           <RecipeDetailEnhanced
             recipe={selectedFavorite as any}
@@ -111,24 +111,25 @@ const Cookbook = () => {
           />
         ) : view === "list" && (
           <>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <BookOpen className="h-7 w-7 text-primary" />
-                <h1 className="text-3xl font-bold text-foreground">Min kokebok</h1>
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-6 w-6 text-primary" />
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">Kokebok</h1>
               </div>
-              <Button onClick={() => { setSelectedRecipe(null); setView("create"); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Ny oppskrift
+              <Button size="sm" onClick={() => { setSelectedRecipe(null); setView("create"); }}>
+                <Plus className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Ny oppskrift</span>
+                <span className="sm:hidden">Ny</span>
               </Button>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2 max-w-xs">
-                <TabsTrigger value="mine" className="gap-2">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="mine" className="gap-1.5 text-sm">
                   <ChefHat className="h-4 w-4" />
-                  Mine oppskrifter
+                  Mine
                 </TabsTrigger>
-                <TabsTrigger value="favoritter" className="gap-2">
+                <TabsTrigger value="favoritter" className="gap-1.5 text-sm">
                   <Heart className="h-4 w-4" />
                   Favoritter
                   {favorites.length > 0 && (
@@ -141,25 +142,25 @@ const Cookbook = () => {
 
               <TabsContent value="mine">
                 {loading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40" />)}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
                   </div>
                 ) : recipes.length === 0 ? (
                   <Card className="border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                      <ChefHat className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium mb-2">Kokeboken er tom</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Opprett egne oppskrifter eller lagre oppskrifter fra exploreren.
+                    <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+                      <ChefHat className="h-10 w-10 text-muted-foreground mb-3" />
+                      <h3 className="text-base font-medium mb-1">Ingen oppskrifter</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Opprett egne eller lagre fra exploreren.
                       </p>
-                      <Button onClick={() => setView("create")}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Opprett din første oppskrift
+                      <Button size="sm" onClick={() => setView("create")}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Opprett oppskrift
                       </Button>
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {recipes.map(recipe => (
                       <Card
                         key={recipe.id}
@@ -168,9 +169,9 @@ const Cookbook = () => {
                       >
                         <div className="flex">
                           {recipe.image_url && (
-                            <img src={recipe.image_url} alt={recipe.title} className="w-28 h-full object-cover flex-shrink-0" />
+                            <img src={recipe.image_url} alt={recipe.title} className="w-24 h-full object-cover flex-shrink-0" />
                           )}
-                          <CardContent className="p-4 flex-1 min-w-0">
+                          <CardContent className="p-3 flex-1 min-w-0">
                             <h3 className="font-semibold text-foreground truncate">{recipe.title}</h3>
                             {recipe.description && (
                               <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{recipe.description}</p>
@@ -202,24 +203,24 @@ const Cookbook = () => {
 
               <TabsContent value="favoritter">
                 {recipesLoading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-40" />)}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
                   </div>
                 ) : favoriteRecipes.length === 0 ? (
                   <Card className="border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                      <Heart className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium mb-2">Ingen favoritter</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Trykk på hjertet på oppskrifter i exploreren for å lagre dem her.
+                    <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+                      <Heart className="h-10 w-10 text-muted-foreground mb-3" />
+                      <h3 className="text-base font-medium mb-1">Ingen favoritter</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Trykk hjertet på oppskrifter for å lagre dem.
                       </p>
-                      <Button variant="outline" onClick={() => navigate("/dinner-explorer")}>
-                        Gå til oppskrift-explorer
+                      <Button variant="outline" size="sm" onClick={() => navigate("/dinner-explorer")}>
+                        Utforsk oppskrifter
                       </Button>
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {favoriteRecipes.map(recipe => (
                       <Card
                         key={recipe.id}
@@ -230,7 +231,7 @@ const Cookbook = () => {
                           {recipe.image_url && (
                             <img src={recipe.image_url} alt={recipe.title} className="w-28 h-full object-cover flex-shrink-0" />
                           )}
-                          <CardContent className="p-4 flex-1 min-w-0">
+                          <CardContent className="p-3 flex-1 min-w-0">
                             <h3 className="font-semibold text-foreground truncate">{recipe.title}</h3>
                             {recipe.description && (
                               <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{recipe.description}</p>
@@ -363,33 +364,31 @@ const CookbookRecipeDetail = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4 mr-1" />
           Tilbake
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="h-4 w-4 mr-2" />
-            Rediger
+        <div className="flex gap-1.5">
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={onEdit}>
+            <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={onDelete} className="text-destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Slett
+          <Button variant="outline" size="icon" className="h-9 w-9 text-destructive" onClick={onDelete}>
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {recipe.image_url && (
         <div className="rounded-xl overflow-hidden shadow-lg">
-          <img src={recipe.image_url} alt={recipe.title} className="w-full h-64 object-cover" />
+          <img src={recipe.image_url} alt={recipe.title} className="w-full h-48 md:h-64 object-cover" />
         </div>
       )}
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">{recipe.title}</h1>
-        {recipe.description && <p className="text-muted-foreground mt-2">{recipe.description}</p>}
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">{recipe.title}</h1>
+        {recipe.description && <p className="text-sm text-muted-foreground mt-1">{recipe.description}</p>}
         <div className="flex gap-4 mt-3 text-sm text-muted-foreground">
           {totalTime > 0 && (
             <span className="flex items-center gap-1">
@@ -453,8 +452,8 @@ const CookbookRecipeDetail = ({
               className="w-full mt-4"
               disabled={selectedIngredients.size === 0}
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Legg til {selectedIngredients.size} ingredienser i handlelisten
+              <Plus className="w-4 h-4 mr-1" />
+              Legg til {selectedIngredients.size} i handlelisten
             </Button>
           </CardContent>
         </Card>
@@ -486,7 +485,7 @@ const CookbookRecipeDetail = ({
               <Flame className="h-5 w-5 text-orange-500" />
               Næringsinnhold per porsjon
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {recipe.calories_per_serving && (
                 <div className="flex flex-col items-center p-4 bg-background rounded-lg border">
                   <Flame className="h-5 w-5 text-orange-500 mb-1" />
