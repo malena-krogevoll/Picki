@@ -4,6 +4,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useCookbook, CookbookRecipe, CookbookRecipeInput } from "@/hooks/useCookbook";
 import { useFavoriteRecipes } from "@/hooks/useFavoriteRecipes";
 import { useRecipes, Recipe } from "@/hooks/useRecipes";
@@ -324,7 +330,7 @@ const CookbookRecipeDetail = ({
   onDelete: () => void;
 }) => {
   const { user } = useAuth();
-  const { lists, addItem } = useShoppingList(user?.id);
+  const { lists, addItem, createList } = useShoppingList(user?.id);
   const { toast } = useToast();
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const originalServings = recipe.servings || 4;
@@ -333,7 +339,9 @@ const CookbookRecipeDetail = ({
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(
     new Set(recipe.ingredients?.map(i => i.name) || [])
   );
+  const [showListPicker, setShowListPicker] = useState(false);
 
+  const activeLists = lists.filter(l => l.status === "active");
   const scaleQuantity = (quantity: string | null): string => {
     if (!quantity) return "";
     const numMatch = quantity.match(/^([\d.,\/]+)\s*(.*)$/);
@@ -362,18 +370,35 @@ const CookbookRecipeDetail = ({
     setSelectedIngredients(next);
   };
 
-  const handleAddToList = async () => {
-    if (lists.length === 0) {
-      toast({ title: "Ingen handleliste", description: "Opprett en handleliste først", variant: "destructive" });
-      return;
-    }
-    const activeList = lists[0];
+  const addIngredientsToList = async (listId: string) => {
     for (const name of selectedIngredients) {
-      await addItem(activeList.id, name);
+      await addItem(listId, name);
     }
     toast({ title: "Lagt til", description: `${selectedIngredients.size} ingredienser lagt til handlelisten` });
   };
 
+  const handleAddToList = async () => {
+    if (selectedIngredients.size === 0) return;
+
+    if (activeLists.length === 0) {
+      // Auto-create a new list
+      const now = new Date();
+      const name = now.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+      const result = await createList(name);
+      if (result?.data) {
+        await addIngredientsToList(result.data.id);
+      }
+    } else if (activeLists.length === 1) {
+      await addIngredientsToList(activeLists[0].id);
+    } else {
+      setShowListPicker(true);
+    }
+  };
+
+  const handlePickList = async (listId: string) => {
+    setShowListPicker(false);
+    await addIngredientsToList(listId);
+  };
   return (
     <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
@@ -529,6 +554,32 @@ const CookbookRecipeDetail = ({
           </CardContent>
         </Card>
       )}
+
+      {/* List picker dialog */}
+      <Dialog open={showListPicker} onOpenChange={setShowListPicker}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Velg handleliste</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {activeLists.map(list => (
+              <Button
+                key={list.id}
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => handlePickList(list.id)}
+              >
+                {list.name}
+                {list.items && (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {list.items.length} varer
+                  </span>
+                )}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
