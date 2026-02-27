@@ -163,13 +163,13 @@ export const ShoppingListItem = ({
       onTouchMove={hasMultiple ? handleTouchMove : undefined}
       onTouchEnd={hasMultiple ? handleTouchEnd : undefined}
     >
-      <div className="p-4">
+      <div className="p-3 md:p-4">
         <div className="flex items-start gap-3">
-          {/* Checkbox */}
+          {/* Checkbox - ensure touch target */}
           <Checkbox
             checked={inCart}
             onCheckedChange={onToggleCart}
-            className="mt-1 h-6 w-6 rounded-md flex-shrink-0"
+            className="mt-1 h-7 w-7 md:h-6 md:w-6 rounded-md flex-shrink-0"
           />
 
           {/* Content */}
@@ -189,9 +189,9 @@ export const ShoppingListItem = ({
                   variant="ghost"
                   size="icon"
                   onClick={onRemove}
-                  className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+                  className="h-10 w-10 rounded-full hover:bg-destructive/10 hover:text-destructive flex-shrink-0 touch-target"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5" />
                 </Button>
               </div>
             ) : (
@@ -203,9 +203,9 @@ export const ShoppingListItem = ({
                     variant="ghost"
                     size="icon"
                     onClick={onRemove}
-                    className="h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive flex-shrink-0 -mt-1"
+                    className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex-shrink-0 -mt-1 touch-target"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
                 
@@ -261,7 +261,7 @@ export const ShoppingListItem = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSwipe('right')}
-                      className="h-8 px-2 text-xs"
+                      className="h-10 px-3 text-xs touch-target"
                     >
                       <ChevronLeft className="h-4 w-4 mr-1" />
                       Forrige
@@ -280,7 +280,7 @@ export const ShoppingListItem = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSwipe('left')}
-                      className="h-8 px-2 text-xs"
+                      className="h-10 px-3 text-xs touch-target"
                     >
                       Neste
                       <ChevronRight className="h-4 w-4 ml-1" />

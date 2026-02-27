@@ -228,11 +228,11 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Tilbake til oppskrifter
+    <div className="max-w-4xl mx-auto px-1 md:px-0">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
+        <Button variant="ghost" onClick={onBack} className="touch-target -ml-2">
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          <span className="text-sm md:text-base">Tilbake</span>
         </Button>
         {user && (
           <Button
@@ -283,25 +283,25 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
         
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-bold text-foreground">{recipe.title}</h1>
+            <h1 className="text-2xl md:text-4xl font-bold text-foreground">{recipe.title}</h1>
             {onToggleFavorite && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => onToggleFavorite(recipe.id)}
-              >
-                <Heart 
-                  className={`h-6 w-6 transition-colors ${
-                    isFavorite 
-                      ? "fill-red-500 text-red-500" 
-                      : "text-muted-foreground hover:text-red-500"
-                  }`} 
-                />
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 touch-target"
+                  onClick={() => onToggleFavorite(recipe.id)}
+                >
+                  <Heart 
+                    className={`h-6 w-6 transition-colors ${
+                      isFavorite 
+                        ? "fill-red-500 text-red-500" 
+                        : "text-muted-foreground hover:text-red-500"
+                    }`} 
+                  />
+                </Button>
             )}
           </div>
-          <p className="text-lg text-muted-foreground mb-4">{recipe.description}</p>
+          <p className="text-base md:text-lg text-muted-foreground mb-4">{recipe.description}</p>
           
           <div className="flex flex-wrap gap-2 mb-4">
             <Badge variant="secondary">{recipe.category}</Badge>
@@ -313,7 +313,7 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
             ))}
           </div>
 
-          <div className="flex gap-6 text-muted-foreground">
+          <div className="flex flex-wrap gap-4 md:gap-6 text-sm md:text-base text-muted-foreground">
             {totalTime > 0 && (
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
@@ -425,19 +425,20 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
               Huk av ingredienser du allerede har
             </p>
           </CardHeader>
-          <CardContent className="space-y-3">
+           <CardContent className="space-y-1">
             {recipe.ingredients?.map((ingredient, index) => {
               const display = getDisplayIngredient(ingredient);
               return (
-                <div key={index} className="flex items-center space-x-3">
+                <div key={index} className="flex items-center space-x-3 py-2 min-h-[44px]">
                   <Checkbox
                     id={`ingredient-${index}`}
                     checked={selectedIngredients.has(display.name)}
                     onCheckedChange={() => toggleIngredient(display.name)}
+                    className="h-6 w-6"
                   />
                   <label
                     htmlFor={`ingredient-${index}`}
-                    className={`text-sm font-medium leading-none cursor-pointer ${
+                    className={`text-sm md:text-base font-medium leading-none cursor-pointer flex-1 ${
                       display.isSubstituted ? "text-primary" : ""
                     }`}
                   >
@@ -453,11 +454,11 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
             })}
             <Button
               onClick={handleAddToList}
-              className="w-full mt-4"
+              className="w-full mt-4 h-12 text-base"
               disabled={selectedIngredients.size === 0}
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Legg til {selectedIngredients.size} ingredienser i handlelisten
+              <Plus className="w-5 h-5 mr-2" />
+              Legg til {selectedIngredients.size} ingredienser
             </Button>
           </CardContent>
         </Card>
