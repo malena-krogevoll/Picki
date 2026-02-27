@@ -60,15 +60,15 @@ const SortablePreferenceItem = forwardRef<HTMLDivElement, SortablePreferenceItem
     };
 
     return (
-      <div
+        <div
         ref={setNodeRef}
         style={style}
-        className="flex items-center gap-2 p-3 rounded-md bg-background border border-border hover:border-primary/50 transition-colors cursor-move"
+        className="flex items-center gap-3 p-4 rounded-md bg-background border border-border hover:border-primary/50 transition-colors cursor-move min-h-[48px]"
         {...attributes}
         {...listeners}
       >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium">{index}. {label}</span>
+        <GripVertical className="h-5 w-5 text-muted-foreground" />
+        <span className="font-medium text-base">{index}. {label}</span>
       </div>
     );
   }
@@ -209,13 +209,13 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
         <Button
           variant="ghost"
           onClick={() => navigate("/")}
-          className="mb-4"
+          className="mb-4 h-11 min-w-[44px]"
         >
-          <ArrowLeft className="mr-2 h-4 w-4" />
+          <ArrowLeft className="mr-2 h-5 w-5" />
           Tilbake
         </Button>
 
@@ -226,44 +226,46 @@ const Profile = () => {
               Sett opp dine preferanser for å få best mulige produktanbefalinger
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Allergier</Label>
+          <CardContent className="space-y-6 md:space-y-8">
+            <div className="space-y-3">
+              <Label className="text-base">Allergier</Label>
               <div className="flex gap-2">
                 <Input
                   value={newAllergy}
                   onChange={(e) => setNewAllergy(e.target.value)}
                   placeholder="Legg til allergi"
                   onKeyPress={(e) => e.key === "Enter" && handleAddAllergy()}
+                  className="h-12 text-base"
                 />
-                <Button onClick={handleAddAllergy}>Legg til</Button>
+                <Button onClick={handleAddAllergy} className="h-12 px-5 text-base">Legg til</Button>
               </div>
               <div className="flex flex-wrap gap-2 mt-2">
                 {allergies.map((allergy) => (
-                  <Badge key={allergy} variant="secondary">
+                  <Badge key={allergy} variant="secondary" className="text-sm py-1.5 px-3">
                     {allergy}
                     <button
                       onClick={() => handleRemoveAllergy(allergy)}
-                      className="ml-2"
+                      className="ml-2 p-1 -mr-1 min-w-[28px] min-h-[28px] flex items-center justify-center"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-4 w-4" />
                     </button>
                   </Badge>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Dietter</Label>
-              <div className="space-y-2">
+            <div className="space-y-3">
+              <Label className="text-base">Dietter</Label>
+              <div className="space-y-1">
                 {AVAILABLE_DIETS.map((diet) => (
-                  <div key={diet.value} className="flex items-center space-x-2">
+                  <div key={diet.value} className="flex items-center space-x-3 min-h-[44px]">
                     <Checkbox
                       id={diet.value}
                       checked={diets.includes(diet.value)}
                       onCheckedChange={() => handleToggleDiet(diet.value)}
+                      className="h-5 w-5"
                     />
-                    <Label htmlFor={diet.value} className="cursor-pointer">
+                    <Label htmlFor={diet.value} className="cursor-pointer text-base flex-1">
                       {diet.label}
                     </Label>
                   </div>
@@ -271,16 +273,17 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Husstandsstørrelse</Label>
+            <div className="space-y-3">
+              <Label className="text-base">Husstandsstørrelse</Label>
               <p className="text-sm text-muted-foreground">
                 Standard antall porsjoner for middagsoppskrifter
               </p>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
+                  className="h-11 w-11"
                   onClick={() => setHouseholdSize(Math.max(1, householdSize - 1))}
                   disabled={householdSize <= 1}
                 >
@@ -291,6 +294,7 @@ const Profile = () => {
                   type="button"
                   variant="outline"
                   size="icon"
+                  className="h-11 w-11"
                   onClick={() => setHouseholdSize(Math.min(12, householdSize + 1))}
                   disabled={householdSize >= 12}
                 >
@@ -300,46 +304,50 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Andre preferanser</Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
+            <div className="space-y-3">
+              <Label className="text-base">Andre preferanser</Label>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-3 min-h-[44px]">
                   <Checkbox
                     id="organic"
                     checked={organic}
                     onCheckedChange={(checked) => setOrganic(checked as boolean)}
+                    className="h-5 w-5"
                   />
-                  <Label htmlFor="organic" className="cursor-pointer">
+                  <Label htmlFor="organic" className="cursor-pointer text-base flex-1">
                     Økologisk mat
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3 min-h-[44px]">
                   <Checkbox
                     id="lowest_price"
                     checked={lowestPrice}
                     onCheckedChange={(checked) => setLowestPrice(checked as boolean)}
+                    className="h-5 w-5"
                   />
-                  <Label htmlFor="lowest_price" className="cursor-pointer">
+                  <Label htmlFor="lowest_price" className="cursor-pointer text-base flex-1">
                     Lavest pris
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3 min-h-[44px]">
                   <Checkbox
                     id="animal_welfare"
                     checked={animalWelfare}
                     onCheckedChange={(checked) => setAnimalWelfare(checked as boolean)}
+                    className="h-5 w-5"
                   />
-                  <Label htmlFor="animal_welfare" className="cursor-pointer">
+                  <Label htmlFor="animal_welfare" className="cursor-pointer text-base flex-1">
                     Dyrevelferd
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3 min-h-[44px]">
                   <Checkbox
                     id="local_food"
                     checked={localFood}
                     onCheckedChange={(checked) => setLocalFood(checked as boolean)}
+                    className="h-5 w-5"
                   />
-                  <Label htmlFor="local_food" className="cursor-pointer">
+                  <Label htmlFor="local_food" className="cursor-pointer text-base flex-1">
                     Lokalmat
                   </Label>
                 </div>
@@ -383,7 +391,7 @@ const Profile = () => {
               </div>
             )}
 
-            <Button onClick={handleSave} className="w-full" disabled={saving}>
+            <Button onClick={handleSave} className="w-full h-12 text-base" disabled={saving}>
               {saving ? "Lagrer..." : "Lagre preferanser"}
             </Button>
           </CardContent>
