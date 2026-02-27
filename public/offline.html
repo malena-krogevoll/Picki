@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Picki – Offline</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fff;
+      color: hsl(105, 58%, 10%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+    }
+    .container { max-width: 400px; }
+    .icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      background: hsl(105, 30%, 95%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon svg {
+      width: 40px;
+      height: 40px;
+      color: hsl(105, 58%, 38%);
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: hsl(105, 58%, 10%);
+    }
+    p {
+      font-size: 1rem;
+      color: hsl(105, 10%, 45%);
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+    button {
+      background: hsl(105, 58%, 38%);
+      color: #fff;
+      border: none;
+      border-radius: 0.75rem;
+      padding: 0.875rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 48px;
+      transition: opacity 0.2s;
+    }
+    button:active { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636a9 9 0 0 1 .203 12.519l-.203.21-1.414-1.414a7 7 0 0 0-.158-9.738l.158-.163 1.414-1.414ZM15.536 8.464a5 5 0 0 1 .146 6.928l-.146.158-1.414-1.414a3 3 0 0 0-.12-4.114l.12-.144 1.414-1.414ZM5.636 5.636l1.414 1.414a7 7 0 0 0 .158 9.738l-.158.163-1.414 1.414a9 9 0 0 1-.203-12.519l.203-.21ZM8.464 8.464l1.414 1.414a3 3 0 0 0 .12 4.114l-.12.144-1.414 1.414a5 5 0 0 1-.146-6.928l.146-.158ZM12 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
+      </svg>
+    </div>
+    <h1>Du er offline</h1>
+    <p>Det ser ut som du ikke har internettforbindelse akkurat nå. Sjekk tilkoblingen din og prøv igjen.</p>
+    <button onclick="window.location.reload()">Prøv igjen</button>
+  </div>
+</body>
+</html>
