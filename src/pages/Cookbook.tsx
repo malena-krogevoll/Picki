@@ -131,11 +131,11 @@ const Cookbook = () => {
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="mine" className="gap-1.5 text-sm">
+              <TabsTrigger value="mine" className="gap-1.5 text-sm md:text-base min-h-[44px]">
                   <ChefHat className="h-4 w-4" />
                   Mine
                 </TabsTrigger>
-                <TabsTrigger value="favoritter" className="gap-1.5 text-sm">
+                <TabsTrigger value="favoritter" className="gap-1.5 text-sm md:text-base min-h-[44px]">
                   <Heart className="h-4 w-4" />
                   Favoritter
                   {favorites.length > 0 && (
@@ -402,16 +402,16 @@ const CookbookRecipeDetail = ({
   return (
     <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-1" />
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-11 min-w-[44px]">
+          <ArrowLeft className="w-5 h-5 mr-1" />
           Tilbake
         </Button>
-        <div className="flex gap-1.5">
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={onEdit}>
-            <Pencil className="h-4 w-4" />
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" className="h-11 w-11" onClick={onEdit}>
+            <Pencil className="h-5 w-5" />
           </Button>
-          <Button variant="outline" size="icon" className="h-9 w-9 text-destructive" onClick={onDelete}>
-            <Trash2 className="h-4 w-4" />
+          <Button variant="outline" size="icon" className="h-11 w-11 text-destructive" onClick={onDelete}>
+            <Trash2 className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -439,22 +439,22 @@ const CookbookRecipeDetail = ({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-7 w-7"
+                className="h-9 w-9"
                 onClick={() => setServings(Math.max(1, servings - 1))}
                 disabled={servings <= 1}
               >
-                <Minus className="h-3 w-3" />
+                <Minus className="h-4 w-4" />
               </Button>
               <span className="font-medium min-w-[3ch] text-center">{servings}</span>
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-7 w-7"
+                className="h-9 w-9"
                 onClick={() => setServings(Math.min(20, servings + 1))}
                 disabled={servings >= 20}
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="h-4 w-4" />
               </Button>
               <span>porsjoner</span>
             </div>
@@ -467,15 +467,16 @@ const CookbookRecipeDetail = ({
           <CardContent className="pt-6">
             <h2 className="font-semibold text-lg mb-3">Ingredienser</h2>
             <p className="text-sm text-muted-foreground mb-3">Huk av ingredienser du allerede har</p>
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {recipe.ingredients.map((ing, i) => (
-                <li key={i} className="flex items-center gap-3 text-sm">
+                <li key={i} className="flex items-center gap-3 text-sm md:text-base min-h-[44px]">
                   <Checkbox
                     id={`cb-ing-${i}`}
                     checked={selectedIngredients.has(ing.name)}
                     onCheckedChange={() => toggleIngredient(ing.name)}
+                    className="h-5 w-5"
                   />
-                  <label htmlFor={`cb-ing-${i}`} className="cursor-pointer">
+                  <label htmlFor={`cb-ing-${i}`} className="cursor-pointer flex-1">
                     {ing.quantity && <span className="font-medium">{scaleQuantity(ing.quantity)} </span>}
                     {ing.unit && <span>{ing.unit} </span>}
                     <span>{ing.name}</span>
@@ -485,7 +486,7 @@ const CookbookRecipeDetail = ({
             </ul>
             <Button
               onClick={handleAddToList}
-              className="w-full mt-4"
+              className="w-full mt-4 h-12 text-base"
               disabled={selectedIngredients.size === 0}
             >
               <Plus className="w-4 h-4 mr-1" />
@@ -566,7 +567,7 @@ const CookbookRecipeDetail = ({
               <Button
                 key={list.id}
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start h-12 text-base"
                 onClick={() => handlePickList(list.id)}
               >
                 {list.name}
