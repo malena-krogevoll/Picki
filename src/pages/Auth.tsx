@@ -115,7 +115,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center px-4 py-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -194,6 +194,7 @@ const Auth = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="din@epost.no"
+                    className="h-12 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -204,19 +205,20 @@ const Auth = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Ditt passord"
+                    className="h-12 text-base"
                   />
                 </div>
                 <Button 
                   onClick={() => handleSubmit(false)}
                   disabled={loading}
-                  className="w-full"
+                  className="w-full h-12 text-base"
                 >
                   {loading ? 'Logger inn...' : 'Logg inn'}
                 </Button>
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
-                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-3 touch-target"
                 >
                   Glemt passord?
                 </button>
@@ -286,7 +288,7 @@ const Auth = () => {
                 <Button 
                   onClick={() => handleSubmit(true)}
                   disabled={loading || !allRequirementsMet || !passwordsMatch}
-                  className="w-full"
+                  className="w-full h-12 text-base"
                 >
                   {loading ? 'Oppretter konto...' : 'Opprett konto'}
                 </Button>
