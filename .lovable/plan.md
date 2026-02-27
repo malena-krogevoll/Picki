@@ -1,36 +1,24 @@
 
 
-## Plan: Gjør Picki til en fullverdig PWA
+## Plan: Bedre sesjonspersistens for PWA
 
-### Hva dette innebærer
-Appen blir installerbar fra nettleseren til hjemskjermen på mobil og desktop. Den vil fungere offline (cached shell), laste raskt, og oppføre seg som en native app med splash screen og riktig ikon.
+### Problemet
+AuthProvider setter bare `loading=false` ved `SIGNED_IN` og `SIGNED_OUT`-events. Når appen våkner fra dvale (mobil/desktop PWA), trigges ofte `TOKEN_REFRESHED` i stedet — som aldri setter `loading=false`. Resultatet er en evig spinner eller redirect til login.
 
-### Implementeringssteg
+### Endringer
 
-1. **Installer `vite-plugin-pwa`** som dev-dependency
+**1. Fiks AuthProvider (`src/components/AuthProvider.tsx`)**
+- Sett `loading=false` for *alle* auth-events, ikke bare SIGNED_IN/SIGNED_OUT
+- Legg til `visibilitychange`-listener som kaller `supabase.auth.getSession()` når appen våkner fra bakgrunn — dette trigger token-refresh hvis nødvendig
+- Håndter `TOKEN_REFRESHED`-event eksplisitt
 
-2. **Konfigurer `vite.config.ts`** med VitePWA-plugin:
-   - App-navn: "Picki", kort navn: "Picki"
-   - Theme-farge og bakgrunnsfarge som matcher appen
-   - `display: "standalone"` for native-følelse
-   - Ikoner basert på `favicon.png` (192x192 og 512x512)
-   - `navigateFallbackDenylist: [/^\/~oauth/]` for å unngå caching av OAuth-ruter
-   - `registerType: 'autoUpdate'` for automatisk oppdatering av service worker
+**2. Oppdater Supabase-klient (`src/integrations/supabase/client.ts`)**
+- Legg til `detectSessionInUrl: true` for å fange opp OAuth/recovery-tokens fra URL
+- Legg til `flowType: 'pkce'` for sikrere token-håndtering
 
-3. **Oppdater `index.html`** med PWA-meta-tags:
-   - `<meta name="theme-color">` 
-   - `<meta name="apple-mobile-web-app-capable" content="yes">`
-   - `<meta name="apple-mobile-web-app-status-bar-style">`
-   - Oppdater description og OG-tags til Picki-branding
+**3. Fjern duplikat useAuth-hook (`src/hooks/useAuth.tsx`)**
+- Denne filen dupliserer AuthProvider-logikken og kan skape forvirring — slettes
 
-4. **Generere PWA-ikoner** i `public/`:
-   - `pwa-192x192.png` og `pwa-512x512.png` (kan bruke favicon.png som kilde)
-   - Maskable icon-variant
-
-5. **Registrer service worker** i `src/main.tsx` ved å importere `registerSW` fra `virtual:pwa-register`
-
-### Tekniske detaljer
-- Bruker `vite-plugin-pwa` som genererer manifest.webmanifest og service worker automatisk
-- Workbox precacher app-shell (HTML, CSS, JS) for offline-støtte
-- Runtime-caching for API-kall kan legges til senere ved behov
+### Teknisk detalj
+Hovedårsaken er linje 35-37 i AuthProvider: `if (event === 'SIGNED_IN' || event === 'SIGNED_OUT')` filtrerer bort `TOKEN_REFRESHED` og `INITIAL_SESSION`, som begge er kritiske for PWA-gjenoppvåkning. Visibility-listeneren sikrer at token refreshes proaktivt når brukeren åpner appen igjen.
 
