@@ -9,6 +9,114 @@ const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// ============================================
+// VDA+ (EPD) OAuth2 token cache & helpers
+// ============================================
+const VDA_TOKEN_URL = "https://login.microsoftonline.com/trades.no/oauth2/v2.0/token";
+const VDA_API_BASE = "https://vda.tradesolution.no/api/v1";
+const VDA_SCOPE = "https://trades.no/TradesolutionApi/.default";
+
+let vdaCachedToken: string | null = null;
+let vdaTokenExpiresAt = 0;
+
+async function getVdaAccessToken(): Promise<string> {
+  if (vdaCachedToken && Date.now() < vdaTokenExpiresAt - 60_000) {
+    return vdaCachedToken;
+  }
+  const clientId = Deno.env.get("VDA_CLIENT_ID");
+  const clientSecret = Deno.env.get("VDA_CLIENT_SECRET");
+  if (!clientId || !clientSecret) throw new Error("VDA credentials not configured");
+
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: VDA_SCOPE,
+  });
+
+  const res = await fetch(VDA_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("VDA token failed:", res.status, err);
+    throw new Error(`VDA token failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  vdaCachedToken = data.access_token;
+  vdaTokenExpiresAt = Date.now() + (data.expires_in ?? 3600) * 1000;
+  console.log(`VDA+ token acquired, expires in ${data.expires_in}s`);
+  return vdaCachedToken!;
+}
+
+async function fetchVdaProduct(gtin: string): Promise<Record<string, unknown> | null> {
+  const token = await getVdaAccessToken();
+  const res = await fetch(`${VDA_API_BASE}/products/${gtin}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+  });
+  if (res.status === 404) { await res.text(); return null; }
+  if (!res.ok) { const t = await res.text(); console.error(`VDA error ${res.status}:`, t); return null; }
+  return await res.json();
+}
+
+// Background EPD enrichment: fetch VDA+ data for top EANs and cache to product_sources
+async function enrichWithEpd(candidates: ProductCandidate[]): Promise<void> {
+  const vdaClientId = Deno.env.get("VDA_CLIENT_ID");
+  if (!vdaClientId) return; // Skip if VDA not configured
+
+  // Only enrich products that have an EAN and limit to 5 to manage rate limits
+  const eansToEnrich = candidates
+    .filter(c => c.product.EAN)
+    .map(c => String(c.product.EAN))
+    .slice(0, 5);
+
+  if (eansToEnrich.length === 0) return;
+
+  // Check which EANs we already have EPD data for (skip those)
+  const { data: existing } = await supabase
+    .from("product_sources")
+    .select("ean")
+    .in("ean", eansToEnrich)
+    .eq("source", "EPD");
+
+  const existingEans = new Set((existing || []).map((r: any) => r.ean));
+  const newEans = eansToEnrich.filter(e => !existingEans.has(e));
+
+  if (newEans.length === 0) {
+    console.log("EPD enrichment: all EANs already cached");
+    return;
+  }
+
+  console.log(`EPD enrichment: fetching ${newEans.length} new products from VDA+`);
+
+  // Fetch in parallel (all at once, max 5)
+  const results = await Promise.allSettled(
+    newEans.map(async (ean) => {
+      const product = await fetchVdaProduct(ean);
+      if (!product) return;
+
+      await supabase.from("product_sources").upsert({
+        ean,
+        source: "EPD" as const,
+        source_product_id: ean,
+        payload: product,
+        name: (product.productName as string) || null,
+        brand: (product.brandName as string) || null,
+        ingredients_raw: (product.ingredientStatement as string) || null,
+        fetched_at: new Date().toISOString(),
+      }, { onConflict: "ean,source", ignoreDuplicates: false });
+    })
+  );
+
+  const fulfilled = results.filter(r => r.status === "fulfilled").length;
+  const rejected = results.filter(r => r.status === "rejected").length;
+  console.log(`EPD enrichment done: ${fulfilled} ok, ${rejected} failed`);
+}
 interface SearchRequest {
   query: string;
   storeId?: string;
