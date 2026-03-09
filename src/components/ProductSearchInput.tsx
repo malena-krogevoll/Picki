@@ -10,6 +10,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { PreferenceIndicators } from "@/components/PreferenceIndicators";
 import { analyzeProductMatch, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
+import { extractCountryOfOrigin, CountryInfo } from "@/utils/countryUtils";
 
 interface ProductData {
   ean: string;
@@ -23,6 +24,7 @@ interface ProductData {
   ingredients?: string;
   allergenInfo?: string;
   filters?: string;
+  countryOfOrigin?: CountryInfo[];
 }
 
 interface ProductSuggestion {
@@ -39,6 +41,7 @@ interface ProductSuggestion {
   allergenInfo?: string;
   filters?: string;
   matchInfo?: MatchInfo;
+  countryOfOrigin?: CountryInfo[];
 }
 
 interface ProductSearchInputProps {
@@ -148,6 +151,31 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
           };
         });
 
+        // Batch-fetch country of origin from cached EPD data
+        const eans = products.map(p => p.ean).filter(Boolean);
+        if (eans.length > 0) {
+          try {
+            const { data: epdSources } = await supabase
+              .from("product_sources")
+              .select("ean, payload")
+              .in("ean", eans)
+              .eq("source", "EPD");
+
+            if (epdSources) {
+              const countryMap = new Map<string, CountryInfo[]>();
+              for (const src of epdSources) {
+                const countries = extractCountryOfOrigin(src.payload as Record<string, unknown>);
+                if (countries.length > 0) countryMap.set(src.ean, countries);
+              }
+              products.forEach(p => {
+                if (countryMap.has(p.ean)) p.countryOfOrigin = countryMap.get(p.ean);
+              });
+            }
+          } catch (e) {
+            console.warn('Failed to fetch country of origin:', e);
+          }
+        }
+
         // Sort products: allergy/diet safety first, then NOVA, then preferences, then price
         const sortedProducts = products.sort((a, b) => {
           // 1. Prioritize products WITHOUT allergy warnings (critical safety)
@@ -210,6 +238,7 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
       ingredients: product.ingredients,
       allergenInfo: product.allergenInfo,
       filters: product.filters,
+      countryOfOrigin: product.countryOfOrigin,
     };
     onAddProduct(product.name, productData);
     setQuery("");
@@ -310,6 +339,9 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="font-medium text-sm truncate">{product.name}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {product.countryOfOrigin?.[0] && (
+                        <span title={product.countryOfOrigin[0].name}>{product.countryOfOrigin[0].flag}</span>
+                      )}
                       {product.brand && <span>{product.brand}</span>}
                       {product.price && (
                         <span className="font-semibold text-foreground">

@@ -9,6 +9,7 @@ import { PreferenceIndicators } from "@/components/PreferenceIndicators";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { CountryInfo } from "@/utils/countryUtils";
 
 interface ProductData {
   ean: string;
@@ -22,6 +23,7 @@ interface ProductData {
   ingredients?: string;
   allergenInfo?: string;
   filters?: string;
+  countryOfOrigin?: CountryInfo[];
 }
 
 interface ShoppingListItemProps {
@@ -230,6 +232,9 @@ export const ShoppingListItem = ({
                       {currentProduct?.name}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {currentProduct?.countryOfOrigin?.[0] && (
+                        <span title={currentProduct.countryOfOrigin[0].name}>{currentProduct.countryOfOrigin[0].flag}</span>
+                      )}
                       {currentProduct?.brand && <span>{currentProduct.brand}</span>}
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap mt-1">
