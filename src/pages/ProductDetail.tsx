@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin } from "lucide-react";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
+import { extractCountryOfOrigin, CountryInfo } from "@/utils/countryUtils";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,7 +128,10 @@ export default function ProductDetail() {
     'BM': 'Bløtdyr', 'NL': 'Sennep',
   };
 
-  // Analyze product for animal welfare (use effective ingredients from EPD if available)
+  // Extract country of origin from EPD payload
+  const countryOfOrigin: CountryInfo[] = epdSource?.payload 
+    ? extractCountryOfOrigin(epdSource.payload as Record<string, unknown>) 
+    : [];
   const matchInfo = product ? analyzeProductMatch(
     {
       name: product.name,
@@ -272,7 +276,14 @@ export default function ProductDetail() {
                 />
               </div>
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-foreground mb-2">{product.brand}</h1>
+                <h1 className="text-3xl font-bold text-foreground mb-2">
+                  {product.brand}
+                  {countryOfOrigin.length > 0 && (
+                    <span className="ml-2 text-2xl" title={countryOfOrigin.map(c => c.name).join(', ')}>
+                      {countryOfOrigin.map(c => c.flag).join(' ')}
+                    </span>
+                  )}
+                </h1>
                 <p className="text-lg text-muted-foreground mb-4">{product.name}</p>
                 <div className="flex items-center gap-4">
                   <p className="text-2xl font-bold text-primary">
@@ -492,7 +503,39 @@ export default function ProductDetail() {
           </Card>
         )}
 
-        {/* Animal Welfare - only show for animal products */}
+        {/* Country of Origin */}
+        {countryOfOrigin.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Opprinnelsesland</CardTitle>
+                <Badge variant="outline" className="rounded-full text-xs gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  EPD-verifisert
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {countryOfOrigin.map((country, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-secondary rounded-xl">
+                    <span className="text-3xl">{country.flag}</span>
+                    <div>
+                      <p className="font-semibold text-foreground">{country.name}</p>
+                      <p className="text-xs text-muted-foreground">Landskode: {country.code}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                Opprinnelsesland er hentet fra produsentens EPD-data og angir hvor produktet er produsert eller bearbeidet.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+
         {userPreferences?.other_preferences?.animal_welfare && matchInfo && matchInfo.animalWelfareLevel !== 'unknown' && matchInfo.animalWelfareLevel !== 'not_applicable' && (
           <Card>
             <CardHeader>
