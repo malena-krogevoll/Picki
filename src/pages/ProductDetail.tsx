@@ -128,25 +128,70 @@ export default function ProductDetail() {
     }
   };
 
+  // Effective ingredients: prefer EPD (producer-verified) over Kassalapp
+  const effectiveIngredients = epdSource?.ingredients_raw || epdSource?.payload?.ingredientStatement || product?.ingredients || '';
+  const ingredientSource = epdSource?.ingredients_raw || epdSource?.payload?.ingredientStatement ? 'EPD (produsentverifisert)' : 'Kassalapp';
+
+  // EPD allergens: only those explicitly present
+  const epdAllergens = (epdSource?.payload?.allergenInfo?.allergens || [])
+    .filter(a => a.levelOfContainmentCode?.toUpperCase() === 'CONTAINS' || a.levelOfContainmentCode?.toUpperCase() === 'YES')
+    .map(a => a.allergenTypeCode || '')
+    .filter(Boolean);
+
+  // Map VDA allergen codes to Norwegian display names
+  const allergenCodeToName: Record<string, string> = {
+    'AC': 'Selleri', 'AE': 'Egg', 'AF': 'Fisk', 'AM': 'Melk',
+    'AN': 'Nøtter', 'AP': 'Peanøtter', 'AS': 'Soya', 'AW': 'Gluten',
+    'AU': 'Sulfitt', 'AX': 'Sesam', 'AY': 'Skalldyr', 'BC': 'Lupin',
+    'BM': 'Bløtdyr', 'NL': 'Sennep',
+  };
+
   useEffect(() => {
     const fetchProductDetails = async () => {
       if (!ean) return;
 
       setLoading(true);
       try {
-        // Fetch product details
-        const { data: productData, error: productError } = await supabase.functions.invoke(
-          'get-product-details',
-          { body: { ean } }
-        );
+        // Fetch product details and EPD data in parallel
+        const [productResult, epdResult] = await Promise.all([
+          supabase.functions.invoke('get-product-details', { body: { ean } }),
+          supabase.from('product_sources')
+            .select('ingredients_raw, payload')
+            .eq('ean', ean)
+            .eq('source', 'EPD')
+            .maybeSingle(),
+        ]);
 
-        if (productError) throw productError;
-        setProduct(productData);
+        if (productResult.error) throw productResult.error;
+        setProduct(productResult.data);
 
-        // Fetch NOVA classification with reasoning (always call, even without ingredients)
+        if (epdResult.data) {
+          setEpdSource(epdResult.data as unknown as EpdSource);
+        }
+
+        // If no EPD data cached, trigger background fetch
+        if (!epdResult.data) {
+          supabase.functions.invoke('fetch-epd', {
+            body: { action: 'lookup', gtin: ean }
+          }).then(({ data }) => {
+            if (data?.found && data.product) {
+              setEpdSource({
+                ingredients_raw: data.product.ingredientStatement || null,
+                payload: data.product,
+              });
+            }
+          }).catch(e => console.warn('EPD background fetch failed:', e));
+        }
+
+        // Use the best available ingredients for NOVA classification
+        const ingredientsForNova = epdResult.data?.ingredients_raw 
+          || (epdResult.data?.payload as any)?.ingredientStatement
+          || productResult.data.ingredients 
+          || '';
+
         const { data: novaResult, error: novaError } = await supabase.functions.invoke(
           'classify-nova',
-          { body: { ingredients_text: productData.ingredients || '' } }
+          { body: { ingredients_text: ingredientsForNova } }
         );
 
         if (novaError) {
