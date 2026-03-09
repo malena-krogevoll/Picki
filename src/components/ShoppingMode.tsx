@@ -187,6 +187,9 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     }
   }, [productData, selectedProducts, cacheKey]);
 
+  // Track whether a store change just happened to force re-fetch
+  const [storeChanged, setStoreChanged] = useState(false);
+
   // Reset only when cache key actually changes (different list or store)
   useEffect(() => {
     if (prevCacheKeyRef.current !== cacheKey) {
@@ -198,11 +201,12 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         fetchedItemsRef.current = existingCache.fetchedItems;
         setLoading(false);
       } else {
-        // New list+store combination - reset
+        // New list+store combination - reset and force re-fetch
         setProductData({});
         setSelectedProducts({});
         fetchedItemsRef.current = new Set();
         setLoading(true);
+        setStoreChanged(true);
       }
       prevCacheKeyRef.current = cacheKey;
       prevStoreIdRef.current = storeId;
@@ -438,12 +442,13 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       }
     };
 
-    // Check if we need to fetch - either first load or new items added
+     // Check if we need to fetch - either first load, new items added, or store changed
     const hasDataForAllItems = items.length > 0 && items.every(
       item => fetchedItemsRef.current.has(item.id) || productData[item.id]
     );
     
-    if (items.length > 0 && !hasDataForAllItems) {
+    if (items.length > 0 && (!hasDataForAllItems || storeChanged)) {
+      if (storeChanged) setStoreChanged(false);
       fetchProducts();
     } else {
       setLoading(false);
@@ -453,7 +458,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       isMounted = false;
       abortController.abort();
     };
-  }, [listId, storeId, items.length]); // Use stable dependencies
+  }, [listId, storeId, items.length, storeChanged]); // Use stable dependencies
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
