@@ -134,21 +134,26 @@ async function searchProducts(query: string): Promise<VdaProduct[]> {
   const url = `${VDA_API_BASE}/products?${params}`;
   console.log(`Searching VDA+: ${url}`);
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+  } catch (e) {
+    console.warn(`VDA+ search network error: ${e instanceof Error ? e.message : e}`);
+    return [];
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
     console.error(`VDA+ search error ${res.status}:`, errorText);
-    throw new Error(`VDA+ search error: ${res.status}`);
+    return [];
   }
 
   const data = await res.json();
-  // VDA+ may return { value: [...] } or an array directly
   return Array.isArray(data) ? data : (data.value ?? data.items ?? []);
 }
 
