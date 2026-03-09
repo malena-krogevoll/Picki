@@ -24,6 +24,7 @@ interface ProductData {
   ingredients?: string;
   allergenInfo?: string;
   filters?: string;
+  countryOfOrigin?: CountryInfo[];
 }
 
 interface ProductSuggestion {
