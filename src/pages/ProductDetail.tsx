@@ -128,7 +128,10 @@ export default function ProductDetail() {
     'BM': 'Bløtdyr', 'NL': 'Sennep',
   };
 
-  // Analyze product for animal welfare (use effective ingredients from EPD if available)
+  // Extract country of origin from EPD payload
+  const countryOfOrigin: CountryInfo[] = epdSource?.payload 
+    ? extractCountryOfOrigin(epdSource.payload as Record<string, unknown>) 
+    : [];
   const matchInfo = product ? analyzeProductMatch(
     {
       name: product.name,
