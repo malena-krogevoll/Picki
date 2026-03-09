@@ -339,6 +339,9 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="font-medium text-sm truncate">{product.name}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {product.countryOfOrigin?.[0] && (
+                        <span title={product.countryOfOrigin[0].name}>{product.countryOfOrigin[0].flag}</span>
+                      )}
                       {product.brand && <span>{product.brand}</span>}
                       {product.price && (
                         <span className="font-semibold text-foreground">
