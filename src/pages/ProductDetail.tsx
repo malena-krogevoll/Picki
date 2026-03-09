@@ -109,25 +109,6 @@ export default function ProductDetail() {
     priority_order: profile.preferences.priority_order || [],
   } : null;
 
-  // Analyze product for animal welfare (use effective ingredients from EPD if available)
-  const matchInfo = product ? analyzeProductMatch(
-    {
-      name: product.name,
-      brand: product.brand || '',
-      allergener: '',
-      ingredienser: effectiveIngredients || product.ingredients || '',
-    },
-    userPreferences
-  ) : null;
-
-  const handleBack = () => {
-    if (listId && storeId) {
-      navigate(`/list/${listId}?view=shopping&store=${storeId}`);
-    } else {
-      navigate(-1);
-    }
-  };
-
   // Effective ingredients: prefer EPD (producer-verified) over Kassalapp
   const effectiveIngredients = epdSource?.ingredients_raw || epdSource?.payload?.ingredientStatement || product?.ingredients || '';
   const ingredientSource = epdSource?.ingredients_raw || epdSource?.payload?.ingredientStatement ? 'EPD (produsentverifisert)' : 'Kassalapp';
@@ -145,6 +126,17 @@ export default function ProductDetail() {
     'AU': 'Sulfitt', 'AX': 'Sesam', 'AY': 'Skalldyr', 'BC': 'Lupin',
     'BM': 'Bløtdyr', 'NL': 'Sennep',
   };
+
+  // Analyze product for animal welfare (use effective ingredients from EPD if available)
+  const matchInfo = product ? analyzeProductMatch(
+    {
+      name: product.name,
+      brand: product.brand || '',
+      allergener: '',
+      ingredienser: effectiveIngredients,
+    },
+    userPreferences
+  ) : null;
 
   useEffect(() => {
     const fetchProductDetails = async () => {
