@@ -9,6 +9,7 @@ import { PreferenceIndicators } from "@/components/PreferenceIndicators";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { CountryInfo } from "@/utils/countryUtils";
 
 interface ProductData {
   ean: string;
