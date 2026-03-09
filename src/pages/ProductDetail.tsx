@@ -377,11 +377,19 @@ export default function ProductDetail() {
         {/* Ingredients */}
         <Card>
           <CardHeader>
-            <CardTitle>Ingredienser</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Ingredienser</CardTitle>
+              {effectiveIngredients && ingredientSource === 'EPD (produsentverifisert)' && (
+                <Badge variant="outline" className="rounded-full text-xs gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  {ingredientSource}
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            {product.ingredients ? (
-              <p className="text-foreground whitespace-pre-wrap">{product.ingredients}</p>
+            {effectiveIngredients ? (
+              <p className="text-foreground whitespace-pre-wrap">{effectiveIngredients}</p>
             ) : (
               <div className="flex items-start gap-3 p-4 bg-muted rounded-xl">
                 <HelpCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
@@ -395,14 +403,28 @@ export default function ProductDetail() {
           </CardContent>
         </Card>
 
-        {/* Detected Allergens from Ingredients */}
-        {product.ingredients && (
+        {/* Detected Allergens */}
+        {(effectiveIngredients || epdAllergens.length > 0) && (
           <Card>
             <CardHeader>
-              <CardTitle>Allergener (fra ingredienslisten)</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Allergener</CardTitle>
+                {epdAllergens.length > 0 && (
+                  <Badge variant="outline" className="rounded-full text-xs gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    EPD-verifisert
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {(() => {
+                // EPD allergens (producer-verified, highest priority)
+                const verifiedAllergenNames = epdAllergens
+                  .map(code => allergenCodeToName[code] || code)
+                  .filter(Boolean);
+
+                // Ingredient-text-based detection (fallback / supplement)
                 const allergenMapping: Record<string, string[]> = {
                   "Gluten": ["hvete", "rug", "bygg", "havre", "spelt", "gluten", "mel", "semule", "durumhvete"],
                   "Melk": ["melk", "laktose", "fløte", "smør", "ost", "kasein", "myse", "kremfløte", "rømme", "yoghurt"],
@@ -420,27 +442,36 @@ export default function ProductDetail() {
                   "Sulfitt": ["sulfitt", "svoveldioksid", "e220", "e221", "e222", "e223", "e224", "e225", "e226", "e227", "e228"]
                 };
                 
-                const ingredientsLower = product.ingredients.toLowerCase();
-                const detectedAllergens: string[] = [];
-                
+                const ingredientsLower = effectiveIngredients.toLowerCase();
+                const textDetected: string[] = [];
                 for (const [allergen, keywords] of Object.entries(allergenMapping)) {
                   if (keywords.some(kw => ingredientsLower.includes(kw))) {
-                    detectedAllergens.push(allergen);
+                    textDetected.push(allergen);
                   }
                 }
+
+                // Merge: EPD verified first, then text-detected (deduplicated)
+                const allAllergens = [...new Set([...verifiedAllergenNames, ...textDetected])];
                 
-                if (detectedAllergens.length === 0) {
+                if (allAllergens.length === 0) {
                   return (
                     <p className="text-muted-foreground text-sm">
-                      Ingen kjente allergener funnet i ingredienslisten
+                      Ingen kjente allergener funnet
                     </p>
                   );
                 }
                 
                 return (
                   <div className="flex flex-wrap gap-2">
-                    {detectedAllergens.map((allergen, idx) => (
-                      <Badge key={idx} variant="destructive" className="rounded-full">
+                    {allAllergens.map((allergen, idx) => (
+                      <Badge 
+                        key={idx} 
+                        variant="destructive" 
+                        className="rounded-full gap-1"
+                      >
+                        {verifiedAllergenNames.includes(allergen) && (
+                          <ShieldCheck className="h-3 w-3" />
+                        )}
                         {allergen}
                       </Badge>
                     ))}
@@ -451,8 +482,10 @@ export default function ProductDetail() {
               <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg border border-border">
                 <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground">
-                  Allergeninformasjon er hentet automatisk fra ingredienslisten og kan inneholde feil. 
-                  Sjekk alltid produktets emballasje før bruk. Picki kan ikke garantere at produkter er fri for allergener.
+                  {epdAllergens.length > 0 
+                    ? 'Allergener merket med ✓ er verifisert av produsenten via EPD. Øvrige er detektert automatisk fra ingredienslisten. Sjekk alltid emballasjen.'
+                    : 'Allergeninformasjon er hentet automatisk fra ingredienslisten og kan inneholde feil. Sjekk alltid produktets emballasje før bruk. Picki kan ikke garantere at produkter er fri for allergener.'
+                  }
                 </p>
               </div>
             </CardContent>
