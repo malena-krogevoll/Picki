@@ -98,23 +98,30 @@ async function fetchProductByGtin(gtin: string): Promise<VdaProduct | null> {
   const url = `${VDA_API_BASE}/products/${gtin}`;
   console.log(`Fetching VDA+ product: ${url}`);
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+  } catch (e) {
+    // DNS/network errors in edge runtime — return null gracefully
+    console.warn(`VDA+ network error for ${gtin}: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
 
   if (res.status === 404) {
     console.log(`VDA+ product not found: ${gtin}`);
-    await res.text(); // consume body
+    await res.text();
     return null;
   }
 
   if (!res.ok) {
     const errorText = await res.text();
     console.error(`VDA+ API error ${res.status}:`, errorText);
-    throw new Error(`VDA+ API error: ${res.status}`);
+    return null;
   }
 
   return await res.json();
