@@ -276,7 +276,14 @@ export default function ProductDetail() {
                 />
               </div>
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-foreground mb-2">{product.brand}</h1>
+                <h1 className="text-3xl font-bold text-foreground mb-2">
+                  {product.brand}
+                  {countryOfOrigin.length > 0 && (
+                    <span className="ml-2 text-2xl" title={countryOfOrigin.map(c => c.name).join(', ')}>
+                      {countryOfOrigin.map(c => c.flag).join(' ')}
+                    </span>
+                  )}
+                </h1>
                 <p className="text-lg text-muted-foreground mb-4">{product.name}</p>
                 <div className="flex items-center gap-4">
                   <p className="text-2xl font-bold text-primary">
