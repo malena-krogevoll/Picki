@@ -524,6 +524,11 @@ serve(async (req) => {
       console.error("Background cache write failed:", err);
     });
 
+    // EPD enrichment: fetch VDA+ data for top results in background
+    enrichWithEpd(topResults).catch(err => {
+      console.error("Background EPD enrichment failed:", err);
+    });
+
     return new Response(
       JSON.stringify({
         query: originalQuery,
