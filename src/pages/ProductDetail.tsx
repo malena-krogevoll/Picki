@@ -138,6 +138,14 @@ export default function ProductDetail() {
     userPreferences
   ) : null;
 
+  const handleBack = () => {
+    if (listId && storeId) {
+      navigate(`/list/${listId}?view=shopping&store=${storeId}`);
+    } else {
+      navigate(-1);
+    }
+  };
+
   useEffect(() => {
     const fetchProductDetails = async () => {
       if (!ean) return;
