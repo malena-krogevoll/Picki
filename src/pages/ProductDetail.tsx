@@ -109,13 +109,13 @@ export default function ProductDetail() {
     priority_order: profile.preferences.priority_order || [],
   } : null;
 
-  // Analyze product for animal welfare
+  // Analyze product for animal welfare (use effective ingredients from EPD if available)
   const matchInfo = product ? analyzeProductMatch(
     {
       name: product.name,
       brand: product.brand || '',
       allergener: '',
-      ingredienser: product.ingredients || '',
+      ingredienser: effectiveIngredients || product.ingredients || '',
     },
     userPreferences
   ) : null;
