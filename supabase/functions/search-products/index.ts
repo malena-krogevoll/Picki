@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, validateAuth, unauthorizedResponse } from "../_shared/auth.ts";
+import { buildResolvedUrl } from "../_shared/doh-resolver.ts";
 
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
@@ -56,9 +57,33 @@ async function getVdaAccessToken(): Promise<string> {
 
 async function fetchVdaProduct(gtin: string): Promise<Record<string, unknown> | null> {
   const token = await getVdaAccessToken();
-  const res = await fetch(`${VDA_API_BASE}/products/${gtin}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  });
+  const url = `${VDA_API_BASE}/products/${gtin}`;
+
+  let res: Response;
+  try {
+    // Try DoH-resolved IP first to bypass DNS issues
+    const resolved = await buildResolvedUrl(url);
+    if (resolved) {
+      try {
+        res = await fetch(resolved.url, {
+          headers: { Host: resolved.hostHeader, Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+      } catch (e) {
+        console.warn(`DoH-resolved VDA fetch failed, trying direct: ${e instanceof Error ? e.message : e}`);
+        res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+      }
+    } else {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+    }
+  } catch (e) {
+    console.warn(`VDA+ network error for ${gtin}: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+
   if (res.status === 404) { await res.text(); return null; }
   if (!res.ok) { const t = await res.text(); console.error(`VDA error ${res.status}:`, t); return null; }
   return await res.json();
