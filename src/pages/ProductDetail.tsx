@@ -95,6 +95,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [novaData, setNovaData] = useState<NovaClassification | null>(null);
   const [loading, setLoading] = useState(true);
+  const [epdSource, setEpdSource] = useState<EpdSource | null>(null);
 
   // Convert profile preferences to UserPreferences format
   const userPreferences: UserPreferences | null = profile?.preferences ? {
