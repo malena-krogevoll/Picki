@@ -213,6 +213,7 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
       ingredients: product.ingredients,
       allergenInfo: product.allergenInfo,
       filters: product.filters,
+      countryOfOrigin: product.countryOfOrigin,
     };
     onAddProduct(product.name, productData);
     setQuery("");
