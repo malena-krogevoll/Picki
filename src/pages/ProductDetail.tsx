@@ -4,12 +4,33 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart } from "lucide-react";
+import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck } from "lucide-react";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+interface EpdSource {
+  ingredients_raw: string | null;
+  payload: {
+    ingredientStatement?: string;
+    allergenInfo?: {
+      allergens?: Array<{
+        allergenTypeCode?: string;
+        levelOfContainmentCode?: string;
+      }>;
+    };
+    nutrientInfo?: {
+      nutrients?: Array<{
+        nutrientTypeCode?: string;
+        quantityContained?: number;
+        measurementUnitCode?: string;
+      }>;
+    };
+    [key: string]: unknown;
+  };
+}
 
 interface Allergen {
   code: string;
