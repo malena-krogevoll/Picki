@@ -503,7 +503,39 @@ export default function ProductDetail() {
           </Card>
         )}
 
-        {/* Animal Welfare - only show for animal products */}
+        {/* Country of Origin */}
+        {countryOfOrigin.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Opprinnelsesland</CardTitle>
+                <Badge variant="outline" className="rounded-full text-xs gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  EPD-verifisert
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {countryOfOrigin.map((country, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-secondary rounded-xl">
+                    <span className="text-3xl">{country.flag}</span>
+                    <div>
+                      <p className="font-semibold text-foreground">{country.name}</p>
+                      <p className="text-xs text-muted-foreground">Landskode: {country.code}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                Opprinnelsesland er hentet fra produsentens EPD-data og angir hvor produktet er produsert eller bearbeidet.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+
         {userPreferences?.other_preferences?.animal_welfare && matchInfo && matchInfo.animalWelfareLevel !== 'unknown' && matchInfo.animalWelfareLevel !== 'not_applicable' && (
           <Card>
             <CardHeader>
