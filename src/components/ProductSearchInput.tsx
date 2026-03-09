@@ -41,6 +41,7 @@ interface ProductSuggestion {
   allergenInfo?: string;
   filters?: string;
   matchInfo?: MatchInfo;
+  countryOfOrigin?: CountryInfo[];
 }
 
 interface ProductSearchInputProps {
