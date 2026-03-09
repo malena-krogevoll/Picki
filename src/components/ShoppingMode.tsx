@@ -442,12 +442,13 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       }
     };
 
-    // Check if we need to fetch - either first load or new items added
+     // Check if we need to fetch - either first load, new items added, or store changed
     const hasDataForAllItems = items.length > 0 && items.every(
       item => fetchedItemsRef.current.has(item.id) || productData[item.id]
     );
     
-    if (items.length > 0 && !hasDataForAllItems) {
+    if (items.length > 0 && (!hasDataForAllItems || storeChanged)) {
+      if (storeChanged) setStoreChanged(false);
       fetchProducts();
     } else {
       setLoading(false);
@@ -457,7 +458,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       isMounted = false;
       abortController.abort();
     };
-  }, [listId, storeId, items.length]); // Use stable dependencies
+  }, [listId, storeId, items.length, storeChanged]); // Use stable dependencies
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
