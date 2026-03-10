@@ -878,7 +878,10 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                                           />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-semibold truncate">{suggestion.brand}</p>
+                                          <p className="text-sm font-semibold truncate">
+                                            {(() => { const c = getCountryFromEAN(suggestion.ean); return c ? <span title={c.name}>{c.flag} </span> : null; })()}
+                                            {suggestion.brand}
+                                          </p>
                                           <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>
                                           <p className="text-sm font-bold text-primary mt-1">
                                             {suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
