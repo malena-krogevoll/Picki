@@ -95,10 +95,7 @@ const ListEditor = () => {
 
   const handleSelectStore = async (storeId: string) => {
     if (!listId) return;
-    // Clear session cache for old store if we're changing stores
-    if (currentList?.store_id && currentList.store_id !== storeId) {
-      clearSessionCache(listId, currentList.store_id);
-    }
+    clearSessionCacheForList(listId);
     await updateListStore(listId, storeId);
     setShowStoreDialog(false);
     setView('shop');

@@ -453,18 +453,52 @@ export const useShoppingList = (userId: string | undefined) => {
   };
 
   const updateListStore = async (listId: string, storeId: string) => {
-    const { error } = await supabase
-      .from("shopping_lists")
-      .update({ store_id: storeId })
-      .eq("id", listId);
+    // Optimistic reset so stale products are never reused in the UI
+    setLists(prev => prev.map(list =>
+      list.id === listId
+        ? {
+            ...list,
+            store_id: storeId,
+            items: list.items?.map(item => ({
+              ...item,
+              product_data: null,
+              selected_product_ean: null,
+            }))
+          }
+        : list
+    ));
 
-    if (error) {
+    if (activeList?.id === listId) {
+      setActiveList({
+        ...activeList,
+        store_id: storeId,
+        items: activeList.items?.map(item => ({
+          ...item,
+          product_data: null,
+          selected_product_ean: null,
+        }))
+      });
+    }
+
+    const [listResult, itemsResult] = await Promise.all([
+      supabase
+        .from("shopping_lists")
+        .update({ store_id: storeId })
+        .eq("id", listId),
+      supabase
+        .from("shopping_list_items")
+        .update({ product_data: null, selected_product_ean: null })
+        .eq("list_id", listId)
+    ]);
+
+    if (listResult.error || itemsResult.error) {
       toast({
         title: "Feil ved oppdatering av butikk",
-        description: error.message,
+        description: listResult.error?.message || itemsResult.error?.message,
         variant: "destructive",
       });
-      return { error };
+      await fetchLists();
+      return { error: listResult.error || itemsResult.error };
     }
 
     await fetchLists();

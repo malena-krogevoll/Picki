@@ -70,6 +70,14 @@ export const clearSessionCache = (listId: string, storeId: string) => {
   sessionProductCache.delete(cacheKey);
 };
 
+export const clearSessionCacheForList = (listId: string) => {
+  for (const key of sessionProductCache.keys()) {
+    if (key.startsWith(`${listId}:`)) {
+      sessionProductCache.delete(key);
+    }
+  }
+};
+
 const getNovaColor = (score: number | null, isEstimated: boolean = false) => {
   if (score === null) return "bg-muted text-muted-foreground border-dashed border";
   if (isEstimated) return "bg-muted text-muted-foreground border-dashed border";
