@@ -499,13 +499,22 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             enrichedEansRef.current.add(ean);
             
             try {
-              const { data, error } = await supabase.functions.invoke('get-product-details', {
-                body: { ean }
-              });
+              // Fetch Kassalapp details and EPD data in parallel
+              const [detailResult, epdResult] = await Promise.all([
+                supabase.functions.invoke('get-product-details', { body: { ean } }),
+                supabase.from('product_sources')
+                  .select('ingredients_raw, image_url')
+                  .eq('ean', ean)
+                  .eq('source', 'EPD')
+                  .maybeSingle()
+              ]);
               
-              if (error || !data) return null;
+              const details = detailResult.error ? null : detailResult.data;
+              const epd = epdResult.data;
               
-              return { itemId, productIndex, ean, details: data };
+              if (!details && !epd) return null;
+              
+              return { itemId, productIndex, ean, details, epd };
             } catch {
               return null;
             }
