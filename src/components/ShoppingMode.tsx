@@ -565,7 +565,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         
         for (const result of results) {
           if (result.status !== 'fulfilled' || !result.value) continue;
-          const { itemId, productIndex, details, epd } = result.value;
+          const { itemId, productIndex, details, epd, kassal } = result.value;
           
           const currentSuggestions = productDataRef.current[itemId];
           if (!currentSuggestions) continue;
