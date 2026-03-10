@@ -79,6 +79,13 @@ export const ShoppingListItem = ({
   const currentProduct = allProducts[currentIndex];
   const hasMultiple = allProducts.length > 1;
 
+  // Resolve country: use product data first, then EAN prefix fallback
+  const displayCountry = useMemo(() => {
+    if (!currentProduct) return null;
+    if (currentProduct.countryOfOrigin?.length) return currentProduct.countryOfOrigin[0];
+    return getCountryFromEAN(currentProduct.ean);
+  }, [currentProduct]);
+
   // Analyze current product for preference match
   const matchInfo = useMemo(() => {
     if (!currentProduct) return null;
