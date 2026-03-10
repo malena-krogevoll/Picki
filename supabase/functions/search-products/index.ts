@@ -794,6 +794,22 @@ serve(async (req) => {
         console.log("No matches found, falling back to all products");
         candidates = allCandidates;
       }
+
+      // DB fallback: supplement with cached products if fewer than 10 results
+      if (candidates.length < 10) {
+        const existingEans = new Set(candidates.filter(c => c.product.EAN).map(c => c.product.EAN!));
+        try {
+          const dbCandidates = await searchDatabaseFallback(
+            originalQuery, effectiveStoreCode, existingEans, userPreferences, intent
+          );
+          if (dbCandidates.length > 0) {
+            candidates.push(...dbCandidates);
+            console.log(`Added ${dbCandidates.length} DB fallback results (total: ${candidates.length})`);
+          }
+        } catch (dbErr) {
+          console.warn("DB fallback search failed:", dbErr);
+        }
+      }
     } catch (apiError) {
       console.error("Kassalapp API failed:", apiError);
       return new Response(
@@ -816,15 +832,22 @@ serve(async (req) => {
     console.log(`Returning ${topResults.length} results, best renvareScore: ${topResults[0]?.renvareScore ?? 0}`);
 
     // Write-through cache: save to DB in background (best effort, don't block response)
-    // We pass allCandidates to cache all products we received, not just top results
     cacheProductsToDatabase(allCandidates).catch(err => {
       console.error("Background cache write failed:", err);
     });
 
-    // EPD enrichment: fetch VDA+ data for top results in background
-    enrichWithEpd(topResults).catch(err => {
-      console.error("Background EPD enrichment failed:", err);
-    });
+    // Background enrichment pipeline: EPD → Kassalapp details → Master recompute → Universal offers
+    (async () => {
+      try {
+        const epdEnriched = await enrichWithEpd(topResults);
+        const kassalEnriched = await enrichWithKassalappDetails(topResults);
+        const allEnriched = [...new Set([...epdEnriched, ...kassalEnriched])];
+        await triggerMasterRecompute(allEnriched);
+        await expandUniversalOffers(allCandidates);
+      } catch (err) {
+        console.error("Background enrichment pipeline failed:", err);
+      }
+    })();
 
     return new Response(
       JSON.stringify({
