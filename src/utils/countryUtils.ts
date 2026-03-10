@@ -175,9 +175,9 @@ export function getCountryFromEAN(ean: string): CountryInfo | null {
   const prefix = parseInt(ean.substring(0, 3), 10);
   if (isNaN(prefix)) return null;
 
-  for (const [start, end, flag, name] of GS1_PREFIX_MAP) {
+  for (const [start, end, flag, name, alpha2] of GS1_PREFIX_MAP) {
     if (prefix >= start && prefix <= end) {
-      return { code: `GS1:${prefix}`, flag, name };
+      return { code: `GS1:${prefix}`, flag, name, alpha2 };
     }
   }
   return null;
