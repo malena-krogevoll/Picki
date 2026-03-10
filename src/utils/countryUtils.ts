@@ -99,6 +99,7 @@ export interface CountryInfo {
   code: string;
   flag: string;
   name: string;
+  alpha2: string; // ISO 3166-1 alpha-2 code for flag image rendering
 }
 
 /**
@@ -108,46 +109,61 @@ export function getCountryInfo(code: string): CountryInfo | null {
   const normalized = code.trim().toUpperCase();
   const data = COUNTRY_DATA[normalized];
   if (!data) return null;
-  return { code: normalized, ...data };
+  // Derive alpha2: if normalized is already 2 chars, use it; otherwise map from numeric
+  const alpha2 = normalized.length === 2 ? normalized : (NUMERIC_TO_ALPHA2[normalized] || normalized);
+  return { code: normalized, alpha2, ...data };
 }
 
 // GS1 EAN barcode prefix → country (first 3 digits of EAN)
 // See https://www.gs1.org/standards/id-keys/company-prefix
-const GS1_PREFIX_MAP: [number, number, string, string][] = [
-  // [rangeStart, rangeEnd, flag, name]
-  [700, 709, "🇳🇴", "Norge"],
-  [730, 739, "🇸🇪", "Sverige"],
-  [570, 579, "🇩🇰", "Danmark"],
-  [640, 649, "🇫🇮", "Finland"],
-  [400, 440, "🇩🇪", "Tyskland"],
-  [870, 879, "🇳🇱", "Nederland"],
-  [540, 549, "🇧🇪", "Belgia"],
-  [300, 379, "🇫🇷", "Frankrike"],
-  [800, 839, "🇮🇹", "Italia"],
-  [840, 849, "🇪🇸", "Spania"],
-  [560, 569, "🇵🇹", "Portugal"],
-  [500, 509, "🇬🇧", "Storbritannia"],
-  [539, 539, "🇮🇪", "Irland"],
-  [760, 769, "🇨🇭", "Sveits"],
-  [900, 919, "🇦🇹", "Østerrike"],
-  [590, 590, "🇵🇱", "Polen"],
-  [859, 859, "🇨🇿", "Tsjekkia"],
-  [520, 521, "🇬🇷", "Hellas"],
-  [868, 869, "🇹🇷", "Tyrkia"],
-  [0, 19, "🇺🇸", "USA"],
-  [750, 759, "🇲🇽", "Mexico"],
-  [789, 790, "🇧🇷", "Brasil"],
-  [779, 779, "🇦🇷", "Argentina"],
-  [690, 699, "🇨🇳", "Kina"],
-  [450, 459, "🇯🇵", "Japan"],
-  [880, 880, "🇰🇷", "Sør-Korea"],
-  [885, 885, "🇹🇭", "Thailand"],
-  [893, 893, "🇻🇳", "Vietnam"],
-  [884, 884, "🇰🇭", "Kambodsja"],
-  [890, 890, "🇮🇳", "India"],
-  [930, 939, "🇦🇺", "Australia"],
-  [940, 949, "🇳🇿", "New Zealand"],
-  [600, 601, "🇿🇦", "Sør-Afrika"],
+// Numeric code → alpha-2 mapping
+const NUMERIC_TO_ALPHA2: Record<string, string> = {
+  "578": "NO", "752": "SE", "208": "DK", "246": "FI", "352": "IS",
+  "276": "DE", "528": "NL", "056": "BE", "250": "FR", "380": "IT",
+  "724": "ES", "620": "PT", "826": "GB", "372": "IE", "756": "CH",
+  "040": "AT", "616": "PL", "203": "CZ", "300": "GR", "792": "TR",
+  "840": "US", "124": "CA", "076": "BR", "032": "AR", "152": "CL",
+  "156": "CN", "392": "JP", "410": "KR", "764": "TH", "704": "VN",
+  "360": "ID", "356": "IN", "036": "AU", "554": "NZ", "710": "ZA",
+  "818": "EG", "504": "MA", "442": "LU", "348": "HU", "642": "RO",
+  "100": "BG", "191": "HR", "233": "EE", "428": "LV", "440": "LT",
+};
+
+const GS1_PREFIX_MAP: [number, number, string, string, string][] = [
+  // [rangeStart, rangeEnd, flag, name, alpha2]
+  [700, 709, "🇳🇴", "Norge", "NO"],
+  [730, 739, "🇸🇪", "Sverige", "SE"],
+  [570, 579, "🇩🇰", "Danmark", "DK"],
+  [640, 649, "🇫🇮", "Finland", "FI"],
+  [400, 440, "🇩🇪", "Tyskland", "DE"],
+  [870, 879, "🇳🇱", "Nederland", "NL"],
+  [540, 549, "🇧🇪", "Belgia", "BE"],
+  [300, 379, "🇫🇷", "Frankrike", "FR"],
+  [800, 839, "🇮🇹", "Italia", "IT"],
+  [840, 849, "🇪🇸", "Spania", "ES"],
+  [560, 569, "🇵🇹", "Portugal", "PT"],
+  [500, 509, "🇬🇧", "Storbritannia", "GB"],
+  [539, 539, "🇮🇪", "Irland", "IE"],
+  [760, 769, "🇨🇭", "Sveits", "CH"],
+  [900, 919, "🇦🇹", "Østerrike", "AT"],
+  [590, 590, "🇵🇱", "Polen", "PL"],
+  [859, 859, "🇨🇿", "Tsjekkia", "CZ"],
+  [520, 521, "🇬🇷", "Hellas", "GR"],
+  [868, 869, "🇹🇷", "Tyrkia", "TR"],
+  [0, 19, "🇺🇸", "USA", "US"],
+  [750, 759, "🇲🇽", "Mexico", "MX"],
+  [789, 790, "🇧🇷", "Brasil", "BR"],
+  [779, 779, "🇦🇷", "Argentina", "AR"],
+  [690, 699, "🇨🇳", "Kina", "CN"],
+  [450, 459, "🇯🇵", "Japan", "JP"],
+  [880, 880, "🇰🇷", "Sør-Korea", "KR"],
+  [885, 885, "🇹🇭", "Thailand", "TH"],
+  [893, 893, "🇻🇳", "Vietnam", "VN"],
+  [884, 884, "🇰🇭", "Kambodsja", "KH"],
+  [890, 890, "🇮🇳", "India", "IN"],
+  [930, 939, "🇦🇺", "Australia", "AU"],
+  [940, 949, "🇳🇿", "New Zealand", "NZ"],
+  [600, 601, "🇿🇦", "Sør-Afrika", "ZA"],
 ];
 
 /**
@@ -159,9 +175,9 @@ export function getCountryFromEAN(ean: string): CountryInfo | null {
   const prefix = parseInt(ean.substring(0, 3), 10);
   if (isNaN(prefix)) return null;
 
-  for (const [start, end, flag, name] of GS1_PREFIX_MAP) {
+  for (const [start, end, flag, name, alpha2] of GS1_PREFIX_MAP) {
     if (prefix >= start && prefix <= end) {
-      return { code: `GS1:${prefix}`, flag, name };
+      return { code: `GS1:${prefix}`, flag, name, alpha2 };
     }
   }
   return null;
@@ -198,7 +214,7 @@ export function extractCountryOfOrigin(payload: Record<string, unknown>): Countr
     } else if (str.length === 2) {
       // Try generating flag from alpha-2 even if not in our map
       const flag = countryCodeToFlag(str);
-      if (flag) results.push({ code: str, flag, name: str });
+      if (flag) results.push({ code: str, flag, name: str, alpha2: str });
     }
   };
 

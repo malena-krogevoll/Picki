@@ -18,6 +18,7 @@ import { StoreSelectorDialog, getStoreName, getStoreIcon, getStoreColor } from "
 import { useDiyAlternatives, DiyRecipe } from "@/hooks/useDiyAlternatives";
 import { DiyAlternativeDialog } from "@/components/DiyAlternativeDialog";
 import { getCountryFromEAN } from "@/utils/countryUtils";
+import { CountryFlag } from "@/components/CountryFlag";
 
 interface ItemIntent {
   original: string;
@@ -816,7 +817,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                                 </span>
                               </div>
                               <p className="font-semibold text-foreground mb-1 truncate">
-                                {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <span title={c.name}>{c.flag} </span> : null; })()}
+                                {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <CountryFlag alpha2={c.alpha2} name={c.name} size="sm" className="mr-1" /> : null; })()}
                                 {selectedProduct.brand}
                               </p>
                               <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
@@ -879,7 +880,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-sm font-semibold truncate">
-                                            {(() => { const c = getCountryFromEAN(suggestion.ean); return c ? <span title={c.name}>{c.flag} </span> : null; })()}
+                                            {(() => { const c = getCountryFromEAN(suggestion.ean); return c ? <CountryFlag alpha2={c.alpha2} name={c.name} size="sm" className="mr-1" /> : null; })()}
                                             {suggestion.brand}
                                           </p>
                                           <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>

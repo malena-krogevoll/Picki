@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin } from "lucide-react";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
+import { CountryFlag } from "@/components/CountryFlag";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -288,8 +289,8 @@ export default function ProductDetail() {
                 <h1 className="text-3xl font-bold text-foreground mb-2">
                   {product.brand}
                   {countryOfOrigin.length > 0 && (
-                    <span className="ml-2 text-2xl" title={countryOfOrigin.map(c => c.name).join(', ')}>
-                      {countryOfOrigin.map(c => c.flag).join(' ')}
+                    <span className="ml-2 inline-flex gap-1 align-middle">
+                      {countryOfOrigin.map((c, i) => <CountryFlag key={i} alpha2={c.alpha2} name={c.name} size="md" />)}
                     </span>
                   )}
                 </h1>
@@ -530,7 +531,7 @@ export default function ProductDetail() {
               <div className="space-y-3">
                 {countryOfOrigin.map((country, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-3 bg-secondary rounded-xl">
-                    <span className="text-3xl">{country.flag}</span>
+                    <CountryFlag alpha2={country.alpha2} name={country.name} size="lg" />
                     <div>
                       <p className="font-semibold text-foreground">{country.name}</p>
                       <p className="text-xs text-muted-foreground">Landskode: {country.code}</p>

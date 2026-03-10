@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PreferenceIndicators } from "@/components/PreferenceIndicators";
 import { analyzeProductMatch, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
+import { CountryFlag } from "@/components/CountryFlag";
 
 interface ProductData {
   ean: string;
@@ -350,7 +351,7 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
                     <p className="font-medium text-sm truncate">{product.name}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {product.countryOfOrigin?.[0] && (
-                        <span title={product.countryOfOrigin[0].name}>{product.countryOfOrigin[0].flag}</span>
+                        <CountryFlag alpha2={product.countryOfOrigin[0].alpha2} name={product.countryOfOrigin[0].name} size="sm" />
                       )}
                       {product.brand && <span>{product.brand}</span>}
                       {product.price && (
