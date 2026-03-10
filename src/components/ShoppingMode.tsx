@@ -189,10 +189,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     }
   }, [productData, selectedProducts, cacheKey]);
 
-  // Track whether a store change just happened to force re-fetch
-  const [storeChanged, setStoreChanged] = useState(false);
-
-  // Reset only when cache key actually changes (different list or store)
+  // Detect store/list changes and force re-fetch
   useEffect(() => {
     if (prevCacheKeyRef.current !== cacheKey) {
       const existingCache = sessionProductCache.get(cacheKey);
@@ -203,12 +200,11 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         fetchedItemsRef.current = existingCache.fetchedItems;
         setLoading(false);
       } else {
-        // New list+store combination - reset and force re-fetch
+        // New list+store combination - reset everything
         setProductData({});
         setSelectedProducts({});
         fetchedItemsRef.current = new Set();
         setLoading(true);
-        setStoreChanged(true);
       }
       prevCacheKeyRef.current = cacheKey;
       prevStoreIdRef.current = storeId;
