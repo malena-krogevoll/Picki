@@ -27,12 +27,24 @@ serve(async (req) => {
       throw new Error("KASSALAPP_API_KEY not configured");
     }
 
-    const response = await fetch(`https://kassal.app/api/v1/products/ean/${ean}`, {
-      headers: { Authorization: `Bearer ${KASSAL_API_KEY}` },
-    });
+    // Retry with backoff on 429
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(`https://kassal.app/api/v1/products/ean/${ean}`, {
+        headers: { Authorization: `Bearer ${KASSAL_API_KEY}` },
+      });
+      if (response.status === 429) {
+        const wait = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+        console.warn(`Kassal 429 for ${ean}, retrying in ${wait}ms (attempt ${attempt + 1})`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      break;
+    }
 
-    if (!response.ok) {
-      throw new Error(`Kassal API error: ${response.status}`);
+    if (!response || !response.ok) {
+      const status = response?.status || 'unknown';
+      throw new Error(`Kassal API error: ${status}`);
     }
 
     const productData = await response.json();

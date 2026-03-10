@@ -598,9 +598,9 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           setProductData(prev => ({ ...prev, ...updates }));
         }
         
-        // Delay between batches
-        if (i + 3 < toEnrich.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        // Delay between requests to respect Kassalapp rate limits
+        if (i + 1 < toEnrich.length) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
       
