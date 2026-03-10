@@ -289,8 +289,8 @@ export default function ProductDetail() {
                 <h1 className="text-3xl font-bold text-foreground mb-2">
                   {product.brand}
                   {countryOfOrigin.length > 0 && (
-                    <span className="ml-2 text-2xl" title={countryOfOrigin.map(c => c.name).join(', ')}>
-                      {countryOfOrigin.map(c => c.flag).join(' ')}
+                    <span className="ml-2 inline-flex gap-1 align-middle">
+                      {countryOfOrigin.map((c, i) => <CountryFlag key={i} alpha2={c.alpha2} name={c.name} size="md" />)}
                     </span>
                   )}
                 </h1>
