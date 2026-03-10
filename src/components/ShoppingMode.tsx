@@ -286,12 +286,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           });
           
           if (!intentError && intentData?.intents) {
-            console.log("AI intent analysis:", {
-              cached: intentData.cached,
-              aiProcessed: intentData.aiProcessed,
-              estimatedCost: intentData.estimatedCost
-            });
-            
             for (const intent of intentData.intents as ItemIntent[]) {
               intentMap.set(intent.original.toLowerCase(), intent);
             }
