@@ -146,6 +146,7 @@ const ListEditor = () => {
         <Header />
         <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
           <ShoppingMode
+            key={`${listId}-${currentList.store_id}`}
             storeId={currentList.store_id}
             listId={listId!}
             onEditList={handleEditList}
