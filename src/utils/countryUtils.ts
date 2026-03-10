@@ -214,7 +214,7 @@ export function extractCountryOfOrigin(payload: Record<string, unknown>): Countr
     } else if (str.length === 2) {
       // Try generating flag from alpha-2 even if not in our map
       const flag = countryCodeToFlag(str);
-      if (flag) results.push({ code: str, flag, name: str });
+      if (flag) results.push({ code: str, flag, name: str, alpha2: str });
     }
   };
 
