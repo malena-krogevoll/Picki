@@ -242,7 +242,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
                 
                 if (cacheAge < maxCacheAge) {
-                  console.log(`Using cached products for: ${item.name}`);
                   cachedResults[item.id] = cached.products;
                   fetchedItemsRef.current.add(item.id);
                   // Restore selected product index from cache
