@@ -817,7 +817,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                                 </span>
                               </div>
                               <p className="font-semibold text-foreground mb-1 truncate">
-                                {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <span title={c.name}>{c.flag} </span> : null; })()}
+                                {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <CountryFlag alpha2={c.alpha2} name={c.name} size="sm" className="mr-1" /> : null; })()}
                                 {selectedProduct.brand}
                               </p>
                               <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
