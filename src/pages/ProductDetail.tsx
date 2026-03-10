@@ -531,7 +531,7 @@ export default function ProductDetail() {
               <div className="space-y-3">
                 {countryOfOrigin.map((country, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-3 bg-secondary rounded-xl">
-                    <span className="text-3xl">{country.flag}</span>
+                    <CountryFlag alpha2={country.alpha2} name={country.name} size="lg" />
                     <div>
                       <p className="font-semibold text-foreground">{country.name}</p>
                       <p className="text-xs text-muted-foreground">Landskode: {country.code}</p>
