@@ -243,19 +243,33 @@ async function triggerMasterRecompute(eans: string[]): Promise<void> {
 
   console.log(`Triggering master recompute for ${eans.length} EANs`);
 
+  const functionUrl = `${supabaseUrl}/functions/v1/recompute-master-product`;
+
   const results = await Promise.allSettled(
     eans.map(async (ean) => {
-      const { error } = await supabase.functions.invoke("recompute-master-product", {
-        body: { ean },
-      });
-      if (error) {
-        console.warn(`Recompute failed for ${ean}:`, error);
+      try {
+        const res = await fetch(functionUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ ean }),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          console.warn(`Recompute failed for ${ean}: ${res.status} ${text}`);
+        } else {
+          await res.text(); // consume body
+        }
+      } catch (e) {
+        console.warn(`Recompute error for ${ean}:`, e instanceof Error ? e.message : e);
       }
     })
   );
 
   const ok = results.filter(r => r.status === "fulfilled").length;
-  console.log(`Master recompute: ${ok}/${eans.length} succeeded`);
+  console.log(`Master recompute: ${ok}/${eans.length} triggered`);
 }
 
 // Universal brands that exist in all/most Norwegian grocery chains
