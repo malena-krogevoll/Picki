@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin } from "lucide-react";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
+import { CountryFlag } from "@/components/CountryFlag";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
