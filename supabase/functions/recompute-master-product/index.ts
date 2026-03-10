@@ -293,10 +293,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    await validateAuth(req);
-  } catch {
-    return unauthorizedResponse();
+  // Accept both user tokens and service role key
+  const authHeader = req.headers.get("Authorization");
+  const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`;
+  
+  if (!isServiceRole) {
+    try {
+      await validateAuth(req);
+    } catch {
+      return unauthorizedResponse();
+    }
   }
 
   try {
