@@ -463,20 +463,18 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     };
   }, [listId, storeId, items.length, cacheKey]);
 
-  // Post-load enrichment: fetch details for selected products missing ingredients/image
+  // Post-load enrichment: fetch details for candidates missing ingredients/image
+  // Enrich top 3 candidates per item, auto-promote best candidate with data
   const enrichedEansRef = useRef<Set<string>>(new Set());
   const enrichmentRunningRef = useRef(false);
   const productDataRef = useRef(productData);
   productDataRef.current = productData;
   
-  // Track when loading transitions from true to false
   const prevLoadingRef = useRef(loading);
   
   useEffect(() => {
-    const wasLoading = prevLoadingRef.current;
     prevLoadingRef.current = loading;
     
-    // Only trigger enrichment when loading finishes OR when productData changes while not loading
     if (loading) return;
     if (Object.keys(productData).length === 0) return;
     if (enrichmentRunningRef.current) return;
@@ -485,32 +483,28 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     enrichmentRunningRef.current = true;
     
     const enrichMissing = async () => {
-      // Find products missing data (only selected/top product per item)
+      // Collect EANs to enrich: top 3 candidates per item that lack data
       const toEnrich: { itemId: string; productIndex: number; ean: string }[] = [];
-      
-      // Use ref to get latest productData
       const currentData = productDataRef.current;
       
       for (const item of items) {
         const suggestions = currentData[item.id];
         if (!suggestions || suggestions.length === 0) continue;
         
-        const selectedIdx = selectedProducts[item.id] || 0;
-        const product = suggestions[selectedIdx];
-        if (!product || !product.ean) continue;
-        
-        // Skip if already enriched
-        if (enrichedEansRef.current.has(product.ean)) continue;
-        
-        // Check if missing image or real ingredients data
-        const hasRealIngredients = product.hasIngredients && product.ingredienser && 
-          !product.ingredienser.includes('Ingen ingrediensinformasjon');
-        const hasImage = !!product.image && product.image.length > 0;
-        
-        // Skip only if has BOTH real ingredients AND image
-        if (hasRealIngredients && hasImage) continue;
-        
-        toEnrich.push({ itemId: item.id, productIndex: selectedIdx, ean: product.ean });
+        // Enrich up to 3 candidates per item (not just the selected one)
+        const candidateCount = Math.min(3, suggestions.length);
+        for (let idx = 0; idx < candidateCount; idx++) {
+          const product = suggestions[idx];
+          if (!product || !product.ean) continue;
+          if (enrichedEansRef.current.has(product.ean)) continue;
+          
+          const hasRealIngredients = product.hasIngredients && hasMeaningfulIngredients(product.ingredienser);
+          const hasImage = !!product.image && product.image.length > 0;
+          
+          if (hasRealIngredients && hasImage) continue;
+          
+          toEnrich.push({ itemId: item.id, productIndex: idx, ean: product.ean });
+        }
       }
       
       if (toEnrich.length === 0) {
@@ -518,54 +512,58 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         return;
       }
       
-      console.log(`Post-load enrichment: fetching details for ${toEnrich.length} products`);
+      console.log(`Post-load enrichment: enriching ${toEnrich.length} candidates across items`);
       
-      // Fetch ONE at a time with generous delay to avoid Kassalapp 429 rate limits
-      // (search-products already hammers the API, so enrichment must be gentle)
       for (let i = 0; i < toEnrich.length && !cancelled; i++) {
-        const batch = [toEnrich[i]];
+        const { itemId, productIndex, ean } = toEnrich[i];
         
-        const results = await Promise.allSettled(
-          batch.map(async ({ itemId, productIndex, ean }) => {
-            enrichedEansRef.current.add(ean);
-            
+        try {
+          // Fetch cached sources first (cheap), live detail as fallback
+          const [epdResult, kassalResult] = await Promise.all([
+            supabase.from('product_sources')
+              .select('ingredients_raw, image_url, payload')
+              .eq('ean', ean)
+              .eq('source', 'EPD')
+              .maybeSingle(),
+            supabase.from('product_sources')
+              .select('ingredients_raw, image_url, payload')
+              .eq('ean', ean)
+              .eq('source', 'KASSALAPP')
+              .maybeSingle()
+          ]);
+          
+          const epd = (epdResult.data as EpdEnrichmentSource | null) ?? null;
+          const kassal = (kassalResult.data as EpdEnrichmentSource | null) ?? null;
+          
+          // Check if cached sources have the data we need
+          const cachedImage = epd?.image_url || epd?.payload?.mainImageUrl || kassal?.image_url || (kassal?.payload as any)?.image;
+          const cachedIngredients = epd?.ingredients_raw || epd?.payload?.ingredientStatement || kassal?.ingredients_raw || (kassal?.payload as any)?.ingredients;
+          
+          let details: any = null;
+          
+          // Only call live API if cached sources don't have what we need
+          if (!cachedImage || !hasMeaningfulIngredients(cachedIngredients)) {
             try {
-              // Fetch Kassalapp details and EPD data in parallel
-              const [detailResult, epdResult, kassalResult] = await Promise.all([
-                supabase.functions.invoke('get-product-details', { body: { ean } }),
-                supabase.from('product_sources')
-                  .select('ingredients_raw, image_url, payload')
-                  .eq('ean', ean)
-                  .eq('source', 'EPD')
-                  .maybeSingle(),
-                supabase.from('product_sources')
-                  .select('ingredients_raw, image_url, payload')
-                  .eq('ean', ean)
-                  .eq('source', 'KASSALAPP')
-                  .maybeSingle()
-              ]);
-              
-              const details = detailResult.error ? null : detailResult.data;
-              const epd = (epdResult.data as EpdEnrichmentSource | null) ?? null;
-              const kassal = (kassalResult.data as EpdEnrichmentSource | null) ?? null;
-              
-              if (!details && !epd && !kassal) return null;
-              
-              return { itemId, productIndex, ean, details, epd, kassal };
+              const detailResult = await supabase.functions.invoke('get-product-details', { body: { ean } });
+              if (!detailResult.error && detailResult.data) {
+                details = detailResult.data;
+              }
+              // If the edge function returned rate_limited, don't block — just use cached data
             } catch {
-              return null;
+              // Non-blocking: live detail is optional
             }
-          })
-        );
-        
-        if (cancelled) break;
-        
-        // Update productData with enriched info - use functional update to avoid stale state
-        const updates: Record<string, ProductSuggestion[]> = {};
-        
-        for (const result of results) {
-          if (result.status !== 'fulfilled' || !result.value) continue;
-          const { itemId, productIndex, details, epd, kassal } = result.value;
+          }
+          
+          if (!details && !epd && !kassal) {
+            // No data from any source — DON'T mark as enriched so we can retry later
+            console.log(`Enrichment: no data for EAN ${ean}, will retry later`);
+            continue;
+          }
+          
+          // Mark as enriched only on success
+          enrichedEansRef.current.add(ean);
+          
+          if (cancelled) break;
           
           const currentSuggestions = productDataRef.current[itemId];
           if (!currentSuggestions) continue;
@@ -575,16 +573,14 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           
           let changed = false;
           
-          // Always update image if we got a better one (EPD payload/image_url or details)
-          const bestImage = epd?.image_url || epd?.payload?.mainImageUrl || kassal?.image_url || kassal?.payload?.image || details?.image;
+          const bestImage = epd?.image_url || epd?.payload?.mainImageUrl || kassal?.image_url || (kassal?.payload as any)?.image || details?.image;
           if (bestImage && bestImage !== product.image) {
             product.image = bestImage;
             changed = true;
           }
           
-          // Best ingredients: EPD > Kassalapp detail
           const epdIngredients = epd?.ingredients_raw || epd?.payload?.ingredientStatement || null;
-          const kassalIngredients = kassal?.ingredients_raw || kassal?.payload?.ingredients || null;
+          const kassalIngredients = kassal?.ingredients_raw || (kassal?.payload as any)?.ingredients || null;
           const detailIngredients = hasMeaningfulIngredients(details?.ingredients) ? details?.ingredients : null;
           const bestIngredients = epdIngredients || kassalIngredients || detailIngredients;
           
@@ -593,12 +589,8 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             product.hasIngredients = true;
             changed = true;
             
-            // Re-classify NOVA for this product
             try {
-              const novaResults = await batchClassifyNova([{
-                ingredienser: bestIngredients,
-                category: ''
-              }]);
+              const novaResults = await batchClassifyNova([{ ingredienser: bestIngredients, category: '' }]);
               const novaData = novaResults.get(0);
               if (novaData) {
                 product.novaScore = novaData.novaScore;
@@ -607,7 +599,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               }
             } catch {}
             
-            // Re-analyze preference match
             product.matchInfo = analyzeProductMatch(
               { name: product.name, brand: product.brand, allergener: product.allergener, ingredienser: product.ingredienser },
               profile?.preferences as UserPreferences | null
@@ -616,19 +607,62 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           
           if (changed) {
             updatedSuggestions[productIndex] = product;
-            updates[itemId] = updatedSuggestions;
-            void cacheItemProducts(itemId, storeId, updatedSuggestions, productIndex);
-            console.log(`Enrichment updated item "${items.find(i => i.id === itemId)?.name}": image=${!!product.image}, ingredients=${hasMeaningfulIngredients(product.ingredienser)}`);
+            
+            if (!cancelled) {
+              setProductData(prev => ({ ...prev, [itemId]: updatedSuggestions }));
+              void cacheItemProducts(itemId, storeId, updatedSuggestions, selectedProducts[itemId] ?? 0);
+              console.log(`Enrichment: "${items.find(i => i.id === itemId)?.name}" candidate[${productIndex}] EAN=${ean}: image=${!!product.image}, ingredients=${hasMeaningfulIngredients(product.ingredienser)}`);
+            }
+          }
+        } catch (err) {
+          // Don't mark as enriched on error — allow retry
+          console.warn(`Enrichment failed for EAN ${ean}:`, err);
+        }
+        
+        // Delay between requests
+        if (i + 1 < toEnrich.length) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+      
+      // After all enrichment, auto-promote best candidate per item
+      if (!cancelled) {
+        const promotions: Record<string, number> = {};
+        const latestData = productDataRef.current;
+        
+        for (const item of items) {
+          const suggestions = latestData[item.id];
+          if (!suggestions || suggestions.length <= 1) continue;
+          
+          const currentIdx = selectedProducts[item.id] ?? 0;
+          const currentProduct = suggestions[currentIdx];
+          
+          // Only promote if current selection lacks data
+          const currentHasData = currentProduct && 
+            hasMeaningfulIngredients(currentProduct.ingredienser) && 
+            !!currentProduct.image && currentProduct.image.length > 0;
+          
+          if (currentHasData) continue;
+          
+          // Find first candidate with both image and ingredients
+          const betterIdx = suggestions.findIndex((s, idx) => 
+            idx !== currentIdx && 
+            hasMeaningfulIngredients(s.ingredienser) && 
+            !!s.image && s.image.length > 0
+          );
+          
+          if (betterIdx >= 0) {
+            promotions[item.id] = betterIdx;
+            console.log(`Auto-promote: "${item.name}" from candidate[${currentIdx}] to candidate[${betterIdx}] (${suggestions[betterIdx].brand} ${suggestions[betterIdx].name})`);
           }
         }
         
-        if (Object.keys(updates).length > 0 && !cancelled) {
-          setProductData(prev => ({ ...prev, ...updates }));
-        }
-        
-        // Delay between requests to respect Kassalapp rate limits
-        if (i + 1 < toEnrich.length) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
+        if (Object.keys(promotions).length > 0) {
+          setSelectedProducts(prev => ({ ...prev, ...promotions }));
+          // Persist promotions
+          for (const [itemId, newIdx] of Object.entries(promotions)) {
+            void updateCachedSelectedIndex(itemId, newIdx);
+          }
         }
       }
       
