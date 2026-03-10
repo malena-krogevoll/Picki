@@ -239,8 +239,8 @@ export const ShoppingListItem = ({
                       {currentProduct?.name}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {currentProduct?.countryOfOrigin?.[0] && (
-                        <span title={currentProduct.countryOfOrigin[0].name}>{currentProduct.countryOfOrigin[0].flag}</span>
+                      {displayCountry && (
+                        <span title={displayCountry.name}>{displayCountry.flag}</span>
                       )}
                       {currentProduct?.brand && <span>{currentProduct.brand}</span>}
                     </div>
