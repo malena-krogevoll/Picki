@@ -9,7 +9,7 @@ import { PreferenceIndicators } from "@/components/PreferenceIndicators";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
-import { CountryInfo } from "@/utils/countryUtils";
+import { CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
 
 interface ProductData {
   ean: string;
@@ -78,6 +78,13 @@ export const ShoppingListItem = ({
   const allProducts = productData ? [productData, ...alternatives] : [];
   const currentProduct = allProducts[currentIndex];
   const hasMultiple = allProducts.length > 1;
+
+  // Resolve country: use product data first, then EAN prefix fallback
+  const displayCountry = useMemo(() => {
+    if (!currentProduct) return null;
+    if (currentProduct.countryOfOrigin?.length) return currentProduct.countryOfOrigin[0];
+    return getCountryFromEAN(currentProduct.ean);
+  }, [currentProduct]);
 
   // Analyze current product for preference match
   const matchInfo = useMemo(() => {
@@ -232,8 +239,8 @@ export const ShoppingListItem = ({
                       {currentProduct?.name}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {currentProduct?.countryOfOrigin?.[0] && (
-                        <span title={currentProduct.countryOfOrigin[0].name}>{currentProduct.countryOfOrigin[0].flag}</span>
+                      {displayCountry && (
+                        <span title={displayCountry.name}>{displayCountry.flag}</span>
                       )}
                       {currentProduct?.brand && <span>{currentProduct.brand}</span>}
                     </div>
