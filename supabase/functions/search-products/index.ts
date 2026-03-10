@@ -90,17 +90,21 @@ async function fetchVdaProduct(gtin: string): Promise<Record<string, unknown> | 
 }
 
 // Background EPD enrichment: fetch VDA+ data for top EANs and cache to product_sources
-async function enrichWithEpd(candidates: ProductCandidate[]): Promise<void> {
+async function enrichWithEpd(candidates: ProductCandidate[]): Promise<string[]> {
+  const enrichedEans: string[] = [];
   const vdaClientId = Deno.env.get("VDA_CLIENT_ID");
-  if (!vdaClientId) return; // Skip if VDA not configured
+  if (!vdaClientId) {
+    console.warn("EPD enrichment skipped: VDA_CLIENT_ID not configured");
+    return enrichedEans;
+  }
 
-  // Only enrich products that have an EAN and limit to 5 to manage rate limits
+  // Increase to 10 EANs for better coverage
   const eansToEnrich = candidates
     .filter(c => c.product.EAN)
     .map(c => String(c.product.EAN))
-    .slice(0, 5);
+    .slice(0, 10);
 
-  if (eansToEnrich.length === 0) return;
+  if (eansToEnrich.length === 0) return enrichedEans;
 
   // Check which EANs we already have EPD data for (skip those)
   const { data: existing } = await supabase
@@ -114,18 +118,22 @@ async function enrichWithEpd(candidates: ProductCandidate[]): Promise<void> {
 
   if (newEans.length === 0) {
     console.log("EPD enrichment: all EANs already cached");
-    return;
+    return enrichedEans;
   }
 
   console.log(`EPD enrichment: fetching ${newEans.length} new products from VDA+`);
 
-  // Fetch in parallel (all at once, max 5)
   const results = await Promise.allSettled(
     newEans.map(async (ean) => {
       const product = await fetchVdaProduct(ean);
-      if (!product) return;
+      if (!product) {
+        console.warn(`VDA+ returned null for EAN ${ean}`);
+        return;
+      }
 
-      await supabase.from("product_sources").upsert({
+      console.log(`VDA+ success for EAN ${ean}: name=${(product as any).productName}, hasIngredients=${!!(product as any).ingredientStatement}`);
+
+      const { error } = await supabase.from("product_sources").upsert({
         ean,
         source: "EPD" as const,
         source_product_id: ean,
@@ -133,14 +141,278 @@ async function enrichWithEpd(candidates: ProductCandidate[]): Promise<void> {
         name: (product.productName as string) || null,
         brand: (product.brandName as string) || null,
         ingredients_raw: (product.ingredientStatement as string) || null,
+        image_url: (product.mainImageUrl as string) || null,
         fetched_at: new Date().toISOString(),
       }, { onConflict: "ean,source", ignoreDuplicates: false });
+
+      if (error) {
+        console.error(`EPD cache upsert error for ${ean}:`, error);
+      } else {
+        enrichedEans.push(ean);
+      }
     })
   );
 
   const fulfilled = results.filter(r => r.status === "fulfilled").length;
   const rejected = results.filter(r => r.status === "rejected").length;
-  console.log(`EPD enrichment done: ${fulfilled} ok, ${rejected} failed`);
+  console.log(`EPD enrichment done: ${fulfilled} ok, ${rejected} failed, ${enrichedEans.length} cached`);
+  return enrichedEans;
+}
+
+// Kassalapp detail fallback: fetch detailed product info for items missing ingredients/images
+async function enrichWithKassalappDetails(candidates: ProductCandidate[]): Promise<string[]> {
+  const enrichedEans: string[] = [];
+  const kassalappApiKey = Deno.env.get("KASSALAPP_API_KEY");
+  if (!kassalappApiKey) return enrichedEans;
+
+  // Find products missing ingredients or images (max 5 to avoid rate limits)
+  const needsEnrichment = candidates
+    .filter(c => c.product.EAN && (!c.product.Ingrediensliste || !c.product.Produktbilde_URL))
+    .map(c => String(c.product.EAN))
+    .slice(0, 5);
+
+  if (needsEnrichment.length === 0) return enrichedEans;
+
+  // Check which we already have detailed Kassalapp data for
+  const { data: existing } = await supabase
+    .from("product_sources")
+    .select("ean, ingredients_raw, image_url")
+    .in("ean", needsEnrichment)
+    .eq("source", "KASSALAPP");
+
+  const existingMap = new Map((existing || []).map((r: any) => [r.ean, r]));
+  const toFetch = needsEnrichment.filter(ean => {
+    const cached = existingMap.get(ean);
+    return !cached || (!cached.ingredients_raw && !cached.image_url);
+  });
+
+  if (toFetch.length === 0) return enrichedEans;
+
+  console.log(`Kassalapp detail enrichment: fetching ${toFetch.length} products`);
+
+  for (const ean of toFetch) {
+    try {
+      const res = await fetch(`https://kassal.app/api/v1/products/ean/${ean}`, {
+        headers: { Authorization: `Bearer ${kassalappApiKey}` },
+      });
+
+      if (!res.ok) {
+        console.warn(`Kassalapp detail fetch failed for ${ean}: ${res.status}`);
+        await res.text();
+        continue;
+      }
+
+      const productData = await res.json();
+      const data = productData.data;
+      const firstProduct = data?.products?.[0];
+      if (!firstProduct) continue;
+
+      const ingredients = firstProduct.ingredients || null;
+      const image = firstProduct.image || null;
+
+      if (ingredients || image) {
+        await supabase.from("product_sources").upsert({
+          ean,
+          source: "KASSALAPP" as const,
+          source_product_id: ean,
+          payload: data,
+          name: firstProduct.name || null,
+          brand: firstProduct.brand || null,
+          image_url: image,
+          ingredients_raw: ingredients,
+          fetched_at: new Date().toISOString(),
+        }, { onConflict: "ean,source", ignoreDuplicates: false });
+
+        enrichedEans.push(ean);
+        console.log(`Kassalapp detail enriched ${ean}: ingredients=${!!ingredients}, image=${!!image}`);
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
+    } catch (e) {
+      console.warn(`Kassalapp detail error for ${ean}:`, e instanceof Error ? e.message : e);
+    }
+  }
+
+  return enrichedEans;
+}
+
+// Trigger master product recomputation for enriched EANs
+async function triggerMasterRecompute(eans: string[]): Promise<void> {
+  if (eans.length === 0) return;
+
+  console.log(`Triggering master recompute for ${eans.length} EANs`);
+
+  const results = await Promise.allSettled(
+    eans.map(async (ean) => {
+      const { error } = await supabase.functions.invoke("recompute-master-product", {
+        body: { ean },
+      });
+      if (error) {
+        console.warn(`Recompute failed for ${ean}:`, error);
+      }
+    })
+  );
+
+  const ok = results.filter(r => r.status === "fulfilled").length;
+  console.log(`Master recompute: ${ok}/${eans.length} succeeded`);
+}
+
+// Universal brands that exist in all/most Norwegian grocery chains
+const UNIVERSAL_BRANDS = [
+  "tine", "gilde", "prior", "stabburet", "norvegia", "jarlsberg",
+  "q-meieriene", "synnøve", "mills", "diplom-is", "hennig-olsen",
+  "freia", "nidar", "orkla", "lerum", "idun", "delikat",
+  "fjordland", "findus", "hoff", "maarud", "kims", "sørlandschips",
+];
+
+// Expand offers for universal brands across all chains
+async function expandUniversalOffers(candidates: ProductCandidate[]): Promise<void> {
+  // Get all chain IDs
+  const { data: allChains } = await supabase.from("chains").select("id, name");
+  if (!allChains || allChains.length < 2) return;
+
+  const chainIds = allChains.map(c => c.id);
+
+  // Find universal brand products
+  const universalProducts = candidates.filter(c => {
+    const brand = (c.product.Merke || "").toLowerCase();
+    const name = (c.product.Produktnavn || "").toLowerCase();
+    return c.product.EAN && UNIVERSAL_BRANDS.some(ub => brand.includes(ub) || name.startsWith(ub + " "));
+  });
+
+  if (universalProducts.length === 0) return;
+
+  const offersToCreate: Array<{ ean: string; chain_id: string; last_seen_at: string; source: string }> = [];
+
+  for (const candidate of universalProducts) {
+    const ean = String(candidate.product.EAN);
+    for (const chainId of chainIds) {
+      offersToCreate.push({
+        ean,
+        chain_id: chainId,
+        last_seen_at: new Date().toISOString(),
+        source: "UNIVERSAL",
+      });
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set<string>();
+  const unique = offersToCreate.filter(o => {
+    const key = `${o.ean}:${o.chain_id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (unique.length > 0) {
+    const { error } = await supabase.from("offers").upsert(unique, {
+      onConflict: "ean,chain_id",
+      ignoreDuplicates: true,
+    });
+    if (error) {
+      console.warn("Universal offers expansion error:", error);
+    } else {
+      console.log(`Expanded ${unique.length} universal offers across ${chainIds.length} chains`);
+    }
+  }
+}
+
+// Search database for cached products as fallback
+async function searchDatabaseFallback(
+  query: string,
+  storeCode: string | undefined,
+  existingEans: Set<number>,
+  userPreferences?: any,
+  intent?: ItemIntent,
+): Promise<ProductCandidate[]> {
+  const queryLower = query.toLowerCase().trim();
+  
+  // Search product_sources by name (ilike)
+  const { data: cachedProducts, error } = await supabase
+    .from("product_sources")
+    .select("ean, name, brand, image_url, ingredients_raw, payload")
+    .or(`name.ilike.%${queryLower}%,brand.ilike.%${queryLower}%`)
+    .limit(30);
+
+  if (error || !cachedProducts || cachedProducts.length === 0) return [];
+
+  // Filter out products we already have from Kassalapp
+  const newProducts = cachedProducts.filter(p => !existingEans.has(Number(p.ean)));
+  if (newProducts.length === 0) return [];
+
+  // If store filtering, check offers table
+  let allowedEans: Set<string> | null = null;
+  if (storeCode) {
+    // Map storeCode to chain names
+    const chainNameMap: Record<string, string[]> = {
+      MENY_NO: ["meny"], KIWI: ["kiwi"], REMA_1000: ["rema 1000", "rema"],
+      COOP_MEGA: ["coop mega", "coop"], COOP_EXTRA: ["coop extra", "coop"],
+      COOP_PRIX: ["coop prix", "coop"], COOP_OBS: ["coop obs", "coop"],
+      SPAR_NO: ["spar"], JOKER_NO: ["joker"], ODA_NO: ["oda"], BUNNPRIS: ["bunnpris"],
+    };
+    const chainNames = chainNameMap[storeCode] || [];
+    
+    if (chainNames.length > 0) {
+      // Get chain IDs for this store
+      const { data: chains } = await supabase
+        .from("chains")
+        .select("id")
+        .or(chainNames.map(n => `name.ilike.%${n}%`).join(","));
+
+      if (chains && chains.length > 0) {
+        const chainIds = chains.map(c => c.id);
+        const eans = newProducts.map(p => p.ean);
+        
+        const { data: offers } = await supabase
+          .from("offers")
+          .select("ean")
+          .in("ean", eans)
+          .in("chain_id", chainIds);
+
+        allowedEans = new Set((offers || []).map(o => o.ean));
+      }
+    }
+  }
+
+  const candidates: ProductCandidate[] = [];
+  for (const product of newProducts) {
+    // If store filter active and product not in store's offers, skip
+    if (allowedEans && !allowedEans.has(product.ean)) continue;
+
+    const payload = product.payload as any;
+    const mappedProduct: Product = {
+      EAN: Number(product.ean),
+      Produktnavn: product.name || payload?.name || "",
+      Pris: payload?.price || "0",
+      Kjede: payload?.store?.name || "Ukjent",
+      StoreCode: storeCode || payload?.store?.code || "",
+      Kategori: payload?.category || "",
+      Merke: product.brand || payload?.brand || "",
+      "Allergener/Kosthold": payload?.allergens || "",
+      Tilleggsfiltre: payload?.nutrition || "",
+      Produktbilde_URL: product.image_url || payload?.image || "",
+      Ingrediensliste: product.ingredients_raw || payload?.ingredients || "",
+      Region: "NO",
+      Tilgjengelighet: "cached",
+    };
+
+    const candidate = intent
+      ? processProductWithIntent(mappedProduct, query, intent, userPreferences)
+      : processProduct(mappedProduct, query, userPreferences);
+
+    // Slight penalty for cached results vs fresh
+    candidate.score *= 0.85;
+    candidate.matchReason += " (fra database)";
+
+    if (candidate.score >= 20) {
+      candidates.push(candidate);
+    }
+  }
+
+  console.log(`DB fallback: found ${candidates.length} additional products for "${query}"`);
+  return candidates;
 }
 interface SearchRequest {
   query: string;
