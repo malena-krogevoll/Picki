@@ -815,7 +815,10 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                                   {getNovaLabel(selectedProduct.novaScore, selectedProduct.hasIngredients)}
                                 </span>
                               </div>
-                              <p className="font-semibold text-foreground mb-1 truncate">{selectedProduct.brand}</p>
+                              <p className="font-semibold text-foreground mb-1 truncate">
+                                {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <span title={c.name}>{c.flag} </span> : null; })()}
+                                {selectedProduct.brand}
+                              </p>
                               <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
                               
                               {/* Preference indicators */}
