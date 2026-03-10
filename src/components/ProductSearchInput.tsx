@@ -151,7 +151,7 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
           };
         });
 
-        // Batch-fetch country of origin from cached EPD data
+        // Enrich with country of origin: EPD first, then EAN prefix fallback
         const eans = products.map(p => p.ean).filter(Boolean);
         if (eans.length > 0) {
           try {
@@ -168,12 +168,22 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
                 if (countries.length > 0) countryMap.set(src.ean, countries);
               }
               products.forEach(p => {
-                if (countryMap.has(p.ean)) p.countryOfOrigin = countryMap.get(p.ean);
+                if (countryMap.has(p.ean)) {
+                  p.countryOfOrigin = countryMap.get(p.ean);
+                }
               });
             }
           } catch (e) {
             console.warn('Failed to fetch country of origin:', e);
           }
+
+          // Fallback: use EAN prefix for products without EPD country data
+          products.forEach(p => {
+            if (!p.countryOfOrigin?.length && p.ean) {
+              const eanCountry = getCountryFromEAN(p.ean);
+              if (eanCountry) p.countryOfOrigin = [eanCountry];
+            }
+          });
         }
 
         // Sort products: allergy/diet safety first, then NOVA, then preferences, then price
