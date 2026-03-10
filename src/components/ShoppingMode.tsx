@@ -437,16 +437,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       item => fetchedItemsRef.current.has(item.id) || productData[item.id]
     );
     
-    // Also detect store change directly via ref (more reliable than storeChanged state)
-    const storeJustChanged = prevStoreIdRef.current !== storeId;
-    
-    if (items.length > 0 && (!hasDataForAllItems || storeChanged || storeJustChanged)) {
-      if (storeChanged) setStoreChanged(false);
-      if (storeJustChanged) {
-        // Ensure refs and state are fully reset for the new store
-        fetchedItemsRef.current = new Set();
-        prevStoreIdRef.current = storeId;
-      }
+    if (items.length > 0 && !hasDataForAllItems) {
       fetchProducts();
     } else {
       setLoading(false);
@@ -456,7 +447,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       isMounted = false;
       abortController.abort();
     };
-  }, [listId, storeId, items.length, storeChanged]); // Use stable dependencies
+  }, [listId, storeId, items.length]); // storeId change triggers reset in prior effect, which clears data → hasDataForAllItems becomes false
 
   // Post-load enrichment: fetch details for selected products missing ingredients/image
   const enrichedEansRef = useRef<Set<string>>(new Set());
