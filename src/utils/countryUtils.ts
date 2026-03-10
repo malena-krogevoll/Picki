@@ -111,6 +111,62 @@ export function getCountryInfo(code: string): CountryInfo | null {
   return { code: normalized, ...data };
 }
 
+// GS1 EAN barcode prefix → country (first 3 digits of EAN)
+// See https://www.gs1.org/standards/id-keys/company-prefix
+const GS1_PREFIX_MAP: [number, number, string, string][] = [
+  // [rangeStart, rangeEnd, flag, name]
+  [700, 709, "🇳🇴", "Norge"],
+  [730, 739, "🇸🇪", "Sverige"],
+  [570, 579, "🇩🇰", "Danmark"],
+  [640, 649, "🇫🇮", "Finland"],
+  [400, 440, "🇩🇪", "Tyskland"],
+  [870, 879, "🇳🇱", "Nederland"],
+  [540, 549, "🇧🇪", "Belgia"],
+  [300, 379, "🇫🇷", "Frankrike"],
+  [800, 839, "🇮🇹", "Italia"],
+  [840, 849, "🇪🇸", "Spania"],
+  [560, 569, "🇵🇹", "Portugal"],
+  [500, 509, "🇬🇧", "Storbritannia"],
+  [539, 539, "🇮🇪", "Irland"],
+  [760, 769, "🇨🇭", "Sveits"],
+  [900, 919, "🇦🇹", "Østerrike"],
+  [590, 590, "🇵🇱", "Polen"],
+  [859, 859, "🇨🇿", "Tsjekkia"],
+  [520, 521, "🇬🇷", "Hellas"],
+  [868, 869, "🇹🇷", "Tyrkia"],
+  [0, 19, "🇺🇸", "USA"],
+  [750, 759, "🇲🇽", "Mexico"],
+  [789, 790, "🇧🇷", "Brasil"],
+  [779, 779, "🇦🇷", "Argentina"],
+  [690, 699, "🇨🇳", "Kina"],
+  [450, 459, "🇯🇵", "Japan"],
+  [880, 880, "🇰🇷", "Sør-Korea"],
+  [885, 885, "🇹🇭", "Thailand"],
+  [893, 893, "🇻🇳", "Vietnam"],
+  [884, 884, "🇰🇭", "Kambodsja"],
+  [890, 890, "🇮🇳", "India"],
+  [930, 939, "🇦🇺", "Australia"],
+  [940, 949, "🇳🇿", "New Zealand"],
+  [600, 601, "🇿🇦", "Sør-Afrika"],
+];
+
+/**
+ * Detect country from EAN barcode prefix (GS1 company prefix).
+ * Returns country info based on where the barcode was registered.
+ */
+export function getCountryFromEAN(ean: string): CountryInfo | null {
+  if (!ean || ean.length < 3) return null;
+  const prefix = parseInt(ean.substring(0, 3), 10);
+  if (isNaN(prefix)) return null;
+
+  for (const [start, end, flag, name] of GS1_PREFIX_MAP) {
+    if (prefix >= start && prefix <= end) {
+      return { code: `GS1:${prefix}`, flag, name };
+    }
+  }
+  return null;
+}
+
 /**
  * Generate flag emoji from alpha-2 country code using regional indicator symbols.
  * Works for any valid ISO 3166-1 alpha-2 code.
