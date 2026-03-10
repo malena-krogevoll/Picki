@@ -1,49 +1,27 @@
 
 
-# Berike Kolonihagen-produkter med data fra kolonihagen.no
 
-## Hva og hvorfor
+## Plan: Bedre utnyttelse av VDA+ API og universelle produkter
 
-Kolonihagen-produktene i databasen mangler ingredienser, bilder og næringsdata fordi de ikke finnes i Kassalapp eller VDA+. Nettsiden kolonihagen.no har alt dette per produkt. Vi legger til en scraping-steg i `seed-kolonihagen` som henter denne informasjonen og lagrer den i `product_sources` og `products`.
+### Implementert
 
-## Tilnærming
+1. **VDA+ berikelse forbedret** — Økt fra 5 til 10 EANs per søk, med detaljert logging (DNS, token, HTTP status, felt-tilgjengelighet)
+2. **Kassalapp detalj-fallback** — Produkter som mangler ingredienser/bilde berikers via `kassal.app/api/v1/products/ean/{ean}` (maks 5 per søk)
+3. **Auto masterprodukt-recompute** — `recompute-master-product` trigges automatisk for alle berikede EANs etter EPD + Kassalapp enrichment
+4. **DB-fallback søk** — Når Kassalapp returnerer < 10 treff, søkes `product_sources` for cachede produkter (f.eks. Tine-produkter funnet i Meny vises for Kiwi-brukere via offers-tabellen)
+5. **Universelle merkevarer** — Produkter fra Tine, Gilde, Prior, Stabburet, Norvegia, Jarlsberg, m.fl. får automatisk offers-oppføringer i alle kjeder
+6. **Kolonihagen-integrasjon** — ~90 Kolonihagen-produkter (Rema 1000-eksklusive, økologiske) seedet fra PDF-katalog med EAN-numre. Edge function `seed-kolonihagen` upsert-er til `product_sources`, `products` og `offers`. VDA+/EPD-berikelse kjøres automatisk. Søkelogikken gir Kolonihagen-produkter 15% boost for Rema 1000-brukere og ytterligere 20% for brukere med økologisk-preferanse.
+7. **Kolonihagen.no scraping** — Seed-funksjonen scraper kolonihagen.no for ingredienser, allergener, næringsinnhold, bilder og beskrivelser. ~115 produkter totalt inkl. nye produkter fra nettsiden (te, tex mex, pasta, is, nøtter, guanciale, yoghurt gresk type). Data lagres i `product_sources` (payload med nutrition/allergens) og `products` (ingredients_raw, image_url). Recompute-master-product trigges for NOVA-klassifisering.
 
-### 1. Utvid produktdatamodellen i seed-funksjonen
-
-Legg til et `url`-felt per produkt i `KOLONIHAGEN_PRODUCTS`-listen som peker til produktsiden på kolonihagen.no (f.eks. `https://www.kolonihagen.no/produkt/peanottsmor`). Disse URL-ene er allerede kjent fra produktkatalogen på nettsiden.
-
-### 2. Scrape hver produktside
-
-Etter den eksisterende seed-logikken (upsert til `product_sources`, `products`, `offers`), legg til et nytt steg:
-
-- For hvert produkt med en URL, fetch produktsiden
-- Parse markdown-responsen for å ekstrahere:
-  - **Ingredienser** (tekst mellom "### Ingredienser" og neste seksjon)
-  - **Næringsinnhold** (energi, fett, karbohydrater, protein, salt)
-  - **Produktbilde** (fra image-URL i markdown)
-  - **Allergener** (utledet fra ingredienser, f.eks. melk, gluten, nøtter)
-- Bruk vanlig `fetch` mot kolonihagen.no — ingen Firecrawl nødvendig da sidene er statiske
-
-### 3. Oppdater databasen med berikede data
-
-- Oppdater `product_sources` med `ingredients_raw` og `image_url`
-- Oppdater `products`-tabellen med `ingredients_raw` og `image_url`
-- Lagre næringsdata og allergener i `payload`-feltet
-- Trigger `recompute-master-product` for NOVA-klassifisering
-
-### 4. Kartlegg alle produkt-URL-er
-
-Basert på produktkatalogen fra nettsiden, legger vi til URL for alle ~90 produkter. Noen nye produkter fra nettsiden som mangler i listen (guanciale, yoghurt gresk type, chai urtete, salsa, tacokrydder, tortillachips, tortillas, bringebærsorbet, latte macchiato is, vaniljeis, pistasjis, pizzaolje, mais, mørk sjokolade, cashewnøtter, peanøtter, pesto rød, amorini, pappardelle, tortiglioni, cerignola oliven, hylleblomstdrikk, rabarbrasaft) legges også til.
-
-## Tekniske detaljer
-
-**Fil som endres:** `supabase/functions/seed-kolonihagen/index.ts`
-
-- Nytt felt `url?: string` i `KolonihagenProduct`-interfacet
-- Ny funksjon `scrapeProductPage(url: string)` som parser ingredienser, næringsdata og bilde fra HTML/markdown
-- Nytt steg 5 etter EPD-berikelse: "Kolonihagen.no scraping"
-- Prosessering i batch (5 om gangen) med 1s delay for å unngå overbelastning
-- Graceful fallback: hvis scraping feiler for et produkt, logges feilen og produktet beholdes uten berikelse
-
-**Ingen nye filer eller migrasjoner trengs.** Eksisterende kolonner `ingredients_raw` og `image_url` i `product_sources` og `products` brukes.
-
+### Bakgrunn-pipeline (ikke-blokkerende)
+```
+Kassalapp-søk → DB-fallback → Score & Sorter → Returner
+                                                    ↓ (bakgrunn)
+                                              EPD-berikelse
+                                                    ↓
+                                           Kassalapp detalj-fallback
+                                                    ↓
+                                         Recompute master product
+                                                    ↓
+                                       Utvid universelle offers
+```
