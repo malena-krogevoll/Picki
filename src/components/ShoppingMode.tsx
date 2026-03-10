@@ -462,6 +462,128 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     };
   }, [listId, storeId, items.length, storeChanged]); // Use stable dependencies
 
+  // Post-load enrichment: fetch details for selected products missing ingredients/image
+  const enrichedEansRef = useRef<Set<string>>(new Set());
+  
+  useEffect(() => {
+    if (loading || Object.keys(productData).length === 0) return;
+    
+    let cancelled = false;
+    
+    const enrichMissing = async () => {
+      // Find products missing data (only selected/top product per item)
+      const toEnrich: { itemId: string; productIndex: number; ean: string }[] = [];
+      
+      for (const item of items) {
+        const suggestions = productData[item.id];
+        if (!suggestions || suggestions.length === 0) continue;
+        
+        const selectedIdx = selectedProducts[item.id] || 0;
+        const product = suggestions[selectedIdx];
+        if (!product || !product.ean) continue;
+        
+        // Skip if already enriched or already has data
+        if (enrichedEansRef.current.has(product.ean)) continue;
+        if (product.hasIngredients && product.image) continue;
+        
+        toEnrich.push({ itemId: item.id, productIndex: selectedIdx, ean: product.ean });
+      }
+      
+      if (toEnrich.length === 0) return;
+      
+      console.log(`Post-load enrichment: fetching details for ${toEnrich.length} products`);
+      
+      // Fetch in batches of 3 with delay
+      for (let i = 0; i < toEnrich.length && !cancelled; i += 3) {
+        const batch = toEnrich.slice(i, i + 3);
+        
+        const results = await Promise.allSettled(
+          batch.map(async ({ itemId, productIndex, ean }) => {
+            enrichedEansRef.current.add(ean);
+            
+            try {
+              const { data, error } = await supabase.functions.invoke('get-product-details', {
+                body: { ean }
+              });
+              
+              if (error || !data) return null;
+              
+              return { itemId, productIndex, ean, details: data };
+            } catch {
+              return null;
+            }
+          })
+        );
+        
+        if (cancelled) return;
+        
+        // Update productData with enriched info
+        const updates: Record<string, ProductSuggestion[]> = {};
+        
+        for (const result of results) {
+          if (result.status !== 'fulfilled' || !result.value) continue;
+          const { itemId, productIndex, details } = result.value;
+          
+          const currentSuggestions = productData[itemId];
+          if (!currentSuggestions) continue;
+          
+          const updatedSuggestions = [...currentSuggestions];
+          const product = { ...updatedSuggestions[productIndex] };
+          
+          let changed = false;
+          
+          if (!product.image && details.image) {
+            product.image = details.image;
+            changed = true;
+          }
+          if ((!product.ingredienser || product.ingredienser.trim() === '') && details.ingredients) {
+            product.ingredienser = details.ingredients;
+            product.hasIngredients = true;
+            changed = true;
+            
+            // Re-classify NOVA for this product
+            try {
+              const novaResults = await batchClassifyNova([{
+                ingredienser: details.ingredients,
+                category: ''
+              }]);
+              const novaData = novaResults.get(0);
+              if (novaData) {
+                product.novaScore = novaData.novaScore;
+                product.novaIsEstimated = novaData.isEstimated;
+                product.hasIngredients = novaData.hasIngredients;
+              }
+            } catch {}
+            
+            // Re-analyze preference match
+            product.matchInfo = analyzeProductMatch(
+              { name: product.name, brand: product.brand, allergener: product.allergener, ingredienser: product.ingredienser },
+              profile?.preferences as UserPreferences | null
+            );
+          }
+          
+          if (changed) {
+            updatedSuggestions[productIndex] = product;
+            updates[itemId] = updatedSuggestions;
+          }
+        }
+        
+        if (Object.keys(updates).length > 0 && !cancelled) {
+          setProductData(prev => ({ ...prev, ...updates }));
+        }
+        
+        // Delay between batches
+        if (i + 3 < toEnrich.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    };
+    
+    enrichMissing();
+    
+    return () => { cancelled = true; };
+  }, [loading, productData, items, selectedProducts]);
+
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
     if (newExpanded.has(itemId)) {
