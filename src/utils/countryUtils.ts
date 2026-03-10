@@ -99,6 +99,7 @@ export interface CountryInfo {
   code: string;
   flag: string;
   name: string;
+  alpha2: string; // ISO 3166-1 alpha-2 code for flag image rendering
 }
 
 /**
