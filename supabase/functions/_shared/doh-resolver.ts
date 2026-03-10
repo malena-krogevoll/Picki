@@ -5,6 +5,7 @@
 // then caches the result in memory with a configurable TTL.
 
 const DOH_ENDPOINT = "https://cloudflare-dns.com/dns-query";
+const GOOGLE_DOH_ENDPOINT = "https://dns.google/resolve";
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CachedIP {
@@ -15,7 +16,8 @@ interface CachedIP {
 const ipCache = new Map<string, CachedIP>();
 
 /**
- * Resolve a hostname to an IPv4 address using Cloudflare DNS-over-HTTPS.
+ * Resolve a hostname to an IPv4 address using DNS-over-HTTPS.
+ * Follows CNAME chains and tries multiple DoH providers.
  * Returns the IP string, or null if resolution fails.
  */
 export async function resolveHostname(hostname: string): Promise<string | null> {
@@ -24,36 +26,69 @@ export async function resolveHostname(hostname: string): Promise<string | null> 
     return cached.ip;
   }
 
-  try {
-    const url = `${DOH_ENDPOINT}?name=${encodeURIComponent(hostname)}&type=A`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/dns-json" },
-    });
-
-    if (!res.ok) {
-      console.error(`DoH resolution failed for ${hostname}: HTTP ${res.status}`);
-      return null;
+  // Try Cloudflare first, then Google as fallback
+  for (const endpoint of [DOH_ENDPOINT, GOOGLE_DOH_ENDPOINT]) {
+    try {
+      const ip = await queryDoH(endpoint, hostname);
+      if (ip) {
+        ipCache.set(hostname, { ip, expiresAt: Date.now() + DEFAULT_TTL_MS });
+        console.log(`DoH resolved ${hostname} → ${ip} (via ${new URL(endpoint).hostname})`);
+        return ip;
+      }
+    } catch (e) {
+      console.warn(`DoH error (${new URL(endpoint).hostname}) for ${hostname}:`, e instanceof Error ? e.message : e);
     }
+  }
 
-    const data = await res.json();
-    // data.Answer is an array of DNS records; type 1 = A record
-    const aRecords = (data.Answer || []).filter((r: any) => r.type === 1);
+  console.warn(`DoH: all providers failed for ${hostname}`);
+  return null;
+}
 
-    if (aRecords.length === 0) {
-      console.warn(`DoH: no A records found for ${hostname}`);
-      return null;
-    }
+async function queryDoH(endpoint: string, hostname: string): Promise<string | null> {
+  const url = `${endpoint}?name=${encodeURIComponent(hostname)}&type=A`;
+  const res = await fetch(url, {
+    headers: { Accept: "application/dns-json" },
+  });
 
-    const ip = aRecords[0].data as string;
-    const ttl = Math.max((aRecords[0].TTL || 300) * 1000, DEFAULT_TTL_MS);
-
-    ipCache.set(hostname, { ip, expiresAt: Date.now() + ttl });
-    console.log(`DoH resolved ${hostname} → ${ip} (TTL ${Math.round(ttl / 1000)}s)`);
-    return ip;
-  } catch (e) {
-    console.error(`DoH resolution error for ${hostname}:`, e instanceof Error ? e.message : e);
+  if (!res.ok) {
+    console.warn(`DoH HTTP ${res.status} from ${new URL(endpoint).hostname}`);
     return null;
   }
+
+  const data = await res.json();
+  const answers = data.Answer || [];
+
+  // Type 1 = A record, Type 5 = CNAME
+  // Follow CNAME chain: if we only get CNAMEs, resolve the final CNAME target
+  const aRecords = answers.filter((r: any) => r.type === 1);
+
+  if (aRecords.length > 0) {
+    return aRecords[0].data as string;
+  }
+
+  // Follow CNAME chain - get the last CNAME target and resolve it
+  const cnameRecords = answers.filter((r: any) => r.type === 5);
+  if (cnameRecords.length > 0) {
+    const target = cnameRecords[cnameRecords.length - 1].data as string;
+    // Remove trailing dot if present
+    const cleanTarget = target.endsWith('.') ? target.slice(0, -1) : target;
+    console.log(`DoH: following CNAME ${hostname} → ${cleanTarget}`);
+    
+    // Resolve the CNAME target (non-recursive, just one more query)
+    const targetUrl = `${endpoint}?name=${encodeURIComponent(cleanTarget)}&type=A`;
+    const targetRes = await fetch(targetUrl, {
+      headers: { Accept: "application/dns-json" },
+    });
+    if (targetRes.ok) {
+      const targetData = await targetRes.json();
+      const targetA = (targetData.Answer || []).filter((r: any) => r.type === 1);
+      if (targetA.length > 0) {
+        return targetA[0].data as string;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
