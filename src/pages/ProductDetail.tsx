@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin } from "lucide-react";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
-import { extractCountryOfOrigin, CountryInfo } from "@/utils/countryUtils";
+import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -128,10 +128,19 @@ export default function ProductDetail() {
     'BM': 'Bløtdyr', 'NL': 'Sennep',
   };
 
-  // Extract country of origin from EPD payload
-  const countryOfOrigin: CountryInfo[] = epdSource?.payload 
-    ? extractCountryOfOrigin(epdSource.payload as Record<string, unknown>) 
-    : [];
+  // Extract country of origin from EPD payload, with EAN fallback
+  const countryOfOrigin: CountryInfo[] = (() => {
+    if (epdSource?.payload) {
+      const epd = extractCountryOfOrigin(epdSource.payload as Record<string, unknown>);
+      if (epd.length > 0) return epd;
+    }
+    // Fallback: derive country from EAN barcode prefix
+    if (ean) {
+      const eanCountry = getCountryFromEAN(ean);
+      if (eanCountry) return [eanCountry];
+    }
+    return [];
+  })();
   const matchInfo = product ? analyzeProductMatch(
     {
       name: product.name,
@@ -509,10 +518,12 @@ export default function ProductDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Opprinnelsesland</CardTitle>
-                <Badge variant="outline" className="rounded-full text-xs gap-1">
-                  <ShieldCheck className="h-3 w-3" />
-                  EPD-verifisert
-                </Badge>
+                {countryOfOrigin.some(c => !c.code.startsWith('GS1:')) && (
+                  <Badge variant="outline" className="rounded-full text-xs gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    EPD-verifisert
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -529,7 +540,10 @@ export default function ProductDetail() {
               </div>
               <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5">
                 <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                Opprinnelsesland er hentet fra produsentens EPD-data og angir hvor produktet er produsert eller bearbeidet.
+                {countryOfOrigin.some(c => c.code.startsWith('GS1:'))
+                  ? 'Opprinnelsesland er estimert basert på strekkodeprefikset (GS1). Dette angir hvor produsenten er registrert, ikke nødvendigvis hvor produktet er produsert.'
+                  : 'Opprinnelsesland er hentet fra produsentens EPD-data og angir hvor produktet er produsert eller bearbeidet.'
+                }
               </p>
             </CardContent>
           </Card>
