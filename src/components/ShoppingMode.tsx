@@ -569,21 +569,19 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           
           let changed = false;
           
-          // Always update image if we got a better one (details or EPD)
-          const bestImage = epd?.image_url || details?.image;
-          if (bestImage && (!product.image || product.image.length === 0)) {
+          // Always update image if we got a better one (EPD payload/image_url or details)
+          const bestImage = epd?.image_url || epd?.payload?.mainImageUrl || details?.image;
+          if (bestImage && bestImage !== product.image) {
             product.image = bestImage;
             changed = true;
           }
           
-          // Best ingredients: EPD > Kassalapp detail (skip fake default strings)
-          const epdIngredients = epd?.ingredients_raw;
-          const detailIngredients = details?.ingredients && 
-            !details.ingredients.includes('Ingen ingrediensinformasjon') ? details.ingredients : null;
+          // Best ingredients: EPD > Kassalapp detail
+          const epdIngredients = epd?.ingredients_raw || epd?.payload?.ingredientStatement || null;
+          const detailIngredients = hasMeaningfulIngredients(details?.ingredients) ? details?.ingredients : null;
           const bestIngredients = epdIngredients || detailIngredients;
           
-          if (bestIngredients && (!product.ingredienser || product.ingredienser.trim() === '' || 
-              product.ingredienser.includes('Ingen ingrediensinformasjon'))) {
+          if (bestIngredients && (!hasMeaningfulIngredients(product.ingredienser) || product.ingredienser !== bestIngredients)) {
             product.ingredienser = bestIngredients;
             product.hasIngredients = true;
             changed = true;
@@ -612,7 +610,8 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           if (changed) {
             updatedSuggestions[productIndex] = product;
             updates[itemId] = updatedSuggestions;
-            console.log(`Enrichment updated item "${items.find(i => i.id === itemId)?.name}": image=${!!product.image}, ingredients=${!!product.ingredienser && product.ingredienser.length > 0}`);
+            void cacheItemProducts(itemId, storeId, updatedSuggestions, productIndex);
+            console.log(`Enrichment updated item "${items.find(i => i.id === itemId)?.name}": image=${!!product.image}, ingredients=${hasMeaningfulIngredients(product.ingredienser)}`);
           }
         }
         
