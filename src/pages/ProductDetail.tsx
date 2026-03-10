@@ -540,7 +540,10 @@ export default function ProductDetail() {
               </div>
               <p className="text-xs text-muted-foreground mt-3 flex items-start gap-1.5">
                 <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                Opprinnelsesland er hentet fra produsentens EPD-data og angir hvor produktet er produsert eller bearbeidet.
+                {countryOfOrigin.some(c => c.code.startsWith('GS1:'))
+                  ? 'Opprinnelsesland er estimert basert på strekkodeprefikset (GS1). Dette angir hvor produsenten er registrert, ikke nødvendigvis hvor produktet er produsert.'
+                  : 'Opprinnelsesland er hentet fra produsentens EPD-data og angir hvor produktet er produsert eller bearbeidet.'
+                }
               </p>
             </CardContent>
           </Card>
