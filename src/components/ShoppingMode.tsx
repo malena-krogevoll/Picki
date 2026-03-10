@@ -435,32 +435,52 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
 
   // Post-load enrichment: fetch details for selected products missing ingredients/image
   const enrichedEansRef = useRef<Set<string>>(new Set());
+  const enrichmentRunningRef = useRef(false);
+  const productDataRef = useRef(productData);
+  productDataRef.current = productData;
+  
+  // Track when loading transitions from true to false
+  const prevLoadingRef = useRef(loading);
   
   useEffect(() => {
-    if (loading || Object.keys(productData).length === 0) return;
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+    
+    // Only trigger enrichment when loading finishes OR when productData changes while not loading
+    if (loading) return;
+    if (Object.keys(productData).length === 0) return;
+    if (enrichmentRunningRef.current) return;
     
     let cancelled = false;
+    enrichmentRunningRef.current = true;
     
     const enrichMissing = async () => {
       // Find products missing data (only selected/top product per item)
       const toEnrich: { itemId: string; productIndex: number; ean: string }[] = [];
       
+      // Use ref to get latest productData
+      const currentData = productDataRef.current;
+      
       for (const item of items) {
-        const suggestions = productData[item.id];
+        const suggestions = currentData[item.id];
         if (!suggestions || suggestions.length === 0) continue;
         
         const selectedIdx = selectedProducts[item.id] || 0;
         const product = suggestions[selectedIdx];
         if (!product || !product.ean) continue;
         
-        // Skip if already enriched or already has data
+        // Skip if already enriched
         if (enrichedEansRef.current.has(product.ean)) continue;
+        // Skip if already has both data
         if (product.hasIngredients && product.image) continue;
         
         toEnrich.push({ itemId: item.id, productIndex: selectedIdx, ean: product.ean });
       }
       
-      if (toEnrich.length === 0) return;
+      if (toEnrich.length === 0) {
+        enrichmentRunningRef.current = false;
+        return;
+      }
       
       console.log(`Post-load enrichment: fetching details for ${toEnrich.length} products`);
       
@@ -486,16 +506,16 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           })
         );
         
-        if (cancelled) return;
+        if (cancelled) break;
         
-        // Update productData with enriched info
+        // Update productData with enriched info - use functional update to avoid stale state
         const updates: Record<string, ProductSuggestion[]> = {};
         
         for (const result of results) {
           if (result.status !== 'fulfilled' || !result.value) continue;
           const { itemId, productIndex, details } = result.value;
           
-          const currentSuggestions = productData[itemId];
+          const currentSuggestions = productDataRef.current[itemId];
           if (!currentSuggestions) continue;
           
           const updatedSuggestions = [...currentSuggestions];
@@ -548,12 +568,14 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
+      
+      enrichmentRunningRef.current = false;
     };
     
     enrichMissing();
     
-    return () => { cancelled = true; };
-  }, [loading, productData, items, selectedProducts]);
+    return () => { cancelled = true; enrichmentRunningRef.current = false; };
+  }, [loading, items.length]);
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
