@@ -18,6 +18,7 @@ import { StoreSelectorDialog, getStoreName, getStoreIcon, getStoreColor } from "
 import { useDiyAlternatives, DiyRecipe } from "@/hooks/useDiyAlternatives";
 import { DiyAlternativeDialog } from "@/components/DiyAlternativeDialog";
 import { getCountryFromEAN } from "@/utils/countryUtils";
+import { CountryFlag } from "@/components/CountryFlag";
 
 interface ItemIntent {
   original: string;
