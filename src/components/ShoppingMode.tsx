@@ -576,7 +576,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           let changed = false;
           
           // Always update image if we got a better one (EPD payload/image_url or details)
-          const bestImage = epd?.image_url || epd?.payload?.mainImageUrl || details?.image;
+          const bestImage = epd?.image_url || epd?.payload?.mainImageUrl || kassal?.image_url || kassal?.payload?.image || details?.image;
           if (bestImage && bestImage !== product.image) {
             product.image = bestImage;
             changed = true;
