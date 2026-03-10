@@ -44,6 +44,18 @@ serve(async (req) => {
 
     if (!response || !response.ok) {
       const status = response?.status || 'unknown';
+      // Return graceful response for rate limiting instead of hard error
+      if (response?.status === 429) {
+        console.warn(`Kassal 429 for ${ean} after retries — returning empty`);
+        return new Response(JSON.stringify({ 
+          ean, 
+          rate_limited: true,
+          error: "Rate limited — try again later" 
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       throw new Error(`Kassal API error: ${status}`);
     }
 
