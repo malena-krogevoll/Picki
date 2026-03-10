@@ -281,7 +281,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         let intentMap: Map<string, ItemIntent> = new Map();
         
         try {
-          console.log("Fetching AI intents for items:", itemNames);
           const { data: intentData, error: intentError } = await supabase.functions.invoke('analyze-shopping-intent', {
             body: { items: itemNames }
           });
