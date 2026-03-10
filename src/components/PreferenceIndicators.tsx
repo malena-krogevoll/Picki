@@ -102,19 +102,13 @@ export const PreferenceIndicators = ({
         </Badge>
       )}
 
-      {/* Local food indicator */}
-      {userPreferences.other_preferences?.local_food && (
+      {/* Local food indicator – only shown when product IS local/Norwegian */}
+      {userPreferences.other_preferences?.local_food && matchInfo.localFoodMatch && (
         <Badge 
-          className={`text-xs px-2 py-0.5 rounded-full ${
-            matchInfo.localFoodMatch 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted text-muted-foreground'
-          }`}
+          className="text-xs px-2 py-0.5 rounded-full bg-primary text-primary-foreground"
         >
           <MapPin className="h-3 w-3 mr-1" />
-          {matchInfo.localFoodMatch 
-            ? (matchInfo.localFoodReason || 'Norsk') 
-            : 'Ikke norsk'}
+          {matchInfo.localFoodReason || 'Norsk'}
         </Badge>
       )}
     </div>
