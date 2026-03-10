@@ -471,8 +471,14 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         
         // Skip if already enriched
         if (enrichedEansRef.current.has(product.ean)) continue;
-        // Skip if already has both data
-        if (product.hasIngredients && product.image) continue;
+        
+        // Check if missing image or real ingredients data
+        const hasRealIngredients = product.hasIngredients && product.ingredienser && 
+          !product.ingredienser.includes('Ingen ingrediensinformasjon');
+        const hasImage = !!product.image && product.image.length > 0;
+        
+        // Skip only if has BOTH real ingredients AND image
+        if (hasRealIngredients && hasImage) continue;
         
         toEnrich.push({ itemId: item.id, productIndex: selectedIdx, ean: product.ean });
       }

@@ -50,7 +50,7 @@ serve(async (req) => {
       vendor: firstProduct.vendor,
       image: firstProduct.image,
       description: firstProduct.description,
-      ingredients: firstProduct.ingredients || "Ingen ingrediensinformasjon tilgjengelig",
+      ingredients: firstProduct.ingredients || null,
       allergens: data.allergens || [],
       nutrition: data.nutrition || null,
       weight: firstProduct.weight,
