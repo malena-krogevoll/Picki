@@ -518,10 +518,12 @@ export default function ProductDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Opprinnelsesland</CardTitle>
-                <Badge variant="outline" className="rounded-full text-xs gap-1">
-                  <ShieldCheck className="h-3 w-3" />
-                  EPD-verifisert
-                </Badge>
+                {countryOfOrigin.some(c => !c.code.startsWith('GS1:')) && (
+                  <Badge variant="outline" className="rounded-full text-xs gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    EPD-verifisert
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent>
