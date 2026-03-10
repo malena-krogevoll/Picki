@@ -170,9 +170,10 @@ const GS1_PREFIX_MAP: [number, number, string, string, string][] = [
  * Detect country from EAN barcode prefix (GS1 company prefix).
  * Returns country info based on where the barcode was registered.
  */
-export function getCountryFromEAN(ean: string): CountryInfo | null {
-  if (!ean || ean.length < 3) return null;
-  const prefix = parseInt(ean.substring(0, 3), 10);
+export function getCountryFromEAN(ean: string | number | null | undefined): CountryInfo | null {
+  const eanStr = String(ean ?? "");
+  if (!eanStr || eanStr.length < 3) return null;
+  const prefix = parseInt(eanStr.substring(0, 3), 10);
   if (isNaN(prefix)) return null;
 
   for (const [start, end, flag, name, alpha2] of GS1_PREFIX_MAP) {
