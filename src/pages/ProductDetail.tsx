@@ -15,8 +15,12 @@ import { toast } from "sonner";
 
 interface EpdSource {
   ingredients_raw: string | null;
+  image_url?: string | null;
   payload: {
     ingredientStatement?: string;
+    mainImageUrl?: string;
+    image?: string;
+    allergens?: unknown;
     allergenInfo?: {
       allergens?: Array<{
         allergenTypeCode?: string;
