@@ -498,9 +498,10 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       
       console.log(`Post-load enrichment: fetching details for ${toEnrich.length} products`);
       
-      // Fetch in batches of 3 with delay
-      for (let i = 0; i < toEnrich.length && !cancelled; i += 3) {
-        const batch = toEnrich.slice(i, i + 3);
+      // Fetch ONE at a time with generous delay to avoid Kassalapp 429 rate limits
+      // (search-products already hammers the API, so enrichment must be gentle)
+      for (let i = 0; i < toEnrich.length && !cancelled; i++) {
+        const batch = [toEnrich[i]];
         
         const results = await Promise.allSettled(
           batch.map(async ({ itemId, productIndex, ean }) => {
