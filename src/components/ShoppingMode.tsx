@@ -44,6 +44,23 @@ interface ProductSuggestion {
   matchInfo: MatchInfo;
 }
 
+interface EpdEnrichmentSource {
+  ingredients_raw: string | null;
+  payload?: {
+    ingredientStatement?: string;
+    mainImageUrl?: string;
+    [key: string]: unknown;
+  } | null;
+  image_url?: string | null;
+}
+
+const hasMeaningfulIngredients = (value?: string | null) => {
+  if (!value) return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return !normalized.toLowerCase().includes('ingen ingrediensinformasjon');
+};
+
 interface CachedItemData {
   storeId: string;
   cachedAt: string;
