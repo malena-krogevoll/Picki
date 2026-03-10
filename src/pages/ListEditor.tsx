@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { ShoppingMode, clearSessionCache } from "@/components/ShoppingMode";
+import { ShoppingMode, clearSessionCacheForList } from "@/components/ShoppingMode";
 import { StoreSelectorDialog } from "@/components/StoreSelectorDialog";
 import { ItemSuggestions } from "@/components/ItemSuggestions";
 import { useAuth } from "@/hooks/useAuth";
