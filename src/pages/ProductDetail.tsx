@@ -128,10 +128,19 @@ export default function ProductDetail() {
     'BM': 'Bløtdyr', 'NL': 'Sennep',
   };
 
-  // Extract country of origin from EPD payload
-  const countryOfOrigin: CountryInfo[] = epdSource?.payload 
-    ? extractCountryOfOrigin(epdSource.payload as Record<string, unknown>) 
-    : [];
+  // Extract country of origin from EPD payload, with EAN fallback
+  const countryOfOrigin: CountryInfo[] = (() => {
+    if (epdSource?.payload) {
+      const epd = extractCountryOfOrigin(epdSource.payload as Record<string, unknown>);
+      if (epd.length > 0) return epd;
+    }
+    // Fallback: derive country from EAN barcode prefix
+    if (ean) {
+      const eanCountry = getCountryFromEAN(ean);
+      if (eanCountry) return [eanCountry];
+    }
+    return [];
+  })();
   const matchInfo = product ? analyzeProductMatch(
     {
       name: product.name,
