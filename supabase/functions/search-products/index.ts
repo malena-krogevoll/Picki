@@ -845,6 +845,100 @@ serve(async (req) => {
     const topResults = candidates.slice(0, 20);
     console.log(`Returning ${topResults.length} results, best renvareScore: ${topResults[0]?.renvareScore ?? 0}`);
 
+    // Synchronous enrichment: fill missing ingredients/images from master products table
+    try {
+      const eans = topResults
+        .map(r => r.product.EAN?.toString())
+        .filter((e): e is string => !!e);
+      
+      if (eans.length > 0) {
+        const { data: masterProducts } = await supabase
+          .from("products")
+          .select("ean, name, brand, image_url, ingredients_raw")
+          .in("ean", eans);
+        
+        if (masterProducts && masterProducts.length > 0) {
+          const masterMap = new Map(masterProducts.map(p => [p.ean, p]));
+          let enrichedCount = 0;
+          
+          for (const result of topResults) {
+            const ean = result.product.EAN?.toString();
+            if (!ean) continue;
+            const master = masterMap.get(ean);
+            if (!master) continue;
+            
+            // Fill missing ingredients
+            if (!result.product.Ingrediensliste && master.ingredients_raw) {
+              result.product.Ingrediensliste = master.ingredients_raw;
+              enrichedCount++;
+            }
+            // Fill missing image
+            if (!result.product.Produktbilde_URL && master.image_url) {
+              result.product.Produktbilde_URL = master.image_url;
+              enrichedCount++;
+            }
+            // Fill missing brand
+            if (!result.product.Merke && master.brand) {
+              result.product.Merke = master.brand;
+            }
+          }
+          
+          if (enrichedCount > 0) {
+            console.log(`Enriched ${enrichedCount} fields from master products table`);
+          }
+        }
+        
+        // Also check product_sources for additional data
+        const missingDataEans = topResults
+          .filter(r => !r.product.Ingrediensliste || !r.product.Produktbilde_URL)
+          .map(r => r.product.EAN?.toString())
+          .filter((e): e is string => !!e);
+        
+        if (missingDataEans.length > 0) {
+          const { data: sources } = await supabase
+            .from("product_sources")
+            .select("ean, ingredients_raw, image_url")
+            .in("ean", missingDataEans)
+            .order("fetched_at", { ascending: false });
+          
+          if (sources && sources.length > 0) {
+            // Build map with best available data per EAN
+            const sourceMap = new Map<string, { ingredients_raw: string | null; image_url: string | null }>();
+            for (const src of sources) {
+              const existing = sourceMap.get(src.ean);
+              sourceMap.set(src.ean, {
+                ingredients_raw: existing?.ingredients_raw || src.ingredients_raw,
+                image_url: existing?.image_url || src.image_url,
+              });
+            }
+            
+            let sourceEnrichedCount = 0;
+            for (const result of topResults) {
+              const ean = result.product.EAN?.toString();
+              if (!ean) continue;
+              const src = sourceMap.get(ean);
+              if (!src) continue;
+              
+              if (!result.product.Ingrediensliste && src.ingredients_raw) {
+                result.product.Ingrediensliste = src.ingredients_raw;
+                sourceEnrichedCount++;
+              }
+              if (!result.product.Produktbilde_URL && src.image_url) {
+                result.product.Produktbilde_URL = src.image_url;
+                sourceEnrichedCount++;
+              }
+            }
+            
+            if (sourceEnrichedCount > 0) {
+              console.log(`Enriched ${sourceEnrichedCount} fields from product_sources`);
+            }
+          }
+        }
+      }
+    } catch (enrichErr) {
+      console.warn("Synchronous master enrichment failed (non-blocking):", enrichErr);
+    }
+
     // Write-through cache: save to DB in background (best effort, don't block response)
     cacheProductsToDatabase(allCandidates).catch(err => {
       console.error("Background cache write failed:", err);
