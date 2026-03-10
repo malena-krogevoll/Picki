@@ -358,11 +358,16 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               const novaResults = await batchClassifyNova(productsForNova);
               
               const productsWithNova: ProductSuggestion[] = filteredResults.map((r: any, idx: number) => {
-                const ingredienser = r.product.Ingrediensliste || '';
-                const allergener = r.product["Allergener/Kosthold"] || '';
+                const ingredienser = r.product.Ingrediensliste || r.product.ingredients || '';
+                const allergener = r.product["Allergener/Kosthold"] || r.product.allergens || '';
                 const novaData = novaResults.get(idx) || { novaScore: null, isEstimated: true, hasIngredients: false };
-                const productName = r.product.Produktnavn || '';
-                const brand = r.product.Merke || '';
+                const productName = r.product.Produktnavn || r.product.name || '';
+                const brand = r.product.Merke || r.product.brand || '';
+                const image = r.product.Produktbilde_URL || r.product.image || '';
+                const ean = r.product.EAN || r.product.ean || '';
+                const store = r.product.StoreCode || r.product.store || storeId;
+                const rawPrice = r.product.Pris ?? r.product.price;
+                const price = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice ?? '')) || null;
                 
                 const matchInfo = analyzeProductMatch(
                   { name: productName, brand, allergener, ingredienser },
@@ -370,12 +375,12 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 );
                 
                 return {
-                  ean: r.product.EAN || '',
+                  ean,
                   brand,
                   name: productName,
-                  image: r.product.Produktbilde_URL || '',
-                  price: parseFloat(r.product.Pris) || null,
-                  store: r.product.StoreCode || storeId,
+                  image,
+                  price,
+                  store,
                   novaScore: novaData.novaScore,
                   novaIsEstimated: novaData.isEstimated,
                   hasIngredients: novaData.hasIngredients,
