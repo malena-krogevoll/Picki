@@ -694,8 +694,18 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       ...prev,
       [itemId]: productIndex
     }));
-    // Persist selected product index to cache in background
+    // Persist selected product index AND selected_product_ean to DB
     updateCachedSelectedIndex(itemId, productIndex);
+    const suggestions = productData[itemId] || [];
+    const selectedEan = suggestions[productIndex]?.ean || null;
+    if (selectedEan) {
+      supabase.from('shopping_list_items')
+        .update({ selected_product_ean: selectedEan })
+        .eq('id', itemId)
+        .then(({ error }) => {
+          if (error) console.warn('Failed to persist selected_product_ean:', error);
+        });
+    }
     toast.success("Produkt byttet");
   };
 
