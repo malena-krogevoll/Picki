@@ -10,7 +10,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { PreferenceIndicators } from "@/components/PreferenceIndicators";
 import { analyzeProductMatch, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
-import { extractCountryOfOrigin, CountryInfo } from "@/utils/countryUtils";
+import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
 
 interface ProductData {
   ean: string;
