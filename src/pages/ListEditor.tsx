@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { ShoppingMode, clearSessionCache } from "@/components/ShoppingMode";
+import { ShoppingMode, clearSessionCacheForList } from "@/components/ShoppingMode";
 import { StoreSelectorDialog } from "@/components/StoreSelectorDialog";
 import { ItemSuggestions } from "@/components/ItemSuggestions";
 import { useAuth } from "@/hooks/useAuth";
@@ -95,10 +95,7 @@ const ListEditor = () => {
 
   const handleSelectStore = async (storeId: string) => {
     if (!listId) return;
-    // Clear session cache for old store if we're changing stores
-    if (currentList?.store_id && currentList.store_id !== storeId) {
-      clearSessionCache(listId, currentList.store_id);
-    }
+    clearSessionCacheForList(listId);
     await updateListStore(listId, storeId);
     setShowStoreDialog(false);
     setView('shop');
