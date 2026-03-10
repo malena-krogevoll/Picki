@@ -584,8 +584,9 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           
           // Best ingredients: EPD > Kassalapp detail
           const epdIngredients = epd?.ingredients_raw || epd?.payload?.ingredientStatement || null;
+          const kassalIngredients = kassal?.ingredients_raw || kassal?.payload?.ingredients || null;
           const detailIngredients = hasMeaningfulIngredients(details?.ingredients) ? details?.ingredients : null;
-          const bestIngredients = epdIngredients || detailIngredients;
+          const bestIngredients = epdIngredients || kassalIngredients || detailIngredients;
           
           if (bestIngredients && (!hasMeaningfulIngredients(product.ingredienser) || product.ingredienser !== bestIngredients)) {
             product.ingredienser = bestIngredients;

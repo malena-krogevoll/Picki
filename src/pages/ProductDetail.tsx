@@ -206,7 +206,7 @@ export default function ProductDetail() {
         }
 
         // If no EPD data cached, trigger background fetch
-        if (!epdResult.data) {
+        if (!epdData) {
           supabase.functions.invoke('fetch-epd', {
             body: { action: 'lookup', gtin: ean }
           }).then(({ data }) => {
@@ -220,9 +220,11 @@ export default function ProductDetail() {
         }
 
         // Use the best available ingredients for NOVA classification
-        const ingredientsForNova = epdResult.data?.ingredients_raw 
-          || (epdResult.data?.payload as any)?.ingredientStatement
-          || productResult.data.ingredients 
+        const ingredientsForNova = epdData?.ingredients_raw 
+          || (epdData?.payload as any)?.ingredientStatement
+          || kassalData?.ingredients_raw
+          || (kassalData?.payload as any)?.ingredients
+          || productData.ingredients 
           || '';
 
         const { data: novaResult, error: novaError } = await supabase.functions.invoke(
