@@ -280,6 +280,9 @@ const UNIVERSAL_BRANDS = [
   "fjordland", "findus", "hoff", "maarud", "kims", "sørlandschips",
 ];
 
+// Brands exclusive to specific chains
+const REMA_EXCLUSIVE_BRANDS = ["kolonihagen"];
+
 // Expand offers for universal brands across all chains
 async function expandUniversalOffers(candidates: ProductCandidate[]): Promise<void> {
   // Get all chain IDs
