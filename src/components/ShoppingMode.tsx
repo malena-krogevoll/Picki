@@ -189,58 +189,64 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     }
   }, [productData, selectedProducts, cacheKey]);
 
-  // Detect store/list changes and force re-fetch
+  // Combined effect: detect store/list changes, reset data, and fetch products
   useEffect(() => {
-    if (prevCacheKeyRef.current !== cacheKey) {
+    let isMounted = true;
+    const abortController = new AbortController();
+
+    // Detect store/list change via cache key
+    const cacheKeyChanged = prevCacheKeyRef.current !== cacheKey;
+    
+    if (cacheKeyChanged) {
+      prevCacheKeyRef.current = cacheKey;
+      prevStoreIdRef.current = storeId;
+      
       const existingCache = sessionProductCache.get(cacheKey);
       if (existingCache) {
-        // Restore from session cache for this list+store
+        // Restore from session cache - no fetch needed
         setProductData(existingCache.products);
         setSelectedProducts(existingCache.selections);
         fetchedItemsRef.current = existingCache.fetchedItems;
         setLoading(false);
+        return;
       } else {
-        // New list+store combination - reset everything
+        // New combination - clear everything, will fetch below
         setProductData({});
         setSelectedProducts({});
         fetchedItemsRef.current = new Set();
         setLoading(true);
       }
-      prevCacheKeyRef.current = cacheKey;
-      prevStoreIdRef.current = storeId;
     }
-  }, [cacheKey, storeId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const abortController = new AbortController();
 
     const fetchProducts = async () => {
       try {
-        // Check for cached product data in database
         const itemsNeedingFetch: typeof items = [];
         const cachedResults: Record<string, ProductSuggestion[]> = {};
         const cachedSelections: Record<string, number> = {};
         
         for (const item of items) {
-          // Skip if we've already fetched this item in this session
-          if (fetchedItemsRef.current.has(item.id) && productData[item.id]) {
+          // On store change, skip all caches - fetch everything fresh
+          if (cacheKeyChanged) {
+            itemsNeedingFetch.push(item);
             continue;
           }
           
-          // Check if item has cached product data for the same store
+          // Skip if already fetched in this session
+          if (fetchedItemsRef.current.has(item.id)) {
+            continue;
+          }
+          
+          // Check DB-cached product data for the same store
           if (item.product_data) {
             try {
               const cached = item.product_data as unknown as CachedItemData;
               if (cached.storeId === storeId && cached.products && Array.isArray(cached.products)) {
-                // Check if cache is fresh (less than 24 hours old)
                 const cacheAge = Date.now() - new Date(cached.cachedAt).getTime();
-                const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+                const maxCacheAge = 24 * 60 * 60 * 1000;
                 
                 if (cacheAge < maxCacheAge) {
                   cachedResults[item.id] = cached.products;
                   fetchedItemsRef.current.add(item.id);
-                  // Restore selected product index from cache
                   if (typeof cached.selectedIndex === 'number') {
                     cachedSelections[item.id] = cached.selectedIndex;
                   }
@@ -248,13 +254,12 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 }
               }
             } catch (e) {
-              // Invalid cache format, need to fetch
+              // Invalid cache format
             }
           }
           itemsNeedingFetch.push(item);
         }
 
-        // Apply cached results and selections immediately
         if (Object.keys(cachedResults).length > 0 && isMounted) {
           setProductData(prev => ({ ...prev, ...cachedResults }));
           if (Object.keys(cachedSelections).length > 0) {
@@ -262,17 +267,14 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           }
         }
         
-        // If all items were cached or already fetched, we're done
         if (itemsNeedingFetch.length === 0) {
-          if (isMounted) {
-            setLoading(false);
-          }
+          if (isMounted) setLoading(false);
           return;
         }
 
         setLoading(true);
 
-        // Step 1: Batch analyze all item names with AI (only for items needing fetch)
+        // Step 1: Batch analyze item names with AI
         const itemNames = itemsNeedingFetch.map(i => i.name);
         let intentMap: Map<string, ItemIntent> = new Map();
         
@@ -286,19 +288,17 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               intentMap.set(intent.original.toLowerCase(), intent);
             }
           } else {
-            console.warn("Intent analysis failed, falling back to basic search:", intentError);
+            console.warn("Intent analysis failed:", intentError);
           }
         } catch (intentErr) {
           console.error("Intent analysis error:", intentErr);
         }
 
-        // Step 2: Search products with AI intent data (staggered to avoid rate limiting)
+        // Step 2: Search products in batches
         const BATCH_SIZE = 3;
         const DELAY_BETWEEN_BATCHES = 400;
-        
         const allResults: { itemId: string; products: ProductSuggestion[] }[] = [];
         
-        // Helper function to process a single item
         const processItem = async (item: typeof items[0]) => {
           try {
             const timeoutPromise = new Promise((_, reject) => {
@@ -306,7 +306,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             });
 
             const intent = intentMap.get(item.name.toLowerCase());
-
             const fetchPromise = supabase.functions.invoke('search-products', {
               body: {
                 query: item.name,
@@ -322,26 +321,21 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               console.error('Error fetching products for', item.name, error);
               return { itemId: item.id, products: [] as ProductSuggestion[] };
             } else if (data?.results && data.results.length > 0) {
-              // Filter and prepare products for batch NOVA classification
               const filteredResults = data.results
                 .filter((r: any) => r.product && r.score > -50)
-                .slice(0, 5); // Limit to top 5 products
+                .slice(0, 5);
               
-              // Prepare batch for NOVA classification
               const productsForNova = filteredResults.map((r: any) => ({
                 ingredienser: r.product.Ingrediensliste || '',
                 category: r.product.Kategori || ''
               }));
               
-              // Batch classify NOVA
               const novaResults = await batchClassifyNova(productsForNova);
               
-              // Build final product list with NOVA scores
               const productsWithNova: ProductSuggestion[] = filteredResults.map((r: any, idx: number) => {
                 const ingredienser = r.product.Ingrediensliste || '';
                 const allergener = r.product["Allergener/Kosthold"] || '';
                 const novaData = novaResults.get(idx) || { novaScore: null, isEstimated: true, hasIngredients: false };
-                
                 const productName = r.product.Produktnavn || '';
                 const brand = r.product.Merke || '';
                 
@@ -366,16 +360,13 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 };
               });
               
-              // Sort products by preference match, then NOVA, then price
               const sortedProducts = sortProductsByPreference(
                 productsWithNova, 
                 profile?.preferences as UserPreferences | null
               );
               
-              // Cache products in background (fire and forget)
               cacheItemProducts(item.id, storeId, sortedProducts);
               fetchedItemsRef.current.add(item.id);
-              
               return { itemId: item.id, products: sortedProducts };
             } else {
               fetchedItemsRef.current.add(item.id);
@@ -387,7 +378,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           }
         };
 
-        // Process items in batches
         for (let i = 0; i < itemsNeedingFetch.length; i += BATCH_SIZE) {
           if (!isMounted) break;
           
@@ -395,7 +385,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           const batchResults = await Promise.all(batch.map(processItem));
           allResults.push(...batchResults);
           
-          // Update UI with partial results as they come in
           if (isMounted && batchResults.length > 0) {
             setProductData(prev => {
               const updated = { ...prev };
@@ -406,7 +395,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             });
           }
           
-          // Wait between batches (except for the last one)
           if (i + BATCH_SIZE < itemsNeedingFetch.length) {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
           }
@@ -414,32 +402,28 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
 
         if (!isMounted) return;
 
-        // Final update with all results (including cached)
         if (isMounted) {
           const results: Record<string, ProductSuggestion[]> = { ...cachedResults };
           allResults.forEach(({ itemId, products }) => {
             results[itemId] = products;
           });
           setProductData(prev => ({ ...prev, ...results }));
-          // Session cache is updated via useEffect
         }
       } catch (error) {
         console.error('Error in fetchProducts:', error);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
-     // Check if we need to fetch - either first load, new items added, or store changed
-    const hasDataForAllItems = items.length > 0 && items.every(
-      item => fetchedItemsRef.current.has(item.id) || productData[item.id]
+    // Fetch if store changed or items still need data
+    const hasDataForAllItems = !cacheKeyChanged && items.length > 0 && items.every(
+      item => fetchedItemsRef.current.has(item.id)
     );
     
     if (items.length > 0 && !hasDataForAllItems) {
       fetchProducts();
-    } else {
+    } else if (!cacheKeyChanged) {
       setLoading(false);
     }
 
@@ -447,7 +431,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       isMounted = false;
       abortController.abort();
     };
-  }, [listId, storeId, items.length]); // storeId change triggers reset in prior effect, which clears data → hasDataForAllItems becomes false
+  }, [listId, storeId, items.length, cacheKey]);
 
   // Post-load enrichment: fetch details for selected products missing ingredients/image
   const enrichedEansRef = useRef<Set<string>>(new Set());
