@@ -939,22 +939,27 @@ serve(async (req) => {
       console.warn("Synchronous master enrichment failed (non-blocking):", enrichErr);
     }
 
-    // Synchronous Kassalapp detail enrichment for products still missing data (max 3, with timeout)
+    // Synchronous Kassalapp detail enrichment for products still missing data
     try {
       const stillMissing = topResults
-        .filter(r => r.product.EAN && (!r.product.Ingrediensliste || !r.product.Produktbilde_URL))
-        .slice(0, 3);
+        .filter(r => {
+          if (!r.product.EAN) return false;
+          const noIngredients = !r.product.Ingrediensliste || r.product.Ingrediensliste.trim().length === 0;
+          const noImage = !r.product.Produktbilde_URL || r.product.Produktbilde_URL.trim().length === 0;
+          return noIngredients || noImage;
+        })
+        .slice(0, 10);
       
       if (stillMissing.length > 0) {
         const kassalappApiKey = Deno.env.get("KASSALAPP_API_KEY");
         if (kassalappApiKey) {
-          console.log(`Synchronous Kassalapp detail fetch for ${stillMissing.length} products missing data`);
+          console.log(`Sync Kassalapp detail fetch for ${stillMissing.length} products missing data (EANs: ${stillMissing.map(r => r.product.EAN).join(', ')})`);
           
           const detailPromises = stillMissing.map(async (candidate) => {
             const ean = String(candidate.product.EAN);
             try {
               const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 3000);
+              const timeout = setTimeout(() => controller.abort(), 5000);
               
               const res = await fetch(`https://kassal.app/api/v1/products/ean/${ean}`, {
                 headers: { Authorization: `Bearer ${kassalappApiKey}` },
@@ -962,16 +967,27 @@ serve(async (req) => {
               });
               clearTimeout(timeout);
               
-              if (!res.ok) { await res.text(); return; }
+              if (!res.ok) { 
+                console.warn(`Detail fetch ${ean}: HTTP ${res.status}`);
+                await res.text(); 
+                return; 
+              }
               
               const productData = await res.json();
-              const firstProduct = productData.data?.products?.[0];
-              if (!firstProduct) return;
+              const data = productData.data;
+              const firstProduct = data?.products?.[0];
+              if (!firstProduct) {
+                console.warn(`Detail fetch ${ean}: no product in response`);
+                return;
+              }
               
-              if (!candidate.product.Ingrediensliste && firstProduct.ingredients) {
+              const hadNoIngredients = !candidate.product.Ingrediensliste || candidate.product.Ingrediensliste.trim().length === 0;
+              const hadNoImage = !candidate.product.Produktbilde_URL || candidate.product.Produktbilde_URL.trim().length === 0;
+              
+              if (hadNoIngredients && firstProduct.ingredients) {
                 candidate.product.Ingrediensliste = firstProduct.ingredients;
               }
-              if (!candidate.product.Produktbilde_URL && firstProduct.image) {
+              if (hadNoImage && firstProduct.image) {
                 candidate.product.Produktbilde_URL = firstProduct.image;
               }
               if (!candidate.product.Merke && firstProduct.brand) {
@@ -984,7 +1000,7 @@ serve(async (req) => {
                   ean,
                   source: "KASSALAPP" as const,
                   source_product_id: ean,
-                  payload: productData.data,
+                  payload: data,
                   name: firstProduct.name || null,
                   brand: firstProduct.brand || null,
                   image_url: firstProduct.image || null,
@@ -993,16 +1009,20 @@ serve(async (req) => {
                 }, { onConflict: "ean,source", ignoreDuplicates: false }).catch(() => {});
               }
               
-              console.log(`Sync detail enriched ${ean}: ingredients=${!!firstProduct.ingredients}, image=${!!firstProduct.image}`);
+              console.log(`Sync enriched ${ean}: ingredients=${hadNoIngredients ? (firstProduct.ingredients ? 'FILLED' : 'still-missing') : 'had'}, image=${hadNoImage ? (firstProduct.image ? 'FILLED' : 'still-missing') : 'had'}`);
             } catch (e) {
               if (e instanceof Error && e.name === 'AbortError') {
                 console.warn(`Detail fetch timeout for ${ean}`);
+              } else {
+                console.warn(`Detail fetch error for ${ean}:`, e instanceof Error ? e.message : e);
               }
             }
           });
           
           await Promise.allSettled(detailPromises);
         }
+      } else {
+        console.log("All top results have ingredients and images - no sync enrichment needed");
       }
     } catch (syncDetailErr) {
       console.warn("Synchronous Kassalapp detail enrichment failed:", syncDetailErr);
