@@ -44,6 +44,23 @@ interface ProductSuggestion {
   matchInfo: MatchInfo;
 }
 
+interface EpdEnrichmentSource {
+  ingredients_raw: string | null;
+  payload?: {
+    ingredientStatement?: string;
+    mainImageUrl?: string;
+    [key: string]: unknown;
+  } | null;
+  image_url?: string | null;
+}
+
+const hasMeaningfulIngredients = (value?: string | null) => {
+  if (!value) return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return !normalized.toLowerCase().includes('ingen ingrediensinformasjon');
+};
+
 interface CachedItemData {
   storeId: string;
   cachedAt: string;
@@ -341,11 +358,16 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               const novaResults = await batchClassifyNova(productsForNova);
               
               const productsWithNova: ProductSuggestion[] = filteredResults.map((r: any, idx: number) => {
-                const ingredienser = r.product.Ingrediensliste || '';
-                const allergener = r.product["Allergener/Kosthold"] || '';
+                const ingredienser = r.product.Ingrediensliste || r.product.ingredients || '';
+                const allergener = r.product["Allergener/Kosthold"] || r.product.allergens || '';
                 const novaData = novaResults.get(idx) || { novaScore: null, isEstimated: true, hasIngredients: false };
-                const productName = r.product.Produktnavn || '';
-                const brand = r.product.Merke || '';
+                const productName = r.product.Produktnavn || r.product.name || '';
+                const brand = r.product.Merke || r.product.brand || '';
+                const image = r.product.Produktbilde_URL || r.product.image || '';
+                const ean = r.product.EAN || r.product.ean || '';
+                const store = r.product.StoreCode || r.product.store || storeId;
+                const rawPrice = r.product.Pris ?? r.product.price;
+                const price = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice ?? '')) || null;
                 
                 const matchInfo = analyzeProductMatch(
                   { name: productName, brand, allergener, ingredienser },
@@ -353,12 +375,12 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 );
                 
                 return {
-                  ean: r.product.EAN || '',
+                  ean,
                   brand,
                   name: productName,
-                  image: r.product.Produktbilde_URL || '',
-                  price: parseFloat(r.product.Pris) || null,
-                  store: r.product.StoreCode || storeId,
+                  image,
+                  price,
+                  store,
                   novaScore: novaData.novaScore,
                   novaIsEstimated: novaData.isEstimated,
                   hasIngredients: novaData.hasIngredients,
@@ -509,21 +531,27 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             
             try {
               // Fetch Kassalapp details and EPD data in parallel
-              const [detailResult, epdResult] = await Promise.all([
+              const [detailResult, epdResult, kassalResult] = await Promise.all([
                 supabase.functions.invoke('get-product-details', { body: { ean } }),
                 supabase.from('product_sources')
-                  .select('ingredients_raw, image_url')
+                  .select('ingredients_raw, image_url, payload')
                   .eq('ean', ean)
                   .eq('source', 'EPD')
+                  .maybeSingle(),
+                supabase.from('product_sources')
+                  .select('ingredients_raw, image_url, payload')
+                  .eq('ean', ean)
+                  .eq('source', 'KASSALAPP')
                   .maybeSingle()
               ]);
               
               const details = detailResult.error ? null : detailResult.data;
-              const epd = epdResult.data;
+              const epd = (epdResult.data as EpdEnrichmentSource | null) ?? null;
+              const kassal = (kassalResult.data as EpdEnrichmentSource | null) ?? null;
               
-              if (!details && !epd) return null;
+              if (!details && !epd && !kassal) return null;
               
-              return { itemId, productIndex, ean, details, epd };
+              return { itemId, productIndex, ean, details, epd, kassal };
             } catch {
               return null;
             }
@@ -537,7 +565,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         
         for (const result of results) {
           if (result.status !== 'fulfilled' || !result.value) continue;
-          const { itemId, productIndex, details, epd } = result.value;
+          const { itemId, productIndex, details, epd, kassal } = result.value;
           
           const currentSuggestions = productDataRef.current[itemId];
           if (!currentSuggestions) continue;
@@ -547,21 +575,20 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           
           let changed = false;
           
-          // Always update image if we got a better one (details or EPD)
-          const bestImage = epd?.image_url || details?.image;
-          if (bestImage && (!product.image || product.image.length === 0)) {
+          // Always update image if we got a better one (EPD payload/image_url or details)
+          const bestImage = epd?.image_url || epd?.payload?.mainImageUrl || kassal?.image_url || kassal?.payload?.image || details?.image;
+          if (bestImage && bestImage !== product.image) {
             product.image = bestImage;
             changed = true;
           }
           
-          // Best ingredients: EPD > Kassalapp detail (skip fake default strings)
-          const epdIngredients = epd?.ingredients_raw;
-          const detailIngredients = details?.ingredients && 
-            !details.ingredients.includes('Ingen ingrediensinformasjon') ? details.ingredients : null;
-          const bestIngredients = epdIngredients || detailIngredients;
+          // Best ingredients: EPD > Kassalapp detail
+          const epdIngredients = epd?.ingredients_raw || epd?.payload?.ingredientStatement || null;
+          const kassalIngredients = kassal?.ingredients_raw || kassal?.payload?.ingredients || null;
+          const detailIngredients = hasMeaningfulIngredients(details?.ingredients) ? details?.ingredients : null;
+          const bestIngredients = epdIngredients || kassalIngredients || detailIngredients;
           
-          if (bestIngredients && (!product.ingredienser || product.ingredienser.trim() === '' || 
-              product.ingredienser.includes('Ingen ingrediensinformasjon'))) {
+          if (bestIngredients && (!hasMeaningfulIngredients(product.ingredienser) || product.ingredienser !== bestIngredients)) {
             product.ingredienser = bestIngredients;
             product.hasIngredients = true;
             changed = true;
@@ -590,7 +617,8 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
           if (changed) {
             updatedSuggestions[productIndex] = product;
             updates[itemId] = updatedSuggestions;
-            console.log(`Enrichment updated item "${items.find(i => i.id === itemId)?.name}": image=${!!product.image}, ingredients=${!!product.ingredienser && product.ingredienser.length > 0}`);
+            void cacheItemProducts(itemId, storeId, updatedSuggestions, productIndex);
+            console.log(`Enrichment updated item "${items.find(i => i.id === itemId)?.name}": image=${!!product.image}, ingredients=${hasMeaningfulIngredients(product.ingredienser)}`);
           }
         }
         

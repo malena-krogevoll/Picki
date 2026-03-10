@@ -15,8 +15,12 @@ import { toast } from "sonner";
 
 interface EpdSource {
   ingredients_raw: string | null;
+  image_url?: string | null;
   payload: {
     ingredientStatement?: string;
+    mainImageUrl?: string;
+    image?: string;
+    allergens?: unknown;
     allergenInfo?: {
       allergens?: Array<{
         allergenTypeCode?: string;
@@ -166,25 +170,47 @@ export default function ProductDetail() {
 
       setLoading(true);
       try {
-        // Fetch product details and EPD data in parallel
-        const [productResult, epdResult] = await Promise.all([
+        // Fetch product details and best cached source data in parallel
+        const [productResult, epdResult, kassalResult] = await Promise.all([
           supabase.functions.invoke('get-product-details', { body: { ean } }),
           supabase.from('product_sources')
-            .select('ingredients_raw, payload')
+            .select('ingredients_raw, image_url, payload')
             .eq('ean', ean)
             .eq('source', 'EPD')
+            .maybeSingle(),
+          supabase.from('product_sources')
+            .select('ingredients_raw, image_url, payload')
+            .eq('ean', ean)
+            .eq('source', 'KASSALAPP')
             .maybeSingle(),
         ]);
 
         if (productResult.error) throw productResult.error;
-        setProduct(productResult.data);
 
-        if (epdResult.data) {
-          setEpdSource(epdResult.data as unknown as EpdSource);
+        const productData = productResult.data as ProductDetails;
+        const epdData = epdResult.data as EpdSource | null;
+        const kassalData = kassalResult.data as EpdSource | null;
+
+        const bestImage = epdData?.payload?.mainImageUrl || epdData?.image_url || kassalData?.image_url || (kassalData?.payload as any)?.image || productData.image || '';
+        const bestIngredients = epdData?.ingredients_raw
+          || epdData?.payload?.ingredientStatement
+          || kassalData?.ingredients_raw
+          || (kassalData?.payload as any)?.ingredients
+          || productData.ingredients
+          || '';
+
+        setProduct({
+          ...productData,
+          image: bestImage,
+          ingredients: bestIngredients,
+        });
+
+        if (epdData) {
+          setEpdSource(epdData);
         }
 
         // If no EPD data cached, trigger background fetch
-        if (!epdResult.data) {
+        if (!epdData) {
           supabase.functions.invoke('fetch-epd', {
             body: { action: 'lookup', gtin: ean }
           }).then(({ data }) => {
@@ -198,9 +224,11 @@ export default function ProductDetail() {
         }
 
         // Use the best available ingredients for NOVA classification
-        const ingredientsForNova = epdResult.data?.ingredients_raw 
-          || (epdResult.data?.payload as any)?.ingredientStatement
-          || productResult.data.ingredients 
+        const ingredientsForNova = epdData?.ingredients_raw 
+          || (epdData?.payload as any)?.ingredientStatement
+          || kassalData?.ingredients_raw
+          || (kassalData?.payload as any)?.ingredients
+          || productData.ingredients 
           || '';
 
         const { data: novaResult, error: novaError } = await supabase.functions.invoke(
