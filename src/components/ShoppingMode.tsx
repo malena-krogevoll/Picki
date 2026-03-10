@@ -17,6 +17,7 @@ import { groupItemsByCategory } from "@/lib/storeLayoutSort";
 import { StoreSelectorDialog, getStoreName, getStoreIcon, getStoreColor } from "@/components/StoreSelectorDialog";
 import { useDiyAlternatives, DiyRecipe } from "@/hooks/useDiyAlternatives";
 import { DiyAlternativeDialog } from "@/components/DiyAlternativeDialog";
+import { getCountryFromEAN } from "@/utils/countryUtils";
 
 interface ItemIntent {
   original: string;
