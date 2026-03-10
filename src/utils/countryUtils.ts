@@ -109,7 +109,9 @@ export function getCountryInfo(code: string): CountryInfo | null {
   const normalized = code.trim().toUpperCase();
   const data = COUNTRY_DATA[normalized];
   if (!data) return null;
-  return { code: normalized, ...data };
+  // Derive alpha2: if normalized is already 2 chars, use it; otherwise map from numeric
+  const alpha2 = normalized.length === 2 ? normalized : (NUMERIC_TO_ALPHA2[normalized] || normalized);
+  return { code: normalized, alpha2, ...data };
 }
 
 // GS1 EAN barcode prefix → country (first 3 digits of EAN)
