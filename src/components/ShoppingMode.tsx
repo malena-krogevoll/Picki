@@ -242,7 +242,6 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
                 
                 if (cacheAge < maxCacheAge) {
-                  console.log(`Using cached products for: ${item.name}`);
                   cachedResults[item.id] = cached.products;
                   fetchedItemsRef.current.add(item.id);
                   // Restore selected product index from cache
@@ -282,18 +281,11 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         let intentMap: Map<string, ItemIntent> = new Map();
         
         try {
-          console.log("Fetching AI intents for items:", itemNames);
           const { data: intentData, error: intentError } = await supabase.functions.invoke('analyze-shopping-intent', {
             body: { items: itemNames }
           });
           
           if (!intentError && intentData?.intents) {
-            console.log("AI intent analysis:", {
-              cached: intentData.cached,
-              aiProcessed: intentData.aiProcessed,
-              estimatedCost: intentData.estimatedCost
-            });
-            
             for (const intent of intentData.intents as ItemIntent[]) {
               intentMap.set(intent.original.toLowerCase(), intent);
             }
