@@ -280,6 +280,9 @@ const UNIVERSAL_BRANDS = [
   "fjordland", "findus", "hoff", "maarud", "kims", "sørlandschips",
 ];
 
+// Brands exclusive to specific chains
+const REMA_EXCLUSIVE_BRANDS = ["kolonihagen"];
+
 // Expand offers for universal brands across all chains
 async function expandUniversalOffers(candidates: ProductCandidate[]): Promise<void> {
   // Get all chain IDs
@@ -418,6 +421,16 @@ async function searchDatabaseFallback(
 
     // Slight penalty for cached results vs fresh
     candidate.score *= 0.85;
+    
+    // Boost Kolonihagen products for Rema 1000 users (organic, clean food)
+    const isKolonihagen = (product.brand || "").toLowerCase().includes("kolonihagen");
+    if (isKolonihagen && storeCode === "REMA_1000") {
+      candidate.score *= 1.15; // 15% boost for store-exclusive brand
+      if (userPreferences?.other_preferences?.organic) {
+        candidate.score *= 1.2; // Additional 20% boost for organic preference
+      }
+    }
+    
     candidate.matchReason += " (fra database)";
 
     if (candidate.score >= 20) {

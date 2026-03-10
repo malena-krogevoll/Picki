@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.fetch-epd]
 verify_jwt = false
+
+[functions.seed-kolonihagen]
+verify_jwt = false
