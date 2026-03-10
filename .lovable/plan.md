@@ -1,24 +1,24 @@
 
 
-## Plan: Bedre sesjonspersistens for PWA
+## Plan: Bedre utnyttelse av VDA+ API og universelle produkter
 
-### Problemet
-AuthProvider setter bare `loading=false` ved `SIGNED_IN` og `SIGNED_OUT`-events. Når appen våkner fra dvale (mobil/desktop PWA), trigges ofte `TOKEN_REFRESHED` i stedet — som aldri setter `loading=false`. Resultatet er en evig spinner eller redirect til login.
+### Implementert
 
-### Endringer
+1. **VDA+ berikelse forbedret** — Økt fra 5 til 10 EANs per søk, med detaljert logging (DNS, token, HTTP status, felt-tilgjengelighet)
+2. **Kassalapp detalj-fallback** — Produkter som mangler ingredienser/bilde berikers via `kassal.app/api/v1/products/ean/{ean}` (maks 5 per søk)
+3. **Auto masterprodukt-recompute** — `recompute-master-product` trigges automatisk for alle berikede EANs etter EPD + Kassalapp enrichment
+4. **DB-fallback søk** — Når Kassalapp returnerer < 10 treff, søkes `product_sources` for cachede produkter (f.eks. Tine-produkter funnet i Meny vises for Kiwi-brukere via offers-tabellen)
+5. **Universelle merkevarer** — Produkter fra Tine, Gilde, Prior, Stabburet, Norvegia, Jarlsberg, m.fl. får automatisk offers-oppføringer i alle kjeder
 
-**1. Fiks AuthProvider (`src/components/AuthProvider.tsx`)**
-- Sett `loading=false` for *alle* auth-events, ikke bare SIGNED_IN/SIGNED_OUT
-- Legg til `visibilitychange`-listener som kaller `supabase.auth.getSession()` når appen våkner fra bakgrunn — dette trigger token-refresh hvis nødvendig
-- Håndter `TOKEN_REFRESHED`-event eksplisitt
-
-**2. Oppdater Supabase-klient (`src/integrations/supabase/client.ts`)**
-- Legg til `detectSessionInUrl: true` for å fange opp OAuth/recovery-tokens fra URL
-- Legg til `flowType: 'pkce'` for sikrere token-håndtering
-
-**3. Fjern duplikat useAuth-hook (`src/hooks/useAuth.tsx`)**
-- Denne filen dupliserer AuthProvider-logikken og kan skape forvirring — slettes
-
-### Teknisk detalj
-Hovedårsaken er linje 35-37 i AuthProvider: `if (event === 'SIGNED_IN' || event === 'SIGNED_OUT')` filtrerer bort `TOKEN_REFRESHED` og `INITIAL_SESSION`, som begge er kritiske for PWA-gjenoppvåkning. Visibility-listeneren sikrer at token refreshes proaktivt når brukeren åpner appen igjen.
-
+### Bakgrunn-pipeline (ikke-blokkerende)
+```
+Kassalapp-søk → DB-fallback → Score & Sorter → Returner
+                                                    ↓ (bakgrunn)
+                                              EPD-berikelse
+                                                    ↓
+                                           Kassalapp detalj-fallback
+                                                    ↓
+                                         Recompute master product
+                                                    ↓
+                                       Utvid universelle offers
+```
