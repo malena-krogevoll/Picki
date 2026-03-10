@@ -441,8 +441,16 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       item => fetchedItemsRef.current.has(item.id) || productData[item.id]
     );
     
-    if (items.length > 0 && (!hasDataForAllItems || storeChanged)) {
+    // Also detect store change directly via ref (more reliable than storeChanged state)
+    const storeJustChanged = prevStoreIdRef.current !== storeId;
+    
+    if (items.length > 0 && (!hasDataForAllItems || storeChanged || storeJustChanged)) {
       if (storeChanged) setStoreChanged(false);
+      if (storeJustChanged) {
+        // Ensure refs and state are fully reset for the new store
+        fetchedItemsRef.current = new Set();
+        prevStoreIdRef.current = storeId;
+      }
       fetchProducts();
     } else {
       setLoading(false);
