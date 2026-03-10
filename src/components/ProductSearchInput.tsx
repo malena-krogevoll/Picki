@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PreferenceIndicators } from "@/components/PreferenceIndicators";
 import { analyzeProductMatch, MatchInfo, UserPreferences } from "@/lib/preferenceAnalysis";
 import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
+import { CountryFlag } from "@/components/CountryFlag";
 
 interface ProductData {
   ean: string;
