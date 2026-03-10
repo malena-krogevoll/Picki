@@ -939,6 +939,75 @@ serve(async (req) => {
       console.warn("Synchronous master enrichment failed (non-blocking):", enrichErr);
     }
 
+    // Synchronous Kassalapp detail enrichment for products still missing data (max 3, with timeout)
+    try {
+      const stillMissing = topResults
+        .filter(r => r.product.EAN && (!r.product.Ingrediensliste || !r.product.Produktbilde_URL))
+        .slice(0, 3);
+      
+      if (stillMissing.length > 0) {
+        const kassalappApiKey = Deno.env.get("KASSALAPP_API_KEY");
+        if (kassalappApiKey) {
+          console.log(`Synchronous Kassalapp detail fetch for ${stillMissing.length} products missing data`);
+          
+          const detailPromises = stillMissing.map(async (candidate) => {
+            const ean = String(candidate.product.EAN);
+            try {
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 3000);
+              
+              const res = await fetch(`https://kassal.app/api/v1/products/ean/${ean}`, {
+                headers: { Authorization: `Bearer ${kassalappApiKey}` },
+                signal: controller.signal,
+              });
+              clearTimeout(timeout);
+              
+              if (!res.ok) { await res.text(); return; }
+              
+              const productData = await res.json();
+              const firstProduct = productData.data?.products?.[0];
+              if (!firstProduct) return;
+              
+              if (!candidate.product.Ingrediensliste && firstProduct.ingredients) {
+                candidate.product.Ingrediensliste = firstProduct.ingredients;
+              }
+              if (!candidate.product.Produktbilde_URL && firstProduct.image) {
+                candidate.product.Produktbilde_URL = firstProduct.image;
+              }
+              if (!candidate.product.Merke && firstProduct.brand) {
+                candidate.product.Merke = firstProduct.brand;
+              }
+              
+              // Also save to product_sources for future cache hits
+              if (firstProduct.ingredients || firstProduct.image) {
+                await supabase.from("product_sources").upsert({
+                  ean,
+                  source: "KASSALAPP" as const,
+                  source_product_id: ean,
+                  payload: productData.data,
+                  name: firstProduct.name || null,
+                  brand: firstProduct.brand || null,
+                  image_url: firstProduct.image || null,
+                  ingredients_raw: firstProduct.ingredients || null,
+                  fetched_at: new Date().toISOString(),
+                }, { onConflict: "ean,source", ignoreDuplicates: false }).catch(() => {});
+              }
+              
+              console.log(`Sync detail enriched ${ean}: ingredients=${!!firstProduct.ingredients}, image=${!!firstProduct.image}`);
+            } catch (e) {
+              if (e instanceof Error && e.name === 'AbortError') {
+                console.warn(`Detail fetch timeout for ${ean}`);
+              }
+            }
+          });
+          
+          await Promise.allSettled(detailPromises);
+        }
+      }
+    } catch (syncDetailErr) {
+      console.warn("Synchronous Kassalapp detail enrichment failed:", syncDetailErr);
+    }
+
     // Write-through cache: save to DB in background (best effort, don't block response)
     cacheProductsToDatabase(allCandidates).catch(err => {
       console.error("Background cache write failed:", err);
