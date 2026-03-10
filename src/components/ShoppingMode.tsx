@@ -17,6 +17,7 @@ import { groupItemsByCategory } from "@/lib/storeLayoutSort";
 import { StoreSelectorDialog, getStoreName, getStoreIcon, getStoreColor } from "@/components/StoreSelectorDialog";
 import { useDiyAlternatives, DiyRecipe } from "@/hooks/useDiyAlternatives";
 import { DiyAlternativeDialog } from "@/components/DiyAlternativeDialog";
+import { getCountryFromEAN } from "@/utils/countryUtils";
 
 interface ItemIntent {
   original: string;
@@ -814,7 +815,10 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                                   {getNovaLabel(selectedProduct.novaScore, selectedProduct.hasIngredients)}
                                 </span>
                               </div>
-                              <p className="font-semibold text-foreground mb-1 truncate">{selectedProduct.brand}</p>
+                              <p className="font-semibold text-foreground mb-1 truncate">
+                                {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <span title={c.name}>{c.flag} </span> : null; })()}
+                                {selectedProduct.brand}
+                              </p>
                               <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{selectedProduct.name}</p>
                               
                               {/* Preference indicators */}
@@ -874,7 +878,10 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                                           />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-semibold truncate">{suggestion.brand}</p>
+                                          <p className="text-sm font-semibold truncate">
+                                            {(() => { const c = getCountryFromEAN(suggestion.ean); return c ? <span title={c.name}>{c.flag} </span> : null; })()}
+                                            {suggestion.brand}
+                                          </p>
                                           <p className="text-xs text-muted-foreground truncate">{suggestion.name}</p>
                                           <p className="text-sm font-bold text-primary mt-1">
                                             {suggestion.price !== null ? `${suggestion.price.toFixed(2)} kr` : 'Pris ikke tilgjengelig'}
