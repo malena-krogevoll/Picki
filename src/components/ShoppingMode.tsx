@@ -531,21 +531,27 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             
             try {
               // Fetch Kassalapp details and EPD data in parallel
-              const [detailResult, epdResult] = await Promise.all([
+              const [detailResult, epdResult, kassalResult] = await Promise.all([
                 supabase.functions.invoke('get-product-details', { body: { ean } }),
                 supabase.from('product_sources')
                   .select('ingredients_raw, image_url, payload')
                   .eq('ean', ean)
                   .eq('source', 'EPD')
+                  .maybeSingle(),
+                supabase.from('product_sources')
+                  .select('ingredients_raw, image_url, payload')
+                  .eq('ean', ean)
+                  .eq('source', 'KASSALAPP')
                   .maybeSingle()
               ]);
               
               const details = detailResult.error ? null : detailResult.data;
               const epd = (epdResult.data as EpdEnrichmentSource | null) ?? null;
+              const kassal = (kassalResult.data as EpdEnrichmentSource | null) ?? null;
               
-              if (!details && !epd) return null;
+              if (!details && !epd && !kassal) return null;
               
-              return { itemId, productIndex, ean, details, epd };
+              return { itemId, productIndex, ean, details, epd, kassal };
             } catch {
               return null;
             }
