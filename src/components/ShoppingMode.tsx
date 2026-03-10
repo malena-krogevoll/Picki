@@ -534,14 +534,14 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               const [detailResult, epdResult] = await Promise.all([
                 supabase.functions.invoke('get-product-details', { body: { ean } }),
                 supabase.from('product_sources')
-                  .select('ingredients_raw, image_url')
+                  .select('ingredients_raw, image_url, payload')
                   .eq('ean', ean)
                   .eq('source', 'EPD')
                   .maybeSingle()
               ]);
               
               const details = detailResult.error ? null : detailResult.data;
-              const epd = epdResult.data;
+              const epd = (epdResult.data as EpdEnrichmentSource | null) ?? null;
               
               if (!details && !epd) return null;
               
