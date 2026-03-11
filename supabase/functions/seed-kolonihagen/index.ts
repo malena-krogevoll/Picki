@@ -693,7 +693,13 @@ serve(async (req) => {
   // Admin-only seeding function — not exposed in the app UI
 
   try {
-    const result = await seedProducts();
+    let options = {};
+    try {
+      const body = await req.json();
+      options = body || {};
+    } catch { /* no body is fine */ }
+    
+    const result = await seedProducts(options);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
