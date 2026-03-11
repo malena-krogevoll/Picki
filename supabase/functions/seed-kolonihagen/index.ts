@@ -564,8 +564,12 @@ async function seedProducts(options?: { skipEpd?: boolean; skipScrape?: boolean;
   } else {
     console.warn("VDA_CLIENT_ID not configured, skipping EPD enrichment");
   }
+  } else {
+    console.log("Skipping EPD enrichment (skipEpd or scrapeOnly)");
+  }
 
   // 5. Scrape kolonihagen.no for ingredients, images, nutrition
+  if (!options?.skipScrape) {
   console.log("Starting kolonihagen.no scraping...");
 
   // Check which products already have ingredients in product_sources or products
