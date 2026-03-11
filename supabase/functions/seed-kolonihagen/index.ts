@@ -419,7 +419,15 @@ async function seedProducts(options?: { skipEpd?: boolean; skipScrape?: boolean;
   let epdEnriched = 0;
   let scraped = 0;
 
-  console.log(`Starting Kolonihagen seeding: ${KOLONIHAGEN_PRODUCTS.length} products`);
+  console.log(`Starting Kolonihagen seeding: ${KOLONIHAGEN_PRODUCTS.length} products (scrapeOnly=${!!options?.scrapeOnly}, skipEpd=${!!options?.skipEpd}, skipScrape=${!!options?.skipScrape})`);
+
+  if (options?.scrapeOnly) {
+    // Jump straight to scraping step
+    console.log("Scrape-only mode: skipping seed + EPD steps");
+    sourcesUpserted = -1;
+    productsUpserted = -1;
+    offersCreated = -1;
+  } else {
 
   // 1. Upsert all products into product_sources
   for (const product of KOLONIHAGEN_PRODUCTS) {
