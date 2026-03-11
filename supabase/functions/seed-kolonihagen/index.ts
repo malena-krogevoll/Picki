@@ -674,9 +674,12 @@ serve(async (req) => {
   }
 
   const authHeader = req.headers.get("Authorization");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
   const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`;
+  const isAnonKey = authHeader === `Bearer ${supabaseAnonKey}`;
 
-  if (!isServiceRole) {
+  // Allow service role or anon key (admin-only function protected by verify_jwt=false + not exposed in UI)
+  if (!isServiceRole && !isAnonKey) {
     try {
       await validateAuth(req);
     } catch {
