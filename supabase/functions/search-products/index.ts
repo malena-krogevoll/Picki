@@ -1054,9 +1054,8 @@ serve(async (req) => {
                 candidate.product.Merke = firstProduct.brand;
               }
               
-              // Also save to product_sources for future cache hits
               if (firstProduct.ingredients || firstProduct.image) {
-                await supabase.from("product_sources").upsert({
+                const { error: upsertErr } = await supabase.from("product_sources").upsert({
                   ean,
                   source: "KASSALAPP" as const,
                   source_product_id: ean,
@@ -1066,7 +1065,8 @@ serve(async (req) => {
                   image_url: firstProduct.image || null,
                   ingredients_raw: firstProduct.ingredients || null,
                   fetched_at: new Date().toISOString(),
-                }, { onConflict: "ean,source", ignoreDuplicates: false }).catch(() => {});
+                }, { onConflict: "ean,source", ignoreDuplicates: false });
+                if (upsertErr) console.warn(`Kassalapp detail cache error for ${ean}:`, upsertErr);
               }
               
               console.log(`Sync enriched ${ean}: ingredients=${hadNoIngredients ? (firstProduct.ingredients ? 'FILLED' : 'still-missing') : 'had'}, image=${hadNoImage ? (firstProduct.image ? 'FILLED' : 'still-missing') : 'had'}`);

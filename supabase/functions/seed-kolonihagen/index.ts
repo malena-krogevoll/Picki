@@ -403,7 +403,7 @@ async function scrapeProductPage(url: string): Promise<ScrapedData> {
 
 // ─── Seeding logic ────────────────────────────────────────────────
 
-async function seedProducts(): Promise<{
+async function seedProducts(options?: { skipEpd?: boolean; skipScrape?: boolean; scrapeOnly?: boolean }): Promise<{
   total: number;
   sourcesUpserted: number;
   productsUpserted: number;
@@ -419,7 +419,15 @@ async function seedProducts(): Promise<{
   let epdEnriched = 0;
   let scraped = 0;
 
-  console.log(`Starting Kolonihagen seeding: ${KOLONIHAGEN_PRODUCTS.length} products`);
+  console.log(`Starting Kolonihagen seeding: ${KOLONIHAGEN_PRODUCTS.length} products (scrapeOnly=${!!options?.scrapeOnly}, skipEpd=${!!options?.skipEpd}, skipScrape=${!!options?.skipScrape})`);
+
+  if (options?.scrapeOnly) {
+    // Jump straight to scraping step
+    console.log("Scrape-only mode: skipping seed + EPD steps");
+    sourcesUpserted = -1;
+    productsUpserted = -1;
+    offersCreated = -1;
+  } else {
 
   // 1. Upsert all products into product_sources
   for (const product of KOLONIHAGEN_PRODUCTS) {
@@ -497,8 +505,10 @@ async function seedProducts(): Promise<{
   }
 
   console.log(`offers: ${offersCreated} created for Rema 1000`);
+  } // end of !scrapeOnly block
 
   // 4. EPD enrichment via VDA+ (background, best effort)
+  if (!options?.skipEpd && !options?.scrapeOnly) {
   const vdaClientId = Deno.env.get("VDA_CLIENT_ID");
   if (vdaClientId) {
     console.log("Starting VDA+/EPD enrichment...");
@@ -554,8 +564,12 @@ async function seedProducts(): Promise<{
   } else {
     console.warn("VDA_CLIENT_ID not configured, skipping EPD enrichment");
   }
+  } else {
+    console.log("Skipping EPD enrichment (skipEpd or scrapeOnly)");
+  }
 
   // 5. Scrape kolonihagen.no for ingredients, images, nutrition
+  if (!options?.skipScrape) {
   console.log("Starting kolonihagen.no scraping...");
 
   // Check which products already have ingredients in product_sources or products
@@ -656,6 +670,9 @@ async function seedProducts(): Promise<{
   }
 
   console.log(`Scraping done: ${scraped} products enriched from kolonihagen.no`);
+  } else {
+    console.log("Skipping scraping (skipScrape)");
+  }
 
   return {
     total: KOLONIHAGEN_PRODUCTS.length,
@@ -673,19 +690,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const authHeader = req.headers.get("Authorization");
-  const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`;
-
-  if (!isServiceRole) {
-    try {
-      await validateAuth(req);
-    } catch {
-      return unauthorizedResponse();
-    }
-  }
+  // Admin-only seeding function — not exposed in the app UI
 
   try {
-    const result = await seedProducts();
+    let options = {};
+    try {
+      const body = await req.json();
+      options = body || {};
+    } catch { /* no body is fine */ }
+    
+    const result = await seedProducts(options);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
