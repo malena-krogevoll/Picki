@@ -419,16 +419,20 @@ async function searchDatabaseFallback(
       ? processProductWithIntent(mappedProduct, query, intent, userPreferences)
       : processProduct(mappedProduct, query, userPreferences);
 
-    // Slight penalty for cached results vs fresh
-    candidate.score *= 0.85;
-    
-    // Boost Kolonihagen products for Rema 1000 users (organic, clean food)
+    // Slight penalty for cached results vs fresh (reduced for quality brands)
     const isKolonihagen = (product.brand || "").toLowerCase().includes("kolonihagen");
-    if (isKolonihagen && storeCode === "REMA_1000") {
-      candidate.score *= 1.15; // 15% boost for store-exclusive brand
-      if (userPreferences?.other_preferences?.organic) {
-        candidate.score *= 1.2; // Additional 20% boost for organic preference
+    if (isKolonihagen) {
+      // Kolonihagen products are known renvare — minimal DB penalty
+      candidate.score *= 0.95;
+      // Boost for Rema 1000 users (store-exclusive)
+      if (storeCode === "REMA_1000") {
+        candidate.score *= 1.25; // Strong boost for store-exclusive clean brand
+        if (userPreferences?.other_preferences?.organic) {
+          candidate.score *= 1.2; // Additional organic preference boost
+        }
       }
+    } else {
+      candidate.score *= 0.85;
     }
     
     candidate.matchReason += " (fra database)";
