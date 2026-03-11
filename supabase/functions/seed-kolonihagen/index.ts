@@ -403,7 +403,7 @@ async function scrapeProductPage(url: string): Promise<ScrapedData> {
 
 // ─── Seeding logic ────────────────────────────────────────────────
 
-async function seedProducts(): Promise<{
+async function seedProducts(options?: { skipEpd?: boolean; skipScrape?: boolean; scrapeOnly?: boolean }): Promise<{
   total: number;
   sourcesUpserted: number;
   productsUpserted: number;
