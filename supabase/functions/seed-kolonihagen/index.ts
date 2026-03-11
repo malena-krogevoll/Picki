@@ -670,6 +670,9 @@ async function seedProducts(options?: { skipEpd?: boolean; skipScrape?: boolean;
   }
 
   console.log(`Scraping done: ${scraped} products enriched from kolonihagen.no`);
+  } else {
+    console.log("Skipping scraping (skipScrape)");
+  }
 
   return {
     total: KOLONIHAGEN_PRODUCTS.length,
