@@ -848,10 +848,53 @@ serve(async (req) => {
       );
     }
 
-    // Sorter etter renvareScore og relevans
+    // Look up NOVA scores from products table for NOVA-aware sorting
+    const candidateEans = candidates
+      .filter(c => c.product.EAN)
+      .map(c => String(c.product.EAN));
+    
+    const novaMap = new Map<string, number>();
+    if (candidateEans.length > 0) {
+      try {
+        const { data: novaProducts } = await supabase
+          .from("products")
+          .select("ean, nova_class")
+          .in("ean", candidateEans)
+          .not("nova_class", "is", null);
+        
+        if (novaProducts) {
+          for (const p of novaProducts) {
+            novaMap.set(p.ean, p.nova_class!);
+          }
+          console.log(`NOVA lookup: found scores for ${novaProducts.length}/${candidateEans.length} products`);
+        }
+      } catch (e) {
+        console.warn("NOVA lookup failed (non-blocking):", e);
+      }
+    }
+
+    // Sort: NOVA-aware ranking prioritizing clean products
     candidates.sort((a, b) => {
+      const aEan = a.product.EAN ? String(a.product.EAN) : "";
+      const bEan = b.product.EAN ? String(b.product.EAN) : "";
+      const aNova = novaMap.get(aEan) ?? 99;
+      const bNova = novaMap.get(bEan) ?? 99;
+
+      // 1. Both have relevance scores above threshold? Compare NOVA first
+      const bothRelevant = a.score >= 50 && b.score >= 50;
+      if (bothRelevant && aNova !== bNova) {
+        // Significant NOVA difference (e.g. NOVA 2 vs NOVA 4) trumps text score
+        if (Math.abs(aNova - bNova) >= 2) return aNova - bNova;
+      }
+
+      // 2. renvareScore difference > 20 is significant
       const renvareDiff = b.renvareScore - a.renvareScore;
       if (Math.abs(renvareDiff) > 20) return renvareDiff;
+
+      // 3. If NOVA is different by 1 and both relevant, still prefer lower NOVA
+      if (bothRelevant && aNova !== bNova) return aNova - bNova;
+
+      // 4. Fall back to text match score
       return b.score - a.score;
     });
 
