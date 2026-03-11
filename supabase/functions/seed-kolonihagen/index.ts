@@ -505,8 +505,10 @@ async function seedProducts(options?: { skipEpd?: boolean; skipScrape?: boolean;
   }
 
   console.log(`offers: ${offersCreated} created for Rema 1000`);
+  } // end of !scrapeOnly block
 
   // 4. EPD enrichment via VDA+ (background, best effort)
+  if (!options?.skipEpd && !options?.scrapeOnly) {
   const vdaClientId = Deno.env.get("VDA_CLIENT_ID");
   if (vdaClientId) {
     console.log("Starting VDA+/EPD enrichment...");
