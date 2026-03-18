@@ -296,8 +296,7 @@ serve(async (req) => {
     console.error("Error in fetch-epd function:", error);
     return new Response(
       JSON.stringify({
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
+        error: "An internal error occurred. Please try again.",
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
