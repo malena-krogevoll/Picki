@@ -453,7 +453,8 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               fetchedItemsRef.current.add(item.id);
               return { itemId: item.id, products: sortedProducts };
             } else {
-              fetchedItemsRef.current.add(item.id);
+              // Don't mark as fetched — empty results may be due to temporary API failure
+              // so the item should be retried on next visit
               return { itemId: item.id, products: [] as ProductSuggestion[] };
             }
           } catch (err) {
