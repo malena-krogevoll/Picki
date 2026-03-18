@@ -198,17 +198,36 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
   // Initialize from session cache if available
   const sessionCache = sessionProductCache.get(cacheKey);
   
+  // When restoring from session cache, filter out items that had empty results
+  // so they get re-fetched (the empty result may have been due to a temporary failure)
+  const validFetchedItems = useMemo(() => {
+    if (!sessionCache) return new Set<string>();
+    const valid = new Set<string>();
+    for (const itemId of sessionCache.fetchedItems) {
+      const products = sessionCache.products[itemId];
+      if (products && products.length > 0) {
+        valid.add(itemId);
+      }
+    }
+    return valid;
+  }, [cacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  
+  // Check if the session cache has any actual products
+  const sessionCacheHasProducts = sessionCache 
+    ? Object.values(sessionCache.products).some(p => p && p.length > 0)
+    : false;
+  
   const [productData, setProductData] = useState<Record<string, ProductSuggestion[]>>(
     sessionCache?.products || {}
   );
-  const [loading, setLoading] = useState(!sessionCache);
+  const [loading, setLoading] = useState(!sessionCacheHasProducts);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>(
     sessionCache?.selections || {}
   );
   
-  // Track fetched items - initialize from session cache
-  const fetchedItemsRef = useRef<Set<string>>(sessionCache?.fetchedItems || new Set());
+  // Track fetched items - initialize from session cache (only items with actual results)
+  const fetchedItemsRef = useRef<Set<string>>(validFetchedItems);
   const prevStoreIdRef = useRef(storeId);
   const prevCacheKeyRef = useRef(cacheKey);
 
