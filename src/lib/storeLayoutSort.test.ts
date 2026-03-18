@@ -39,6 +39,26 @@ describe("categorizeProduct", () => {
     const result = categorizeProduct("potetgull");
     expect(result.category).toBe("Snacks og godteri");
   });
+
+  it("is case-insensitive", () => {
+    const result = categorizeProduct("Melk");
+    expect(result.category).toBe("Meieriprodukter");
+  });
+
+  it("handles empty string", () => {
+    const result = categorizeProduct("");
+    expect(result.category).toBe("Annet");
+  });
+
+  it("categorizes compound dairy products", () => {
+    expect(categorizeProduct("lettmelk").category).toBe("Meieriprodukter");
+    expect(categorizeProduct("skummetmelk").category).toBe("Meieriprodukter");
+  });
+
+  it("categorizes via productBrand parameter", () => {
+    const result = categorizeProduct("filet", "Lerøy", "Lerøy");
+    expect(result.category).toBe("Fisk og sjømat");
+  });
 });
 
 describe("groupItemsByCategory", () => {

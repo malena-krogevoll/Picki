@@ -127,6 +127,58 @@ describe("analyzeProductMatch - match score", () => {
   });
 });
 
+describe("analyzeProductMatch - organic preference", () => {
+  it("detects økologisk product", () => {
+    const result = analyzeProductMatch(
+      { name: "Økologisk melk", brand: "Tine", ingredienser: "melk" },
+      makePrefs({ other_preferences: { organic: true, lowest_price: false } })
+    );
+    expect(result.organicMatch).toBe(true);
+    expect(result.matchScore).toBeGreaterThan(50);
+  });
+
+  it("penalizes non-organic when organic is preferred", () => {
+    const result = analyzeProductMatch(
+      { name: "Vanlig melk", brand: "Tine", ingredienser: "melk" },
+      makePrefs({ other_preferences: { organic: true, lowest_price: false } })
+    );
+    expect(result.organicMatch).toBe(false);
+  });
+});
+
+describe("analyzeProductMatch - priority order scoring", () => {
+  it("boosts score when priority matches", () => {
+    const withPriority = analyzeProductMatch(
+      { name: "Økologisk melk", brand: "Tine", ingredienser: "melk" },
+      makePrefs({
+        other_preferences: { organic: true, lowest_price: false },
+        priority_order: ["organic", "local_food"]
+      })
+    );
+    const withoutPriority = analyzeProductMatch(
+      { name: "Økologisk melk", brand: "Tine", ingredienser: "melk" },
+      makePrefs({
+        other_preferences: { organic: true, lowest_price: false },
+        priority_order: []
+      })
+    );
+    expect(withPriority.matchScore).toBeGreaterThan(withoutPriority.matchScore);
+  });
+});
+
+describe("analyzeProductMatch - multiple allergens", () => {
+  it("detects both gluten and milk", () => {
+    const result = analyzeProductMatch(
+      { name: "Pannekaker", brand: "Test", ingredienser: "hvetemel, melk, egg, sukker" },
+      makePrefs({ allergies: ["gluten", "melk", "egg"] })
+    );
+    expect(result.allergyWarnings).toContain("gluten");
+    expect(result.allergyWarnings).toContain("melk");
+    expect(result.allergyWarnings).toContain("egg");
+    expect(result.matchScore).toBeLessThan(10);
+  });
+});
+
 describe("sortProductsByPreference", () => {
   it("puts allergen-warning products last", () => {
     const products = [
