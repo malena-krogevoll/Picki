@@ -147,27 +147,14 @@ export const useShoppingList = (userId: string | undefined) => {
   };
 
   const addItem = async (listId: string, name: string, productData?: ProductData, quantity: number = 1, notes?: string) => {
-    // Convert ProductData to Json-compatible format
-    const productDataAsJson = productData ? {
-      ean: productData.ean,
-      name: productData.name,
-      brand: productData.brand,
-      price: productData.price,
-      image: productData.image,
-      novaScore: productData.novaScore,
-      isEstimated: productData.isEstimated,
-      store: productData.store,
-      ingredients: productData.ingredients,
-      allergenInfo: productData.allergenInfo,
-      filters: productData.filters,
-    } as Json : undefined;
+    const productDataAsJson = productData ? productDataToJson(productData) : undefined;
 
     const { error } = await supabase
       .from("shopping_list_items")
       .insert({
         list_id: listId,
         name,
-        quantity: Math.max(1, quantity),
+        quantity: sanitizeQuantity(quantity),
         notes: notes || null,
         product_data: productDataAsJson ?? null,
         selected_product_ean: productData?.ean ?? null,
