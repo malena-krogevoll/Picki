@@ -197,7 +197,8 @@ describe("parseShoppingListText – whitespace and edge cases", () => {
   });
 
   it("should handle tab characters in input", () => {
-    expect(names("melk\tegg")).toEqual(["melk\tegg"]); // tabs are not separators, kept as-is
+    // Tabs are normalized to spaces by the whitespace normalizer
+    expect(names("melk\tegg")).toEqual(["melk egg"]);
   });
 
   it("should handle trailing/leading separators", () => {
