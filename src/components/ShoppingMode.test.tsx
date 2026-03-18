@@ -1,6 +1,6 @@
 // @ts-nocheck - RTL types resolve at test runtime via vitest
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ShoppingMode, sessionProductCache, clearSessionCache, clearSessionCacheForList } from "./ShoppingMode";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +54,9 @@ const makeProduct = (overrides: Record<string, any> = {}) => ({
   },
   ...overrides,
 });
+
+// Mutable items list that tests can modify
+let mockItems: any[] = [];
 
 vi.mock("@/hooks/useShoppingList", () => ({
   useShoppingList: () => ({
@@ -142,9 +145,6 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn() },
 }));
 
-// Mutable items list that tests can modify
-let mockItems: any[] = [];
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -185,7 +185,6 @@ describe("ShoppingMode", () => {
       mockItems = [];
       seedCache([], {});
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("Ingen varer i handlelisten")).toBeInTheDocument();
     });
   });
@@ -196,10 +195,7 @@ describe("ShoppingMode", () => {
   describe("loading state", () => {
     it("renders skeletons while loading (no cache)", () => {
       mockItems = [makeItem()];
-      // No cache → triggers loading
       render(<ShoppingMode {...defaultProps} />);
-
-      // Should show skeleton placeholders (the loading branch)
       const skeletons = document.querySelectorAll("[class*='animate-pulse'], [data-slot='skeleton']");
       expect(skeletons.length).toBeGreaterThan(0);
     });
@@ -214,9 +210,7 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("Melk")).toBeInTheDocument();
       expect(screen.getByText("Tine")).toBeInTheDocument();
       expect(screen.getByText("Helmelk 1L")).toBeInTheDocument();
@@ -228,20 +222,16 @@ describe("ShoppingMode", () => {
       const product = makeProduct({ novaScore: 1 });
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("NOVA 1")).toBeInTheDocument();
     });
 
-    it("renders 'Data mangler' for product without ingredients", () => {
+    it("renders 'Ukjent' for product without ingredients", () => {
       const item = makeItem();
       const product = makeProduct({ novaScore: null, hasIngredients: false });
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("Ukjent")).toBeInTheDocument();
     });
 
@@ -250,9 +240,7 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("3x")).toBeInTheDocument();
     });
 
@@ -260,12 +248,8 @@ describe("ShoppingMode", () => {
       const item = makeItem({ id: "item-nf", name: "Sjeldent krydder" });
       mockItems = [item];
       seedCache([item], { [item.id]: [] });
-
       render(<ShoppingMode {...defaultProps} />);
-
-      expect(
-        screen.getByText(/Ingen produkter funnet for "Sjeldent krydder"/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Ingen produkter funnet for "Sjeldent krydder"/)).toBeInTheDocument();
     });
   });
 
@@ -278,12 +262,9 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       const checkbox = screen.getAllByRole("checkbox")[0];
       fireEvent.click(checkbox);
-
       expect(mockUpdateItemStatus).toHaveBeenCalledWith("item-1", true);
     });
 
@@ -292,9 +273,7 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("I handlekurv")).toBeInTheDocument();
     });
   });
@@ -312,18 +291,15 @@ describe("ShoppingMode", () => {
       ];
       mockItems = [item];
       seedCache([item], { [item.id]: products });
-
       render(<ShoppingMode {...defaultProps} />);
 
       const altButton = screen.getByText("2 alternativer");
       expect(altButton).toBeInTheDocument();
 
-      // Expand
       fireEvent.click(altButton);
       expect(screen.getByText("Q")).toBeInTheDocument();
       expect(screen.getByText("Røros")).toBeInTheDocument();
 
-      // Collapse
       fireEvent.click(altButton);
       expect(screen.queryByText("Q")).not.toBeInTheDocument();
     });
@@ -336,9 +312,7 @@ describe("ShoppingMode", () => {
       ];
       mockItems = [item];
       seedCache([item], { [item.id]: products });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("1 alternativ")).toBeInTheDocument();
     });
   });
@@ -352,17 +326,11 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
 
-      // Find compact toggle button (the LayoutList/List icon button)
       const compactToggle = screen.getByTitle("Kompakt visning");
       fireEvent.click(compactToggle);
-
       expect(localStorage.getItem("picki-compact-view")).toBe("true");
-
-      // In compact mode the item name is truncated in a different layout
-      // Verify "Du søkte etter:" is NOT shown (only in full view)
       expect(screen.queryByText("Du søkte etter:")).not.toBeInTheDocument();
     });
   });
@@ -380,9 +348,7 @@ describe("ShoppingMode", () => {
       const p2 = makeProduct({ ean: "7038010000002", price: 35.0 });
       mockItems = items;
       seedCache(items, { i1: [p1], i2: [p2] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("59.90 kr")).toBeInTheDocument();
       expect(screen.getByText("1 av 2 varer i kurv")).toBeInTheDocument();
     });
@@ -392,14 +358,11 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
 
-      // The footer "Fullfør" button
       const completeButtons = screen.getAllByText(/Fullfør/);
       fireEvent.click(completeButtons[completeButtons.length - 1]);
 
-      // Wait for async completeList
       await vi.waitFor(() => {
         expect(mockCompleteList).toHaveBeenCalledWith("list-1");
       });
@@ -416,17 +379,14 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       const onEditList = vi.fn();
       render(<ShoppingMode {...defaultProps} onEditList={onEditList} />);
 
-      // The Pencil/Rediger button
       const editButtons = screen.getAllByRole("button");
       const editBtn = editButtons.find(
         (b) => b.textContent?.includes("Rediger") || b.querySelector("[class*='lucide-pencil']")
       );
       if (editBtn) fireEvent.click(editBtn);
-
       expect(onEditList).toHaveBeenCalled();
     });
 
@@ -435,7 +395,6 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
 
       const homeButtons = screen.getAllByRole("button");
@@ -443,7 +402,6 @@ describe("ShoppingMode", () => {
         (b) => b.textContent?.includes("Hjem") || b.querySelector("[class*='lucide-home']")
       );
       if (homeBtn) fireEvent.click(homeBtn);
-
       expect(mockNavigate).toHaveBeenCalledWith("/");
     });
 
@@ -452,9 +410,7 @@ describe("ShoppingMode", () => {
       const product = makeProduct();
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("Rema 1000")).toBeInTheDocument();
     });
   });
@@ -466,9 +422,7 @@ describe("ShoppingMode", () => {
     it("clearSessionCache removes specific list+store entry", () => {
       sessionProductCache.set("list-1:REMA_1000", { products: {}, selections: {}, fetchedItems: new Set() });
       sessionProductCache.set("list-1:KIWI", { products: {}, selections: {}, fetchedItems: new Set() });
-
       clearSessionCache("list-1", "REMA_1000");
-
       expect(sessionProductCache.has("list-1:REMA_1000")).toBe(false);
       expect(sessionProductCache.has("list-1:KIWI")).toBe(true);
     });
@@ -477,9 +431,7 @@ describe("ShoppingMode", () => {
       sessionProductCache.set("list-1:REMA_1000", { products: {}, selections: {}, fetchedItems: new Set() });
       sessionProductCache.set("list-1:KIWI", { products: {}, selections: {}, fetchedItems: new Set() });
       sessionProductCache.set("list-2:REMA_1000", { products: {}, selections: {}, fetchedItems: new Set() });
-
       clearSessionCacheForList("list-1");
-
       expect(sessionProductCache.has("list-1:REMA_1000")).toBe(false);
       expect(sessionProductCache.has("list-1:KIWI")).toBe(false);
       expect(sessionProductCache.has("list-2:REMA_1000")).toBe(true);
@@ -487,7 +439,7 @@ describe("ShoppingMode", () => {
   });
 
   // =========================================================================
-  // NOVA helpers
+  // NOVA display
   // =========================================================================
   describe("NOVA display", () => {
     it("shows warning banner for high-NOVA product", () => {
@@ -495,13 +447,9 @@ describe("ShoppingMode", () => {
       const product = makeProduct({ novaScore: 4, novaIsEstimated: false });
       mockItems = [item];
       seedCache([item], { [item.id]: [product] });
-
       render(<ShoppingMode {...defaultProps} />);
-
       expect(screen.getByText("NOVA 4")).toBeInTheDocument();
-      expect(
-        screen.getByText(/Sterkt bearbeidet produkt/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Sterkt bearbeidet produkt/)).toBeInTheDocument();
     });
   });
 });
