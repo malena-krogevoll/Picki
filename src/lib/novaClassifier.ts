@@ -1,5 +1,6 @@
-// NOVA classification logic extracted from classify-nova edge function
-// for shared use and unit testing
+// Frontend copy of NOVA classification logic.
+// The canonical backend version lives at supabase/functions/_shared/novaClassifier.ts.
+// IMPORTANT: Keep both files in sync — any rule changes must be applied to both.
 
 export const VERSION = "1.0.0";
 
