@@ -1,22 +1,22 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+/**
+ * Shared NOVA classification logic for Deno edge functions.
+ * This is the single source of truth for NOVA scoring in the backend.
+ *
+ * IMPORTANT: Keep this file in sync with src/lib/novaClassifier.ts (frontend copy).
+ * Both files must produce identical classification results.
+ */
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+export const VERSION = "1.0.0";
+export const RULESET_DATE = "2025-01-15";
 
-const VERSION = "1.0.0";
-const RULESET_DATE = "2025-01-15";
-
-interface Rule {
+export interface Rule {
   id: string;
   pattern: RegExp;
   type: 'strong' | 'weak' | 'real_food';
   description: string;
 }
 
-const UPF_STRONG_RULES: Rule[] = [
+export const UPF_STRONG_RULES: Rule[] = [
   { id: "UPF_STRONG_AROMA_GENERIC", pattern: /\baroma(er)?\b/gi, type: 'strong', description: "Generisk aroma" },
   { id: "UPF_STRONG_AROMA_NATURAL", pattern: /\bnaturlig(e)? aroma(er)?\b/gi, type: 'strong', description: "Naturlig aroma" },
   { id: "UPF_STRONG_AROMA_SMOKE", pattern: /\brøkaroma\b/gi, type: 'strong', description: "Røkaroma" },
@@ -42,7 +42,7 @@ const UPF_STRONG_RULES: Rule[] = [
   { id: "UPF_STRONG_CARMINE", pattern: /\b(karmin|E ?120|annatto|E ?160b)\b/gi, type: 'strong', description: "Karmin/Annatto" },
 ];
 
-const UPF_WEAK_RULES: Rule[] = [
+export const UPF_WEAK_RULES: Rule[] = [
   { id: "UPF_WEAK_PRESERVATIVE", pattern: /\bkonserveringsmiddel\b/gi, type: 'weak', description: "Konserveringsmiddel" },
   { id: "UPF_WEAK_E200", pattern: /\bE ?2\d{2}\b/gi, type: 'weak', description: "E200-serie (konserveringsmidler)" },
   { id: "UPF_WEAK_ANTIOXIDANT", pattern: /\bantioksidant(er)?\b/gi, type: 'weak', description: "Antioksidant" },
@@ -54,7 +54,7 @@ const UPF_WEAK_RULES: Rule[] = [
   { id: "UPF_WEAK_REFINED_OIL", pattern: /\braffinert(e)? vegetabilsk(e)? olje(r)?\b/gi, type: 'weak', description: "Raffinert vegetabilsk olje" },
 ];
 
-const REAL_FOOD_RULES: Rule[] = [
+export const REAL_FOOD_RULES: Rule[] = [
   { id: "REAL_FOOD_WHOLE_GRAIN", pattern: /\bhel(e)? korn\b/gi, type: 'real_food', description: "Hele korn" },
   { id: "REAL_FOOD_WHOLE_NUTS", pattern: /\bhele nøtter\b/gi, type: 'real_food', description: "Hele nøtter" },
   { id: "REAL_FOOD_LEGUMES", pattern: /\bbelgfrukter\b/gi, type: 'real_food', description: "Belg frukter" },
@@ -67,6 +67,53 @@ const REAL_FOOD_RULES: Rule[] = [
   { id: "REAL_FOOD_DRIED", pattern: /\btørket\b/gi, type: 'real_food', description: "Tørket" },
   { id: "REAL_FOOD_SMOKED", pattern: /\brøkt\b(?!\s*aroma)/gi, type: 'real_food', description: "Røkt (ikke røkaroma)" },
 ];
+
+export const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon'];
+
+const NO_INGREDIENTS_PHRASES = [
+  'ingen ingrediensinformasjon tilgjengelig',
+  'ingen ingrediensinformasjon',
+  'ingredienser ikke tilgjengelig',
+  'not available',
+  'n/a',
+  'ingen data',
+  'mangler ingredienser',
+  'ukjent',
+];
+
+export interface Signal {
+  type: 'strong' | 'weak' | 'real_food';
+  rule_id: string;
+  match: string;
+  description: string;
+}
+
+export interface ClassificationInput {
+  ingredients_text: string;
+  additives?: string[];
+  product_category?: string;
+  language?: string;
+}
+
+export interface ClassificationResult {
+  nova_group: 1 | 2 | 3 | 4 | null;
+  confidence: number;
+  reasoning: string;
+  signals: Signal[];
+  has_ingredients: boolean;
+  is_estimated: boolean;
+  debug: {
+    ingredients_count: number;
+    has_e_numbers: boolean;
+    e_numbers: string[];
+    strong_hits: number;
+    weak_hits: number;
+    real_food_hits: number;
+    normalized_text_sample: string;
+  };
+  version: string;
+  timestamp: string;
+}
 
 function normalizeText(text: string): string {
   return text.toLowerCase().replace(/\s+/g, ' ').replace(/%/g, '').trim();
@@ -82,14 +129,7 @@ function extractENumbers(text: string): string[] {
   return [...new Set(matches.map(e => e.replace(/\s+/g, '').toUpperCase()))];
 }
 
-interface Signal {
-  type: 'strong' | 'weak' | 'real_food';
-  rule_id: string;
-  match: string;
-  description: string;
-}
-
-function matchRules(text: string, rules: Rule[]): Signal[] {
+export function matchRules(text: string, rules: Rule[]): Signal[] {
   const signals: Signal[] = [];
   for (const rule of rules) {
     const matches = text.match(rule.pattern);
@@ -103,40 +143,28 @@ function matchRules(text: string, rules: Rule[]): Signal[] {
   return signals;
 }
 
-interface ClassificationInput {
-  ingredients_text: string;
-  additives?: string[];
-  product_category?: string;
-  language?: string;
-}
-
-interface ClassificationResult {
-  nova_group: 1 | 2 | 3 | 4;
-  confidence: number;
-  reasoning: string;
-  signals: Signal[];
-  debug: {
-    ingredients_count: number;
-    has_e_numbers: boolean;
-    e_numbers: string[];
-    strong_hits: number;
-    weak_hits: number;
-    real_food_hits: number;
-    normalized_text_sample: string;
-  };
-  version: string;
-  timestamp: string;
-}
-
-function classifyNova(input: ClassificationInput): ClassificationResult {
+export function classifyNova(input: ClassificationInput): ClassificationResult {
   const { ingredients_text, additives = [], product_category } = input;
   
-  if (!ingredients_text || ingredients_text.trim().length === 0) {
+  const normalizedInput = (ingredients_text || '').trim().toLowerCase();
+  const isMissingIngredients = !ingredients_text || 
+    ingredients_text.trim().length === 0 ||
+    NO_INGREDIENTS_PHRASES.some(phrase => normalizedInput.includes(phrase));
+  
+  if (isMissingIngredients) {
+    const categoryLower = (product_category || '').toLowerCase();
+    const isHighRiskCategory = HIGH_RISK_CATEGORIES.some(cat => categoryLower.includes(cat));
+    
     return {
-      nova_group: 2, confidence: 0.2,
-      reasoning: 'Ingen ingrediensinformasjon tilgjengelig for klassifisering.',
+      nova_group: isHighRiskCategory ? 4 : null,
+      confidence: isHighRiskCategory ? 0.15 : 0,
+      has_ingredients: false,
+      is_estimated: true,
+      reasoning: isHighRiskCategory 
+        ? `Ingrediensliste mangler. Basert på produktkategori (${product_category}) anslås produktet som sterkt bearbeidet (NOVA 4), men dette er usikkert.`
+        : 'Ingen ingrediensinformasjon tilgjengelig. Klassifisering ikke mulig uten ingrediensliste.',
       signals: [],
-      debug: { ingredients_count: 0, has_e_numbers: false, e_numbers: [], strong_hits: 0, weak_hits: 0, real_food_hits: 0, normalized_text_sample: "" },
+      debug: { ingredients_count: 0, has_e_numbers: false, e_numbers: [], strong_hits: 0, weak_hits: 0, real_food_hits: 0, normalized_text_sample: normalizedInput.substring(0, 100) },
       version: VERSION, timestamp: new Date().toISOString()
     };
   }
@@ -201,61 +229,9 @@ function classifyNova(input: ClassificationInput): ClassificationResult {
   
   return {
     nova_group: novaGroup, confidence: Math.round(confidence * 100) / 100, reasoning, signals: allSignals,
+    has_ingredients: true,
+    is_estimated: false,
     debug: { ingredients_count: ingredientsCount, has_e_numbers: hasENumbers, e_numbers: allENumbers, strong_hits: strongHits, weak_hits: weakHits, real_food_hits: realFoodHits, normalized_text_sample: normalizedText.substring(0, 100) },
     version: VERSION, timestamp: new Date().toISOString()
   };
 }
-
-const ClassifyInputSchema = z.object({
-  ingredients_text: z.string().min(1).max(5000),
-  additives: z.array(z.string()).optional(),
-  product_category: z.enum(['snacks', 'frokostblanding', 'drikke', 'kjeks', 'pålegg', 'meieri', 'ferdigrett', 'annet']).optional(),
-  language: z.string().default('no').optional()
-});
-
-const BatchInputSchema = z.array(ClassifyInputSchema).max(100);
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  const url = new URL(req.url);
-  const path = url.pathname;
-
-  try {
-    if (req.method === 'GET' && path.endsWith('/health')) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    if (req.method === 'GET' && path.endsWith('/version')) {
-      return new Response(JSON.stringify({ version: VERSION, ruleset_date: RULESET_DATE }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    if (req.method === 'POST' && path.endsWith('/classify-nova')) {
-      const body = await req.json();
-      const validationResult = ClassifyInputSchema.safeParse(body);
-      if (!validationResult.success) {
-        return new Response(JSON.stringify({ error: 'Validation error', details: validationResult.error.format() }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      const result = classifyNova(validationResult.data);
-      return new Response(JSON.stringify(result), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    if (req.method === 'POST' && path.endsWith('/classify-batch')) {
-      const body = await req.json();
-      const validationResult = BatchInputSchema.safeParse(body);
-      if (!validationResult.success) {
-        return new Response(JSON.stringify({ error: 'Validation error', details: validationResult.error.format() }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      const results = validationResult.data.map(item => classifyNova(item));
-      return new Response(JSON.stringify(results), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    return new Response(JSON.stringify({ error: 'Not found', available_endpoints: ['GET /health', 'GET /version', 'POST /classify-nova', 'POST /classify-batch'] }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-  } catch (error) {
-    console.error('Error processing request:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
-});
