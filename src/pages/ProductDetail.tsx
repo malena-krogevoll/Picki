@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin } from "lucide-react";
+import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin, ArrowRightLeft } from "lucide-react";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -98,10 +98,20 @@ export default function ProductDetail() {
   const searchParams = new URLSearchParams(window.location.search);
   const listId = searchParams.get('listId');
   const storeId = searchParams.get('storeId');
+  const itemId = searchParams.get('itemId');
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [novaData, setNovaData] = useState<NovaClassification | null>(null);
   const [loading, setLoading] = useState(true);
   const [epdSource, setEpdSource] = useState<EpdSource | null>(null);
+  const [alternatives, setAlternatives] = useState<Array<{
+    ean: string;
+    brand: string;
+    name: string;
+    image: string;
+    price: number | null;
+    novaScore: number | null;
+  }>>([]);
+  const [swapping, setSwapping] = useState(false);
 
   // Convert profile preferences to UserPreferences format
   const userPreferences: UserPreferences | null = profile?.preferences ? {
@@ -260,6 +270,79 @@ export default function ProductDetail() {
 
     fetchProductDetails();
   }, [ean]);
+
+  // Load alternatives from cached product_data
+  useEffect(() => {
+    if (!itemId) return;
+    
+    const loadAlternatives = async () => {
+      const { data, error } = await supabase
+        .from('shopping_list_items')
+        .select('product_data, selected_product_ean')
+        .eq('id', itemId)
+        .single();
+      
+      if (error || !data?.product_data) return;
+      
+      const cache = data.product_data as Record<string, any>;
+      const products = cache.products as Array<any> || [];
+      
+      // Filter out the currently selected product
+      const otherProducts = products.filter((p: any) => p.ean !== ean);
+      setAlternatives(otherProducts.map((p: any) => ({
+        ean: p.ean,
+        brand: p.brand || '',
+        name: p.name || '',
+        image: p.image || '',
+        price: p.price ?? null,
+        novaScore: p.novaScore ?? null,
+      })));
+    };
+    
+    loadAlternatives();
+  }, [itemId, ean]);
+
+  // Swap the selected product with an alternative
+  const handleSwapProduct = async (altEan: string) => {
+    if (!itemId || swapping) return;
+    setSwapping(true);
+    
+    try {
+      // Read current cache
+      const { data, error: fetchError } = await supabase
+        .from('shopping_list_items')
+        .select('product_data')
+        .eq('id', itemId)
+        .single();
+      
+      if (fetchError || !data?.product_data) throw new Error('Could not load item data');
+      
+      const cache = data.product_data as Record<string, any>;
+      const products = cache.products as Array<any> || [];
+      const newIndex = products.findIndex((p: any) => p.ean === altEan);
+      
+      if (newIndex === -1) throw new Error('Alternative not found');
+      
+      // Update selected index and EAN
+      const updatedCache = { ...cache, selectedIndex: newIndex };
+      await supabase
+        .from('shopping_list_items')
+        .update({ 
+          product_data: updatedCache, 
+          selected_product_ean: altEan 
+        })
+        .eq('id', itemId);
+      
+      toast.success("Produkt byttet");
+      // Navigate to the new product's detail page
+      navigate(`/product/${altEan}?listId=${listId}&storeId=${storeId}&itemId=${itemId}`, { replace: true });
+    } catch (e) {
+      console.error('Swap failed:', e);
+      toast.error("Kunne ikke bytte produkt");
+    } finally {
+      setSwapping(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -640,6 +723,60 @@ export default function ProductDetail() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{product.description}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Product Alternatives */}
+        {alternatives.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5" />
+                Alternativer ({alternatives.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {alternatives.map((alt) => {
+                const country = getCountryFromEAN(alt.ean);
+                return (
+                  <div
+                    key={alt.ean}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-border bg-secondary/50 hover:bg-secondary transition-colors"
+                  >
+                    <div className="bg-white p-1 rounded-lg border border-border shrink-0">
+                      <img
+                        src={alt.image || '/placeholder.svg'}
+                        alt={alt.name}
+                        className="w-12 h-12 object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">
+                        {country && <CountryFlag alpha2={country.alpha2} name={country.name} size="sm" className="mr-1" />}
+                        {alt.brand}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{alt.name}</p>
+                      <p className="text-sm font-bold text-primary mt-0.5">
+                        {alt.price !== null ? `${alt.price.toFixed(2)} kr` : 'Pris ukjent'}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl h-10 shrink-0 touch-target"
+                      onClick={() => handleSwapProduct(alt.ean)}
+                      disabled={swapping}
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
+                      Bytt
+                    </Button>
+                  </div>
+                );
+              })}
+              <p className="text-xs text-muted-foreground pt-2">
+                Trykk «Bytt» for å erstatte valgt produkt på handlelisten.
+              </p>
             </CardContent>
           </Card>
         )}

@@ -944,7 +944,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                       {selectedProduct ? (
                         <div
                           className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
-                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}&itemId=${item.id}`)}
                         >
                           <div className="bg-white rounded-lg border border-border p-0.5 flex-shrink-0">
                             <img
@@ -1075,7 +1075,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                         )}
 
                         <div
-                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}&itemId=${item.id}`)}
                           data-has-ingredients={String(selectedProduct.hasIngredients)}
                           data-nova-score={String(selectedProduct.novaScore)}
                           data-nova-estimated={String(selectedProduct.novaIsEstimated)}
