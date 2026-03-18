@@ -179,6 +179,17 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
   const [selectedDiyItemId, setSelectedDiyItemId] = useState<string | null>(null);
   const [selectedDiyItemName, setSelectedDiyItemName] = useState<string>("");
   const [dismissedDiyItems, setDismissedDiyItems] = useState<Set<string>>(new Set());
+  const [compactView, setCompactView] = useState(() => {
+    try { return localStorage.getItem('picki-compact-view') === 'true'; } catch { return false; }
+  });
+
+  const toggleCompactView = useCallback(() => {
+    setCompactView(prev => {
+      const next = !prev;
+      try { localStorage.setItem('picki-compact-view', String(next)); } catch {}
+      return next;
+    });
+  }, []);
   
   // Get cache key for this list+store combination
   const cacheKey = `${listId}:${storeId}`;
