@@ -2,32 +2,17 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
+import {
+  parseProductData,
+  productDataToJson,
+  sanitizeQuantity,
+  mapDbItemsToShoppingListItems,
+  prepareDuplicateItems,
+  type ProductData,
+  type ShoppingListItem,
+} from "@/lib/shoppingListUtils";
 
-export interface ProductData {
-  ean: string;
-  name: string;
-  brand: string;
-  price: number | null;
-  image: string;
-  novaScore: number | null;
-  isEstimated?: boolean;
-  store: string;
-  ingredients?: string;
-  allergenInfo?: string;
-  filters?: string;
-}
-
-export interface ShoppingListItem {
-  id: string;
-  list_id: string;
-  name: string;
-  quantity: number;
-  notes: string | null;
-  selected_product_ean: string | null;
-  product_data: ProductData | null;
-  in_cart: boolean;
-  created_at: string;
-}
+export type { ProductData, ShoppingListItem };
 
 export interface ShoppingList {
   id: string;
@@ -39,40 +24,6 @@ export interface ShoppingList {
   completed_at?: string | null;
   items?: ShoppingListItem[];
 }
-
-// Helper to safely convert JSON to ProductData
-const parseProductData = (data: Json | null): ProductData | null => {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-  const obj = data as Record<string, Json | undefined>;
-  return {
-    ean: String(obj.ean || ''),
-    name: String(obj.name || ''),
-    brand: String(obj.brand || ''),
-    price: typeof obj.price === 'number' ? obj.price : null,
-    image: String(obj.image || ''),
-    novaScore: typeof obj.novaScore === 'number' ? obj.novaScore : null,
-    isEstimated: Boolean(obj.isEstimated),
-    store: String(obj.store || ''),
-    ingredients: obj.ingredients ? String(obj.ingredients) : undefined,
-    allergenInfo: obj.allergenInfo ? String(obj.allergenInfo) : undefined,
-    filters: obj.filters ? String(obj.filters) : undefined,
-  };
-};
-
-// Helper to convert DB items to our interface
-const mapDbItemsToShoppingListItems = (items: any[]): ShoppingListItem[] => {
-  return items.map(item => ({
-    id: item.id,
-    list_id: item.list_id,
-    name: item.name,
-    quantity: item.quantity ?? 1,
-    notes: item.notes ?? null,
-    selected_product_ean: item.selected_product_ean,
-    product_data: parseProductData(item.product_data),
-    in_cart: item.in_cart ?? false,
-    created_at: item.created_at,
-  }));
-};
 
 export const useShoppingList = (userId: string | undefined) => {
   const [lists, setLists] = useState<ShoppingList[]>([]);
