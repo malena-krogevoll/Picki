@@ -502,13 +502,7 @@ export const useShoppingList = (userId: string | undefined) => {
 
     // Kopier alle varer
     if (originalList.items && originalList.items.length > 0) {
-      const itemsToInsert = originalList.items.map((item: any) => ({
-        list_id: newList.id,
-        name: item.name,
-        quantity: item.quantity ?? 1,
-        notes: item.notes ?? null,
-        in_cart: false,
-      }));
+      const itemsToInsert = prepareDuplicateItems(originalList.items, newList.id);
 
       const { error: itemsError } = await supabase
         .from("shopping_list_items")
