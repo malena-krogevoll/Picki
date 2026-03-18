@@ -52,6 +52,32 @@ const PREP_PATTERNS = [
 const FILLER_WORDS = ['av', 'med', 'til', 'fra', 'på', 'i'];
 
 /**
+ * Splits text into items, handling the conflict between Norwegian decimal comma
+ * and comma-as-list-separator.
+ * 
+ * Heuristic: A comma followed immediately by a digit (e.g. "1,5") is treated
+ * as a decimal separator. All other commas are treated as list separators.
+ */
+function splitItems(text: string): string[] {
+  // Split on: comma NOT followed by a digit, newline, or semicolon
+  return text
+    .split(/,(?!\d)|[\n;]/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Strips bullet point markers and numbered list prefixes from the beginning of text.
+ * Handles: • item, - item, * item, 1. item, 2) item, etc.
+ */
+function stripListPrefix(text: string): string {
+  return text
+    .replace(/^[•\-\*]\s+/, '')       // Bullet points: •, -, *
+    .replace(/^\d+[.)]\s+/, '')        // Numbered lists: 1. or 2)
+    .trim();
+}
+
+/**
  * Parses free text input into shopping list items
  * Supports formats like:
  * - "milk, eggs, bread"
@@ -59,12 +85,13 @@ const FILLER_WORDS = ['av', 'med', 'til', 'fra', 'på', 'i'];
  * - "3x apples, bread (whole grain)"
  * - "200 g tørket pasta" -> "pasta"
  * - "2 stk paprika i terninger" -> "paprika"
+ * - "1,5 kg mel" -> "mel" (Norwegian decimal comma)
+ * - "• melk\n- egg" -> "melk", "egg"
  */
 export function parseShoppingListText(text: string): ParsedItem[] {
   if (!text.trim()) return [];
 
-  // Split by common separators (comma, newline, semicolon)
-  const items = text.split(/[,\n;]/).map(item => item.trim()).filter(Boolean);
+  const items = splitItems(text);
   
   const parsedItems: ParsedItem[] = [];
 
@@ -85,6 +112,9 @@ function parseIndividualItem(item: string): ParsedItem | null {
   let quantity = 1;
   let notes = '';
 
+  // Strip bullet/numbered list prefixes first
+  cleanItem = stripListPrefix(cleanItem);
+
   // Extract notes in parentheses
   const notesMatch = cleanItem.match(/\(([^)]+)\)/);
   if (notesMatch) {
@@ -93,7 +123,7 @@ function parseIndividualItem(item: string): ParsedItem | null {
   }
 
   // Extract quantity from the beginning
-  // Pattern: number followed by optional unit
+  // Supports both "2" and "1,5" (Norwegian decimal comma) and "1.5"
   const quantityMatch = cleanItem.match(/^(\d+(?:[.,]\d+)?)\s*/);
   if (quantityMatch) {
     const quantityStr = quantityMatch[1].replace(',', '.');
