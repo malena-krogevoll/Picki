@@ -410,7 +410,7 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
                       display.isSubstituted ? "text-primary" : ""
                     }`}
                   >
-                    {isDinnerRecipe ? scaleQuantity(ingredient.quantity) : ingredient.quantity} {ingredient.unit} {display.name}
+                    {isDinnerRecipe ? scaleQuantity(ingredient.quantity, currentScaleFactor) : ingredient.quantity} {ingredient.unit} {display.name}
                     {display.isSubstituted && (
                       <span className="text-xs text-muted-foreground ml-2">
                         (erstatter {display.original})
