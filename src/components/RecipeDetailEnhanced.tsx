@@ -48,11 +48,13 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
   
   // For dinner recipes, use household_size as default. For base/diy, use recipe's servings.
   const isDinnerRecipe = recipe.recipe_type === "dinner";
-  const defaultServings = isDinnerRecipe 
-    ? (profile?.preferences?.household_size || recipe.servings || 4)
-    : (recipe.servings || 1);
+  const initialServings = defaultServings(
+    recipe.recipe_type,
+    recipe.servings,
+    profile?.preferences?.household_size,
+  );
   
-  const [servings, setServings] = useState<number>(defaultServings);
+  const [servings, setServings] = useState<number>(initialServings);
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(
     new Set(recipe.ingredients?.map(i => i.name) || [])
   );
