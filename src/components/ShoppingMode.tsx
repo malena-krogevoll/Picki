@@ -226,6 +226,29 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     }
   }, [productData, selectedProducts, cacheKey]);
 
+  // Sync selections from DB when items update (e.g. after product swap in ProductDetail)
+  useEffect(() => {
+    let changed = false;
+    const updatedSelections = { ...selectedProducts };
+    for (const item of items) {
+      if (item.product_data && item.selected_product_ean) {
+        try {
+          const cached = item.product_data as unknown as CachedItemData;
+          if (cached.products && Array.isArray(cached.products)) {
+            const dbIndex = cached.products.findIndex(p => p.ean === item.selected_product_ean);
+            if (dbIndex !== -1 && updatedSelections[item.id] !== dbIndex) {
+              updatedSelections[item.id] = dbIndex;
+              changed = true;
+            }
+          }
+        } catch {}
+      }
+    }
+    if (changed) {
+      setSelectedProducts(updatedSelections);
+    }
+  }, [items]);
+
   // Combined effect: detect store/list changes, reset data, and fetch products
   useEffect(() => {
     let isMounted = true;
