@@ -82,13 +82,10 @@ describe("parseShoppingListText", () => {
     expect(result[0].quantity).toBe(5);
     expect(result[0].product_name).toBe("mel");
   });
-});
 
   it("parses bullet point lists (• and -)", () => {
-    // Bullet chars are not separators in current impl — they stay in item text
     const result = parseShoppingListText("• melk\n- egg\n* brød");
     expect(result).toHaveLength(3);
-    // The bullet/dash/asterisk is stripped or the name still works
     expect(result.map(r => r.product_name)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("melk"),
