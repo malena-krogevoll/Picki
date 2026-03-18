@@ -1,42 +1,27 @@
 
 
-## Forbedre unit-testdekning
 
-### Nye tester for eksisterende filer
+## Plan: Bedre utnyttelse av VDA+ API og universelle produkter
 
-**1. `textParser.test.ts` — legg til edge cases**
-- Bullet point-lister (`• melk`, `- egg`)
-- Nummererte lister (`1. melk`, `2) egg`)
-- Duplikathåndtering
-- Svært lange input-strenger
+### Implementert
 
-**2. `preferenceAnalysis.test.ts` — utvid**
-- Test `organic`-preferanse (økologisk matching)
-- Test `priority_order`-logikken som påvirker scoring
-- Test `lowest_price`-preferanse
-- Flere allergen-kombinasjoner
+1. **VDA+ berikelse forbedret** — Økt fra 5 til 10 EANs per søk, med detaljert logging (DNS, token, HTTP status, felt-tilgjengelighet)
+2. **Kassalapp detalj-fallback** — Produkter som mangler ingredienser/bilde berikers via `kassal.app/api/v1/products/ean/{ean}` (maks 5 per søk)
+3. **Auto masterprodukt-recompute** — `recompute-master-product` trigges automatisk for alle berikede EANs etter EPD + Kassalapp enrichment
+4. **DB-fallback søk** — Når Kassalapp returnerer < 10 treff, søkes `product_sources` for cachede produkter (f.eks. Tine-produkter funnet i Meny vises for Kiwi-brukere via offers-tabellen)
+5. **Universelle merkevarer** — Produkter fra Tine, Gilde, Prior, Stabburet, Norvegia, Jarlsberg, m.fl. får automatisk offers-oppføringer i alle kjeder
+6. **Kolonihagen-integrasjon** — ~90 Kolonihagen-produkter (Rema 1000-eksklusive, økologiske) seedet fra PDF-katalog med EAN-numre. Edge function `seed-kolonihagen` upsert-er til `product_sources`, `products` og `offers`. VDA+/EPD-berikelse kjøres automatisk. Søkelogikken gir Kolonihagen-produkter 15% boost for Rema 1000-brukere og ytterligere 20% for brukere med økologisk-preferanse.
+7. **Kolonihagen.no scraping** — Seed-funksjonen scraper kolonihagen.no for ingredienser, allergener, næringsinnhold, bilder og beskrivelser. ~115 produkter totalt inkl. nye produkter fra nettsiden (te, tex mex, pasta, is, nøtter, guanciale, yoghurt gresk type). Data lagres i `product_sources` (payload med nutrition/allergens) og `products` (ingredients_raw, image_url). Recompute-master-product trigges for NOVA-klassifisering.
 
-**3. `storeLayoutSort.test.ts` — flere edge cases**
-- Case-insensitivity (`Melk` vs `melk`)
-- Tom streng input
-- Sammensatte produktnavn (`lettmelk`, `skummetmelk`)
-
-### Nye testfiler
-
-**4. `src/utils/countryUtils.test.ts`**
-- Test `getCountryFromEAN()` — norske EAN (70-79), svenske (73), danske (57), ukjente
-- Test flagg-emoji-mapping
-
-**5. `src/lib/novaClassifier.test.ts`** (krever ekstraksjon)
-- Ekstraher NOVA-klassifiseringslogikken fra edge function til en delt modul `src/lib/novaClassifier.ts`
-- Test sterke UPF-signaler, svake signaler, real food, batch-klassifisering
-- Denne logikken er kompleks (~200 linjer regex-regler) og fortjener grundig testing
-
-### Filer som endres/opprettes
-- `src/lib/textParser.test.ts` — utvides
-- `src/lib/preferenceAnalysis.test.ts` — utvides
-- `src/lib/storeLayoutSort.test.ts` — utvides
-- `src/utils/countryUtils.test.ts` — ny fil
-- `src/lib/novaClassifier.ts` — ny fil (ekstrahert fra edge function)
-- `src/lib/novaClassifier.test.ts` — ny fil
-
+### Bakgrunn-pipeline (ikke-blokkerende)
+```
+Kassalapp-søk → DB-fallback → Score & Sorter → Returner
+                                                    ↓ (bakgrunn)
+                                              EPD-berikelse
+                                                    ↓
+                                           Kassalapp detalj-fallback
+                                                    ↓
+                                         Recompute master product
+                                                    ↓
+                                       Utvid universelle offers
+```
