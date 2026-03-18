@@ -18,6 +18,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCookbook } from "@/hooks/useCookbook";
+import { scaleQuantity, scaleFactor, defaultServings } from "@/lib/servingScaling";
 
 interface Substitution {
   original_ingredient: string;
@@ -47,11 +48,13 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
   
   // For dinner recipes, use household_size as default. For base/diy, use recipe's servings.
   const isDinnerRecipe = recipe.recipe_type === "dinner";
-  const defaultServings = isDinnerRecipe 
-    ? (profile?.preferences?.household_size || recipe.servings || 4)
-    : (recipe.servings || 1);
+  const initialServings = defaultServings(
+    recipe.recipe_type,
+    recipe.servings,
+    profile?.preferences?.household_size,
+  );
   
-  const [servings, setServings] = useState<number>(defaultServings);
+  const [servings, setServings] = useState<number>(initialServings);
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(
     new Set(recipe.ingredients?.map(i => i.name) || [])
   );
@@ -67,42 +70,7 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const hasWarnings = recipe._hasWarnings || false;
   const originalServings = recipe.servings || 4;
-  const scaleFactor = servings / originalServings;
-  
-  // Scale ingredient quantity
-  const scaleQuantity = (quantity: string | null): string => {
-    if (!quantity) return "";
-    
-    // Try to parse the quantity as a number
-    const numMatch = quantity.match(/^([\d.,\/]+)\s*(.*)$/);
-    if (!numMatch) return quantity;
-    
-    let numPart = numMatch[1];
-    const textPart = numMatch[2];
-    
-    // Handle fractions like "1/2"
-    if (numPart.includes("/")) {
-      const [numerator, denominator] = numPart.split("/").map(n => parseFloat(n.replace(",", ".")));
-      const scaledValue = (numerator / denominator) * scaleFactor;
-      
-      // Format nicely
-      if (scaledValue === Math.floor(scaledValue)) {
-        return `${scaledValue}${textPart ? " " + textPart : ""}`;
-      }
-      return `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
-    }
-    
-    const num = parseFloat(numPart.replace(",", "."));
-    if (isNaN(num)) return quantity;
-    
-    const scaledValue = num * scaleFactor;
-    
-    // Format: use whole numbers when possible, otherwise 1 decimal
-    if (scaledValue === Math.floor(scaledValue)) {
-      return `${scaledValue}${textPart ? " " + textPart : ""}`;
-    }
-    return `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
-  };
+  const currentScaleFactor = scaleFactor(servings, originalServings);
 
   const toggleIngredient = (ingredientName: string) => {
     const newSelected = new Set(selectedIngredients);
@@ -442,7 +410,7 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
                       display.isSubstituted ? "text-primary" : ""
                     }`}
                   >
-                    {isDinnerRecipe ? scaleQuantity(ingredient.quantity) : ingredient.quantity} {ingredient.unit} {display.name}
+                    {isDinnerRecipe ? scaleQuantity(ingredient.quantity, currentScaleFactor) : ingredient.quantity} {ingredient.unit} {display.name}
                     {display.isSubstituted && (
                       <span className="text-xs text-muted-foreground ml-2">
                         (erstatter {display.original})
