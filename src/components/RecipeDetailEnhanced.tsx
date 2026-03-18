@@ -70,42 +70,7 @@ export const RecipeDetailEnhanced = ({ recipe, onBack, isFavorite = false, onTog
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const hasWarnings = recipe._hasWarnings || false;
   const originalServings = recipe.servings || 4;
-  const scaleFactor = servings / originalServings;
-  
-  // Scale ingredient quantity
-  const scaleQuantity = (quantity: string | null): string => {
-    if (!quantity) return "";
-    
-    // Try to parse the quantity as a number
-    const numMatch = quantity.match(/^([\d.,\/]+)\s*(.*)$/);
-    if (!numMatch) return quantity;
-    
-    let numPart = numMatch[1];
-    const textPart = numMatch[2];
-    
-    // Handle fractions like "1/2"
-    if (numPart.includes("/")) {
-      const [numerator, denominator] = numPart.split("/").map(n => parseFloat(n.replace(",", ".")));
-      const scaledValue = (numerator / denominator) * scaleFactor;
-      
-      // Format nicely
-      if (scaledValue === Math.floor(scaledValue)) {
-        return `${scaledValue}${textPart ? " " + textPart : ""}`;
-      }
-      return `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
-    }
-    
-    const num = parseFloat(numPart.replace(",", "."));
-    if (isNaN(num)) return quantity;
-    
-    const scaledValue = num * scaleFactor;
-    
-    // Format: use whole numbers when possible, otherwise 1 decimal
-    if (scaledValue === Math.floor(scaledValue)) {
-      return `${scaledValue}${textPart ? " " + textPart : ""}`;
-    }
-    return `${scaledValue.toFixed(1).replace(".", ",")}${textPart ? " " + textPart : ""}`;
-  };
+  const currentScaleFactor = scaleFactor(servings, originalServings);
 
   const toggleIngredient = (ingredientName: string) => {
     const newSelected = new Set(selectedIngredients);
