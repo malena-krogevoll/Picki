@@ -215,20 +215,7 @@ export const useShoppingList = (userId: string | undefined) => {
   };
 
   const updateItemProduct = async (itemId: string, productData: ProductData) => {
-    // Convert ProductData to Json-compatible format
-    const productDataAsJson = {
-      ean: productData.ean,
-      name: productData.name,
-      brand: productData.brand,
-      price: productData.price,
-      image: productData.image,
-      novaScore: productData.novaScore,
-      isEstimated: productData.isEstimated,
-      store: productData.store,
-      ingredients: productData.ingredients,
-      allergenInfo: productData.allergenInfo,
-      filters: productData.filters,
-    } as Json;
+    const productDataAsJson = productDataToJson(productData);
 
     const { error } = await supabase
       .from("shopping_list_items")
