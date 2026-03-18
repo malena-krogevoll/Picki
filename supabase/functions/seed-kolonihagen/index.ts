@@ -690,7 +690,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Admin-only seeding function — not exposed in the app UI
+  // Service-role-only: reject all other callers
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader !== `Bearer ${supabaseServiceKey}`) {
+    return unauthorizedResponse();
+  }
 
   try {
     let options = {};
