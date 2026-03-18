@@ -725,6 +725,60 @@ export default function ProductDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Product Alternatives */}
+        {alternatives.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5" />
+                Alternativer ({alternatives.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {alternatives.map((alt) => {
+                const country = getCountryFromEAN(alt.ean);
+                return (
+                  <div
+                    key={alt.ean}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-border bg-secondary/50 hover:bg-secondary transition-colors"
+                  >
+                    <div className="bg-white p-1 rounded-lg border border-border shrink-0">
+                      <img
+                        src={alt.image || '/placeholder.svg'}
+                        alt={alt.name}
+                        className="w-12 h-12 object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">
+                        {country && <CountryFlag alpha2={country.alpha2} name={country.name} size="sm" className="mr-1" />}
+                        {alt.brand}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{alt.name}</p>
+                      <p className="text-sm font-bold text-primary mt-0.5">
+                        {alt.price !== null ? `${alt.price.toFixed(2)} kr` : 'Pris ukjent'}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl h-10 shrink-0 touch-target"
+                      onClick={() => handleSwapProduct(alt.ean)}
+                      disabled={swapping}
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
+                      Bytt
+                    </Button>
+                  </div>
+                );
+              })}
+              <p className="text-xs text-muted-foreground pt-2">
+                Trykk «Bytt» for å erstatte valgt produkt på handlelisten.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
