@@ -271,7 +271,79 @@ export default function ProductDetail() {
     fetchProductDetails();
   }, [ean]);
 
-  if (loading) {
+  // Load alternatives from cached product_data
+  useEffect(() => {
+    if (!itemId) return;
+    
+    const loadAlternatives = async () => {
+      const { data, error } = await supabase
+        .from('shopping_list_items')
+        .select('product_data, selected_product_ean')
+        .eq('id', itemId)
+        .single();
+      
+      if (error || !data?.product_data) return;
+      
+      const cache = data.product_data as Record<string, any>;
+      const products = cache.products as Array<any> || [];
+      
+      // Filter out the currently selected product
+      const otherProducts = products.filter((p: any) => p.ean !== ean);
+      setAlternatives(otherProducts.map((p: any) => ({
+        ean: p.ean,
+        brand: p.brand || '',
+        name: p.name || '',
+        image: p.image || '',
+        price: p.price ?? null,
+        novaScore: p.novaScore ?? null,
+      })));
+    };
+    
+    loadAlternatives();
+  }, [itemId, ean]);
+
+  // Swap the selected product with an alternative
+  const handleSwapProduct = async (altEan: string) => {
+    if (!itemId || swapping) return;
+    setSwapping(true);
+    
+    try {
+      // Read current cache
+      const { data, error: fetchError } = await supabase
+        .from('shopping_list_items')
+        .select('product_data')
+        .eq('id', itemId)
+        .single();
+      
+      if (fetchError || !data?.product_data) throw new Error('Could not load item data');
+      
+      const cache = data.product_data as Record<string, any>;
+      const products = cache.products as Array<any> || [];
+      const newIndex = products.findIndex((p: any) => p.ean === altEan);
+      
+      if (newIndex === -1) throw new Error('Alternative not found');
+      
+      // Update selected index and EAN
+      const updatedCache = { ...cache, selectedIndex: newIndex };
+      await supabase
+        .from('shopping_list_items')
+        .update({ 
+          product_data: updatedCache, 
+          selected_product_ean: altEan 
+        })
+        .eq('id', itemId);
+      
+      toast.success("Produkt byttet");
+      // Navigate to the new product's detail page
+      navigate(`/product/${altEan}?listId=${listId}&storeId=${storeId}&itemId=${itemId}`, { replace: true });
+    } catch (e) {
+      console.error('Swap failed:', e);
+      toast.error("Kunne ikke bytte produkt");
+    } finally {
+      setSwapping(false);
+    }
+  };
+
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-4xl mx-auto p-6 space-y-6">
