@@ -18,6 +18,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCookbook } from "@/hooks/useCookbook";
+import { scaleQuantity, scaleFactor, defaultServings } from "@/lib/servingScaling";
 
 interface Substitution {
   original_ingredient: string;
