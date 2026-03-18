@@ -892,7 +892,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
 
       {/* Main content - scrollable */}
       <div className="flex-1 px-4 py-4 md:px-0 overflow-y-auto touch-scroll">
-        <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto pb-32 md:pb-6">
+        <div className={`${compactView ? 'space-y-1' : 'space-y-4 md:space-y-6'} max-w-2xl mx-auto pb-32 md:pb-6`}>
           {groupedItems.map((group) => (
             <div key={group.category} className="space-y-3">
               {/* Category header */}
