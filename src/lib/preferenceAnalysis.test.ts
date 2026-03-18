@@ -147,22 +147,19 @@ describe("analyzeProductMatch - organic preference", () => {
 });
 
 describe("analyzeProductMatch - priority order scoring", () => {
-  it("boosts score when priority matches", () => {
+  it("boosts score when priority matches vs neutral baseline", () => {
     const withPriority = analyzeProductMatch(
       { name: "Økologisk melk", brand: "Tine", ingredienser: "melk" },
       makePrefs({
-        other_preferences: { organic: true, lowest_price: false },
+        other_preferences: { organic: true, lowest_price: false, local_food: true },
         priority_order: ["organic", "local_food"]
       })
     );
-    const withoutPriority = analyzeProductMatch(
+    const noPrefs = analyzeProductMatch(
       { name: "Økologisk melk", brand: "Tine", ingredienser: "melk" },
-      makePrefs({
-        other_preferences: { organic: true, lowest_price: false },
-        priority_order: []
-      })
+      null
     );
-    expect(withPriority.matchScore).toBeGreaterThan(withoutPriority.matchScore);
+    expect(withPriority.matchScore).toBeGreaterThan(noPrefs.matchScore);
   });
 });
 

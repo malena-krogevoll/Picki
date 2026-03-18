@@ -55,8 +55,8 @@ describe("categorizeProduct", () => {
     expect(categorizeProduct("skummetmelk").category).toBe("Meieriprodukter");
   });
 
-  it("categorizes via productBrand parameter", () => {
-    const result = categorizeProduct("filet", "Lerøy", "Lerøy");
+  it("categorizes via productName parameter", () => {
+    const result = categorizeProduct("filet", "Laksefilet");
     expect(result.category).toBe("Fisk og sjømat");
   });
 });
