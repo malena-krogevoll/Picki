@@ -1,27 +1,47 @@
 
 
+## Kompakt handlemodus for ShoppingMode
 
-## Plan: Bedre utnyttelse av VDA+ API og universelle produkter
+### Problem
+Hver vare i handlemodus tar mye vertikal plass (søketekst, NOVA-advarsler, stort produktkort med merke/pris/badges, alternativer-knapp, DIY-forslag). Pa en 390px-bred mobil far brukeren kanskje bare 1-2 varer synlig om gangen.
 
-### Implementert
+### Losning
+Legg til en "kompakt visning"-toggle i headeren. Nar kompakt modus er aktiv, vises hver vare som en enkel rad med:
+- Avkryssingsboks (44px touch target)
+- Produktbilde (40x40)
+- Produktnavn (truncated, 1 linje)
+- Pris
 
-1. **VDA+ berikelse forbedret** — Økt fra 5 til 10 EANs per søk, med detaljert logging (DNS, token, HTTP status, felt-tilgjengelighet)
-2. **Kassalapp detalj-fallback** — Produkter som mangler ingredienser/bilde berikers via `kassal.app/api/v1/products/ean/{ean}` (maks 5 per søk)
-3. **Auto masterprodukt-recompute** — `recompute-master-product` trigges automatisk for alle berikede EANs etter EPD + Kassalapp enrichment
-4. **DB-fallback søk** — Når Kassalapp returnerer < 10 treff, søkes `product_sources` for cachede produkter (f.eks. Tine-produkter funnet i Meny vises for Kiwi-brukere via offers-tabellen)
-5. **Universelle merkevarer** — Produkter fra Tine, Gilde, Prior, Stabburet, Norvegia, Jarlsberg, m.fl. får automatisk offers-oppføringer i alle kjeder
-6. **Kolonihagen-integrasjon** — ~90 Kolonihagen-produkter (Rema 1000-eksklusive, økologiske) seedet fra PDF-katalog med EAN-numre. Edge function `seed-kolonihagen` upsert-er til `product_sources`, `products` og `offers`. VDA+/EPD-berikelse kjøres automatisk. Søkelogikken gir Kolonihagen-produkter 15% boost for Rema 1000-brukere og ytterligere 20% for brukere med økologisk-preferanse.
-7. **Kolonihagen.no scraping** — Seed-funksjonen scraper kolonihagen.no for ingredienser, allergener, næringsinnhold, bilder og beskrivelser. ~115 produkter totalt inkl. nye produkter fra nettsiden (te, tex mex, pasta, is, nøtter, guanciale, yoghurt gresk type). Data lagres i `product_sources` (payload med nutrition/allergens) og `products` (ingredients_raw, image_url). Recompute-master-product trigges for NOVA-klassifisering.
+Alt annet skjules: soketekst, NOVA-badges, advarsler, preferanseindikatorer, alternativer-knapp, DIY-forslag. Brukeren kan trykke pa en vare for a ga til produktdetaljer om de trenger mer info.
 
-### Bakgrunn-pipeline (ikke-blokkerende)
+### Teknisk plan
+
+**1. Legg til kompakt-toggle state i ShoppingMode.tsx**
+- Ny `const [compactView, setCompactView] = useState(false)` state
+- Toggle-knapp i sticky header (ikon: `List`/`LayoutList` fra lucide)
+- Lagre preferansen i localStorage sa den huskes
+
+**2. Betinget rendering av varekort (ShoppingMode.tsx, linje ~914-1163)**
+- Nar `compactView === true`, rendrer en forenklet rad i stedet for det fulle produktkortet:
+
+```text
+┌──────────────────────────────────────┐
+│ [✓]  [img]  Kolonihagen Kokt sk.. 42kr │
+└──────────────────────────────────────┘
 ```
-Kassalapp-søk → DB-fallback → Score & Sorter → Returner
-                                                    ↓ (bakgrunn)
-                                              EPD-berikelse
-                                                    ↓
-                                           Kassalapp detalj-fallback
-                                                    ↓
-                                         Recompute master product
-                                                    ↓
-                                       Utvid universelle offers
-```
+
+- Raden er ~48-56px hoy (vs ~150-200px i fullvisning)
+- Checkbox + bilde + navn (truncate) + pris, alt pa en linje
+- Klikk pa raden gar til produktdetaljer
+- Avkryssede varer far `line-through` og dempet farge
+- Ingen NOVA-badge, ingen advarsler, ingen alternativer, ingen DIY
+
+**3. Kategoriheadere forblir synlige**
+- Emoji + kategorinavn beholdes for navigering i butikken
+- Gjor dem litt mer kompakte (mindre padding)
+
+**4. Footer/totalsum forblir uendret**
+
+### Filer som endres
+- `src/components/ShoppingMode.tsx` — toggle state, header-knapp, kompakt rad-rendering
+
