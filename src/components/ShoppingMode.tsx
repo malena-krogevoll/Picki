@@ -861,6 +861,9 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             <Pencil className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Rediger</span>
           </Button>
+          <Button variant="ghost" onClick={toggleCompactView} className="rounded-2xl h-11 w-11 touch-target p-0" title={compactView ? "Full visning" : "Kompakt visning"}>
+            {compactView ? <LayoutList className="h-4 w-4" /> : <List className="h-4 w-4" />}
+          </Button>
           {allItemsInCart && (
             <Button onClick={handleCompleteList} className="bg-primary hover:bg-primary/90 rounded-2xl h-11 touch-target hidden sm:flex">
               <CheckCircle2 className="mr-2 h-4 w-4" />
