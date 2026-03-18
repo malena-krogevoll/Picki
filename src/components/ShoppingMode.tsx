@@ -925,6 +925,59 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                   ? findDiyAlternative(item.name) 
                   : null;
 
+                if (compactView) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all touch-target ${
+                        item.in_cart 
+                          ? 'bg-primary/5 opacity-60' 
+                          : 'bg-card border border-border'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={item.in_cart}
+                        onCheckedChange={() => handleToggleCart(item.id, item.in_cart)}
+                        className="h-6 w-6 rounded-md touch-target flex-shrink-0"
+                        disabled={isItemLoading}
+                      />
+                      {selectedProduct ? (
+                        <div
+                          className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                        >
+                          <div className="bg-white rounded-lg border border-border p-0.5 flex-shrink-0">
+                            <img
+                              src={selectedProduct.image || '/placeholder.svg'}
+                              alt={selectedProduct.name}
+                              className="w-10 h-10 object-contain"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${item.in_cart ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                              {item.quantity > 1 && <span className="text-muted-foreground mr-1">{item.quantity}×</span>}
+                              {selectedProduct.brand} {selectedProduct.name}
+                            </p>
+                          </div>
+                          <span className={`text-sm font-semibold flex-shrink-0 ${item.in_cart ? 'text-muted-foreground' : 'text-primary'}`}>
+                            {selectedProduct.price !== null ? `${selectedProduct.price.toFixed(0)} kr` : ''}
+                          </span>
+                        </div>
+                      ) : isItemLoading ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <Skeleton className="h-10 w-10 rounded-lg flex-shrink-0" />
+                          <Skeleton className="h-4 flex-1" />
+                        </div>
+                      ) : (
+                        <span className={`text-sm flex-1 truncate ${item.in_cart ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                          {item.quantity > 1 && <span className="text-muted-foreground mr-1">{item.quantity}×</span>}
+                          {item.name}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
                     <div className="p-4 md:p-5">
