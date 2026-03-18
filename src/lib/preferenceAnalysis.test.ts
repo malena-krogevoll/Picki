@@ -46,7 +46,8 @@ describe("analyzeProductMatch – allergens", () => {
       makePrefs({ allergies: ["gluten"] })
     );
     expect(result.allergyWarnings).toContain("gluten");
-    expect(result.allergyTriggers["gluten"]).toContain("hvetemel");
+    // allergenMapping maps "gluten" → ["hvete", "mel", ...], so triggers contain sub-matches
+    expect(result.allergyTriggers["gluten"]).toEqual(expect.arrayContaining(["hvete"]));
   });
 
   it("should detect milk allergen from 'melk' in ingredients", () => {
