@@ -98,10 +98,20 @@ export default function ProductDetail() {
   const searchParams = new URLSearchParams(window.location.search);
   const listId = searchParams.get('listId');
   const storeId = searchParams.get('storeId');
+  const itemId = searchParams.get('itemId');
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [novaData, setNovaData] = useState<NovaClassification | null>(null);
   const [loading, setLoading] = useState(true);
   const [epdSource, setEpdSource] = useState<EpdSource | null>(null);
+  const [alternatives, setAlternatives] = useState<Array<{
+    ean: string;
+    brand: string;
+    name: string;
+    image: string;
+    price: number | null;
+    novaScore: number | null;
+  }>>([]);
+  const [swapping, setSwapping] = useState(false);
 
   // Convert profile preferences to UserPreferences format
   const userPreferences: UserPreferences | null = profile?.preferences ? {
