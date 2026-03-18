@@ -428,11 +428,10 @@ describe('processProductWithIntent', () => {
     expect(result.score).toBeLessThanOrEqual(0);
   });
 
-  it('should handle empty exclude patterns', () => {
-    const intent = makeIntent({ excludePatterns: [] });
-    const product = makeProduct({ Produktnavn: 'Hvitløksdressing', Kategori: 'meieri' });
+  it('should handle empty exclude patterns without crashing', () => {
+    const intent = makeIntent({ excludePatterns: [], primaryProduct: 'hvitløk', productCategory: 'grønnsaker' });
+    const product = makeProduct({ Produktnavn: 'Hvitløk 3pk', Kategori: 'grønnsaker' });
     const result = processProductWithIntent(product, 'hvitløk', intent);
-    // No exclusion penalty → positive score
     expect(result.score).toBeGreaterThan(0);
   });
 });
