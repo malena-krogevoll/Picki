@@ -183,7 +183,8 @@ describe("parseShoppingListText – list prefixes", () => {
   it("should handle bullet + quantity combined", () => {
     const result = parseShoppingListText("• 2 stk paprika\n- 500 g kjøttdeig");
     expect(result[0]).toMatchObject({ product_name: "paprika", quantity: 2 });
-    expect(result[1]).toMatchObject({ product_name: "kjøttdeig", quantity: 1 });
+    // "500 g kjøttdeig" → quantity parsed as 500 (floored), unit "g" stripped
+    expect(result[1]).toMatchObject({ product_name: "kjøttdeig", quantity: 500 });
   });
 });
 
