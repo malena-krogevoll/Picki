@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle, Home, Pencil, Store, ChefHat } from "lucide-react";
+import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle, Home, Pencil, Store, ChefHat, List, LayoutList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useProfile } from "@/hooks/useProfile";
@@ -179,6 +179,17 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
   const [selectedDiyItemId, setSelectedDiyItemId] = useState<string | null>(null);
   const [selectedDiyItemName, setSelectedDiyItemName] = useState<string>("");
   const [dismissedDiyItems, setDismissedDiyItems] = useState<Set<string>>(new Set());
+  const [compactView, setCompactView] = useState(() => {
+    try { return localStorage.getItem('picki-compact-view') === 'true'; } catch { return false; }
+  });
+
+  const toggleCompactView = useCallback(() => {
+    setCompactView(prev => {
+      const next = !prev;
+      try { localStorage.setItem('picki-compact-view', String(next)); } catch {}
+      return next;
+    });
+  }, []);
   
   // Get cache key for this list+store combination
   const cacheKey = `${listId}:${storeId}`;
@@ -850,6 +861,9 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             <Pencil className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Rediger</span>
           </Button>
+          <Button variant="ghost" onClick={toggleCompactView} className="rounded-2xl h-11 w-11 touch-target p-0" title={compactView ? "Full visning" : "Kompakt visning"}>
+            {compactView ? <LayoutList className="h-4 w-4" /> : <List className="h-4 w-4" />}
+          </Button>
           {allItemsInCart && (
             <Button onClick={handleCompleteList} className="bg-primary hover:bg-primary/90 rounded-2xl h-11 touch-target hidden sm:flex">
               <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -878,12 +892,12 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
 
       {/* Main content - scrollable */}
       <div className="flex-1 px-4 py-4 md:px-0 overflow-y-auto touch-scroll">
-        <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto pb-32 md:pb-6">
+        <div className={`${compactView ? 'space-y-1' : 'space-y-4 md:space-y-6'} max-w-2xl mx-auto pb-32 md:pb-6`}>
           {groupedItems.map((group) => (
-            <div key={group.category} className="space-y-3">
+            <div key={group.category} className={compactView ? 'space-y-0.5' : 'space-y-3'}>
               {/* Category header */}
-              <div className="flex items-center gap-2 px-1 sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-5">
-                <span className="text-lg">{group.emoji}</span>
+              <div className={`flex items-center gap-2 px-1 sticky top-0 bg-background/95 backdrop-blur-sm z-5 ${compactView ? 'py-1.5' : 'py-2'}`}>
+                <span className={compactView ? 'text-base' : 'text-lg'}>{group.emoji}</span>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   {group.category}
                 </h2>
@@ -910,6 +924,59 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 const diyAlternative = !dismissedDiyItems.has(item.id) && !item.in_cart 
                   ? findDiyAlternative(item.name) 
                   : null;
+
+                if (compactView) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all touch-target ${
+                        item.in_cart 
+                          ? 'bg-primary/5 opacity-60' 
+                          : 'bg-card border border-border'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={item.in_cart}
+                        onCheckedChange={() => handleToggleCart(item.id, item.in_cart)}
+                        className="h-6 w-6 rounded-md touch-target flex-shrink-0"
+                        disabled={isItemLoading}
+                      />
+                      {selectedProduct ? (
+                        <div
+                          className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                        >
+                          <div className="bg-white rounded-lg border border-border p-0.5 flex-shrink-0">
+                            <img
+                              src={selectedProduct.image || '/placeholder.svg'}
+                              alt={selectedProduct.name}
+                              className="w-10 h-10 object-contain"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${item.in_cart ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                              {item.quantity > 1 && <span className="text-muted-foreground mr-1">{item.quantity}×</span>}
+                              {selectedProduct.brand} {selectedProduct.name}
+                            </p>
+                          </div>
+                          <span className={`text-sm font-semibold flex-shrink-0 ${item.in_cart ? 'text-muted-foreground' : 'text-primary'}`}>
+                            {selectedProduct.price !== null ? `${selectedProduct.price.toFixed(0)} kr` : ''}
+                          </span>
+                        </div>
+                      ) : isItemLoading ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <Skeleton className="h-10 w-10 rounded-lg flex-shrink-0" />
+                          <Skeleton className="h-4 flex-1" />
+                        </div>
+                      ) : (
+                        <span className={`text-sm flex-1 truncate ${item.in_cart ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                          {item.quantity > 1 && <span className="text-muted-foreground mr-1">{item.quantity}×</span>}
+                          {item.name}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
 
                 return (
                   <div key={item.id} className={`bg-card border-2 rounded-2xl overflow-hidden transition-all ${item.in_cart ? "border-primary/50 bg-primary/5" : "border-border"}`}>
