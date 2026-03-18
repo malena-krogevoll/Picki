@@ -1075,7 +1075,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                         )}
 
                         <div
-                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}`)}
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}&itemId=${item.id}`)}
                           data-has-ingredients={String(selectedProduct.hasIngredients)}
                           data-nova-score={String(selectedProduct.novaScore)}
                           data-nova-estimated={String(selectedProduct.novaIsEstimated)}
