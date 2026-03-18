@@ -841,27 +841,27 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
     <div className="flex flex-col min-h-[calc(100vh-60px)] md:min-h-0">
       {/* Sticky header for mobile */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 md:px-0 md:py-0 md:border-0 md:bg-transparent md:backdrop-blur-none md:static">
-        <div className="flex items-center justify-between max-w-2xl mx-auto gap-2">
-          <Button variant="outline" onClick={() => navigate("/")} className="rounded-2xl h-11 touch-target">
-            <Home className="h-4 w-4 mr-2" />
+        <div className="flex items-center justify-between max-w-2xl mx-auto gap-1 sm:gap-2">
+          <Button variant="outline" onClick={() => navigate("/")} className="rounded-2xl h-11 w-11 sm:w-auto touch-target p-0 sm:px-4">
+            <Home className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Hjem</span>
           </Button>
           <Button
             variant="outline"
             onClick={() => setShowStoreDialog(true)}
-            className="rounded-2xl h-11 touch-target flex-1 max-w-[180px] justify-between"
+            className="rounded-2xl h-11 touch-target flex-1 min-w-0 max-w-[140px] sm:max-w-[180px] justify-between"
           >
-            <div className="flex items-center gap-2">
-              <StoreIconComponent className={`h-4 w-4 ${getStoreColor(storeId)}`} />
+            <div className="flex items-center gap-1.5 min-w-0">
+              <StoreIconComponent className={`h-4 w-4 shrink-0 ${getStoreColor(storeId)}`} />
               <span className="text-sm font-medium truncate">{getStoreName(storeId)}</span>
             </div>
-            <ChevronDown className="h-4 w-4 ml-1 opacity-50" />
+            <ChevronDown className="h-3 w-3 ml-0.5 opacity-50 shrink-0" />
           </Button>
-          <Button variant="outline" onClick={onEditList} className="rounded-2xl h-11 touch-target">
-            <Pencil className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={onEditList} className="rounded-2xl h-11 w-11 sm:w-auto touch-target p-0 sm:px-4">
+            <Pencil className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Rediger</span>
           </Button>
-          <Button variant="ghost" onClick={toggleCompactView} className="rounded-2xl h-11 w-11 touch-target p-0" title={compactView ? "Full visning" : "Kompakt visning"}>
+          <Button variant={compactView ? "secondary" : "ghost"} onClick={toggleCompactView} className="rounded-2xl h-11 w-11 touch-target p-0 shrink-0" title={compactView ? "Full visning" : "Kompakt visning"}>
             {compactView ? <LayoutList className="h-4 w-4" /> : <List className="h-4 w-4" />}
           </Button>
           {allItemsInCart && (
