@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin } from "lucide-react";
+import { ArrowLeft, Leaf, AlertCircle, HelpCircle, Heart, ShieldCheck, MapPin, ArrowRightLeft } from "lucide-react";
 import { analyzeProductMatch, UserPreferences } from "@/lib/preferenceAnalysis";
 import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/countryUtils";
 import { CountryFlag } from "@/components/CountryFlag";
