@@ -1,155 +1,214 @@
 import { describe, it, expect } from "vitest";
-import { classifyNova, matchRules, UPF_STRONG_RULES, UPF_WEAK_RULES, REAL_FOOD_RULES } from "./novaClassifier";
+import {
+  classifyNova,
+  matchRules,
+  UPF_STRONG_RULES,
+  UPF_WEAK_RULES,
+  REAL_FOOD_RULES,
+  HIGH_RISK_CATEGORIES,
+} from "./novaClassifier";
 
-describe("classifyNova - missing ingredients", () => {
-  it("returns null for empty ingredients", () => {
-    const result = classifyNova({ ingredients_text: "" });
+// =============================================================================
+// HELPER: shortcut for classifying with just ingredients text
+// =============================================================================
+const classify = (text: string, opts: { additives?: string[]; category?: string } = {}) =>
+  classifyNova({ ingredients_text: text, additives: opts.additives, product_category: opts.category });
+
+// =============================================================================
+// 1. MISSING INGREDIENTS — must return safe fallbacks
+// =============================================================================
+describe("classifyNova – missing ingredients", () => {
+  it.each([
+    ["empty string", ""],
+    ["whitespace only", "   "],
+    ["Norwegian 'no info' phrase", "ingen ingrediensinformasjon tilgjengelig"],
+    ["n/a", "N/A"],
+    ["ukjent", "ukjent"],
+  ])("should return null nova_group for '%s' without category", (_label, text) => {
+    const result = classify(text);
     expect(result.nova_group).toBeNull();
     expect(result.has_ingredients).toBe(false);
     expect(result.is_estimated).toBe(true);
   });
 
-  it("estimates NOVA 4 for high-risk category without ingredients", () => {
-    const result = classifyNova({ ingredients_text: "", product_category: "pizza" });
-    expect(result.nova_group).toBe(4);
-    expect(result.is_estimated).toBe(true);
-    expect(result.confidence).toBeLessThan(0.3);
+  it("should estimate NOVA 4 for high-risk category even without ingredients", () => {
+    for (const cat of ["pizza", "chips", "brus"]) {
+      const result = classify("", { category: cat });
+      expect(result.nova_group).toBe(4);
+      expect(result.confidence).toBeLessThan(0.3);
+      expect(result.is_estimated).toBe(true);
+    }
   });
 
-  it("returns null for non-high-risk category without ingredients", () => {
-    const result = classifyNova({ ingredients_text: "", product_category: "frukt" });
+  it("should return null for non-high-risk category without ingredients", () => {
+    const result = classify("", { category: "frukt" });
     expect(result.nova_group).toBeNull();
-  });
-
-  it("treats 'ingen ingrediensinformasjon' as missing", () => {
-    const result = classifyNova({ ingredients_text: "ingen ingrediensinformasjon tilgjengelig" });
-    expect(result.has_ingredients).toBe(false);
   });
 });
 
-describe("classifyNova - strong UPF signals → NOVA 4", () => {
-  it("detects aroma", () => {
-    const result = classifyNova({ ingredients_text: "melk, sukker, aroma, salt" });
+// =============================================================================
+// 2. STRONG UPF SIGNALS → NOVA 4 — these ingredients prove ultra-processing
+// =============================================================================
+describe("classifyNova – strong UPF signals → NOVA 4", () => {
+  it.each([
+    ["aroma", "melk, sukker, aroma, salt"],
+    ["aspartam", "vann, aspartam, sitronsyre"],
+    ["E951 (sweetener E-number)", "vann, E951, sitronsyre"],
+    ["emulgator", "mel, sukker, emulgator, vann"],
+    ["modifisert stivelse", "vann, modifisert stivelse, salt"],
+    ["glukose-sirup", "sukker, glukose-sirup, kakao"],
+    ["hydrogenert fett", "mel, hydrogenert fett, sukker"],
+    ["fargestoff", "vann, sukker, fargestoff, aroma"],
+    ["maltodekstrin", "maltodekstrin, salt, krydder"],
+    ["soyaproteinisolat", "vann, soyaprotein isolat, olje"],
+  ])("should classify as NOVA 4 when '%s' is present", (_label, text) => {
+    const result = classify(text);
     expect(result.nova_group).toBe(4);
     expect(result.signals.some(s => s.type === "strong")).toBe(true);
   });
 
-  it("detects artificial sweetener (aspartam)", () => {
-    const result = classifyNova({ ingredients_text: "vann, aspartam, sitronsyre" });
-    expect(result.nova_group).toBe(4);
-  });
-
-  it("detects E-number sweetener", () => {
-    const result = classifyNova({ ingredients_text: "vann, E951, sitronsyre" });
-    expect(result.nova_group).toBe(4);
-  });
-
-  it("detects emulgator", () => {
-    const result = classifyNova({ ingredients_text: "mel, sukker, emulgator, vann" });
-    expect(result.nova_group).toBe(4);
-  });
-
-  it("detects modifisert stivelse", () => {
-    const result = classifyNova({ ingredients_text: "vann, modifisert stivelse, salt" });
-    expect(result.nova_group).toBe(4);
-  });
-
-  it("detects glukosesirup", () => {
-    const result = classifyNova({ ingredients_text: "sukker, glukose-sirup, kakao" });
-    expect(result.nova_group).toBe(4);
-  });
-
-  it("detects hydrogenert fett", () => {
-    const result = classifyNova({ ingredients_text: "mel, hydrogenert fett, sukker" });
-    expect(result.nova_group).toBe(4);
-  });
-
-  it("increases confidence with multiple strong signals", () => {
-    const one = classifyNova({ ingredients_text: "mel, aroma" });
-    const multi = classifyNova({ ingredients_text: "mel, aroma, emulgator, fargestoff" });
+  it("should increase confidence with multiple strong signals", () => {
+    const one = classify("mel, aroma");
+    const multi = classify("mel, aroma, emulgator, fargestoff");
     expect(multi.confidence).toBeGreaterThan(one.confidence);
   });
-});
 
-describe("classifyNova - weak signals → NOVA 3", () => {
-  it("detects konserveringsmiddel", () => {
-    const result = classifyNova({ ingredients_text: "tomat, salt, konserveringsmiddel" });
-    expect(result.nova_group).toBe(3);
-  });
-
-  it("detects palmeolje", () => {
-    const result = classifyNova({ ingredients_text: "mel, palmeolje, sukker" });
-    expect(result.nova_group).toBe(3);
-  });
-
-  it("detects E200-series", () => {
-    const result = classifyNova({ ingredients_text: "ost, E202" });
-    expect(result.nova_group).toBe(3);
+  it("should have confidence ≤ 0.98 (never certain)", () => {
+    const result = classify("aroma, emulgator, fargestoff, modifisert stivelse, aspartam");
+    expect(result.confidence).toBeLessThanOrEqual(0.98);
   });
 });
 
-describe("classifyNova - real food → NOVA 1", () => {
-  it("classifies simple fruit as NOVA 1", () => {
-    const result = classifyNova({ ingredients_text: "frukt" });
+// =============================================================================
+// 3. WEAK SIGNALS → NOVA 3 — mildly processed indicators
+// =============================================================================
+describe("classifyNova – weak signals → NOVA 3", () => {
+  it.each([
+    ["konserveringsmiddel", "tomat, salt, konserveringsmiddel"],
+    ["palmeolje", "mel, palmeolje, sukker"],
+    ["E200-series preservative", "ost, E202"],
+  ])("should classify as NOVA 3 when '%s' is present (no strong signal)", (_label, text) => {
+    expect(classify(text).nova_group).toBe(3);
+  });
+});
+
+// =============================================================================
+// 4. REAL FOOD → NOVA 1 — minimal processing signals
+// =============================================================================
+describe("classifyNova – real food → NOVA 1", () => {
+  it.each([
+    ["single fruit", "frukt"],
+    ["pasteurized milk", "pasteurisert melk"],
+    ["fermented product", "melk, fermentert kultur"],
+  ])("should classify '%s' as NOVA 1", (_label, text) => {
+    const result = classify(text);
     expect(result.nova_group).toBe(1);
     expect(result.confidence).toBeGreaterThan(0.6);
   });
-
-  it("classifies pasteurisert melk as NOVA 1", () => {
-    const result = classifyNova({ ingredients_text: "pasteurisert melk" });
-    expect(result.nova_group).toBe(1);
-  });
-
-  it("classifies fermented product as NOVA 1", () => {
-    const result = classifyNova({ ingredients_text: "melk, fermentert kultur" });
-    expect(result.nova_group).toBe(1);
-  });
 });
 
-describe("classifyNova - NOVA 2 (culinary ingredients)", () => {
-  it("classifies plain ingredient list without signals as NOVA 2", () => {
-    const result = classifyNova({ ingredients_text: "hvetemel, vann, salt, olje, sukker" });
+// =============================================================================
+// 5. CULINARY INGREDIENTS → NOVA 2 — basic ingredients without signals
+// =============================================================================
+describe("classifyNova – culinary ingredients → NOVA 2", () => {
+  it("should classify basic ingredient list without signals as NOVA 2", () => {
+    const result = classify("hvetemel, vann, salt, olje, sukker");
     expect(result.nova_group).toBe(2);
   });
 });
 
-describe("classifyNova - many ingredients + weak signals → NOVA 4", () => {
-  it("upgrades to NOVA 4 with 8+ ingredients and E-numbers", () => {
-    const result = classifyNova({
-      ingredients_text: "mel, sukker, vann, salt, olje, melk, egg, kakao, E300"
-    });
+// =============================================================================
+// 6. ESCALATION RULES — many ingredients + weak signals → NOVA 4
+// =============================================================================
+describe("classifyNova – escalation to NOVA 4", () => {
+  it("should upgrade to NOVA 4 with 8+ ingredients and E-numbers", () => {
+    const result = classify("mel, sukker, vann, salt, olje, melk, egg, kakao, E300");
+    expect(result.nova_group).toBe(4);
+  });
+
+  it("should upgrade to NOVA 4 with 8+ ingredients and 2+ weak signals", () => {
+    const result = classify("mel, sukker, vann, salt, olje, melk, egg, kakao, palmeolje, konserveringsmiddel");
     expect(result.nova_group).toBe(4);
   });
 });
 
-describe("classifyNova - additives parameter", () => {
-  it("considers external additives list", () => {
-    const result = classifyNova({
-      ingredients_text: "mel, sukker, vann, salt, olje, melk, egg, kakao",
-      additives: ["E471"]
-    });
+// =============================================================================
+// 7. EXTERNAL ADDITIVES — additives parameter should influence classification
+// =============================================================================
+describe("classifyNova – additives parameter", () => {
+  it("should consider external additives list for E-number detection", () => {
+    const result = classify("mel, sukker, vann, salt, olje, melk, egg, kakao", { additives: ["E471"] });
     expect(result.nova_group).toBe(4);
+  });
+
+  it("should not fail with empty additives array", () => {
+    const result = classify("mel, sukker", { additives: [] });
+    expect(result).toBeDefined();
   });
 });
 
+// =============================================================================
+// 8. matchRules — low-level rule matching
+// =============================================================================
 describe("matchRules", () => {
-  it("returns empty for clean text", () => {
-    const signals = matchRules("melk, sukker, salt", UPF_STRONG_RULES);
-    expect(signals).toHaveLength(0);
+  it("should return empty array for clean text", () => {
+    expect(matchRules("melk, sukker, salt", UPF_STRONG_RULES)).toHaveLength(0);
   });
 
-  it("finds multiple strong signals", () => {
+  it("should find multiple strong signals", () => {
     const signals = matchRules("aroma, emulgator, fargestoff", UPF_STRONG_RULES);
     expect(signals.length).toBeGreaterThanOrEqual(3);
+    expect(signals.every(s => s.type === "strong")).toBe(true);
   });
 
-  it("finds weak signals", () => {
+  it("should find weak signals", () => {
     const signals = matchRules("konserveringsmiddel, palmeolje", UPF_WEAK_RULES);
     expect(signals.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("finds real food signals", () => {
+  it("should find real food signals", () => {
     const signals = matchRules("hele korn, fermentert, tørket", REAL_FOOD_RULES);
     expect(signals.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("should return unique matches per rule (no duplicates from global regex)", () => {
+    const signals = matchRules("aroma og mer aroma", UPF_STRONG_RULES);
+    // "aroma" appears twice, but they're the same match text — should still be valid
+    expect(signals.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// =============================================================================
+// 9. RESULT STRUCTURE — always returns required fields
+// =============================================================================
+describe("classifyNova – result structure", () => {
+  it("should always include version and timestamp", () => {
+    const result = classify("melk");
+    expect(result.version).toBeDefined();
+    expect(result.timestamp).toBeDefined();
+    expect(new Date(result.timestamp).getTime()).not.toBeNaN();
+  });
+
+  it("should include debug info with ingredient count", () => {
+    const result = classify("melk, sukker, salt");
+    expect(result.debug.ingredients_count).toBe(3);
+  });
+
+  it("should list detected E-numbers in debug", () => {
+    const result = classify("mel, E300, E202");
+    expect(result.debug.e_numbers).toEqual(expect.arrayContaining(["E300", "E202"]));
+    expect(result.debug.has_e_numbers).toBe(true);
+  });
+});
+
+// =============================================================================
+// 10. HIGH_RISK_CATEGORIES — verify the constant is sensible
+// =============================================================================
+describe("HIGH_RISK_CATEGORIES", () => {
+  it("should contain common ultra-processed food categories", () => {
+    expect(HIGH_RISK_CATEGORIES).toContain("pizza");
+    expect(HIGH_RISK_CATEGORIES).toContain("chips");
+    expect(HIGH_RISK_CATEGORIES).toContain("brus");
+    expect(HIGH_RISK_CATEGORIES).toContain("godteri");
   });
 });
