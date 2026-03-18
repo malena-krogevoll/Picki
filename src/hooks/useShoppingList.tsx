@@ -174,8 +174,7 @@ export const useShoppingList = (userId: string | undefined) => {
   };
 
   const updateItemQuantity = async (itemId: string, quantity: number) => {
-    const newQuantity = Math.max(1, quantity);
-    
+    const newQuantity = sanitizeQuantity(quantity);
     // Optimistic update
     setLists(prevLists =>
       prevLists.map(list => ({
