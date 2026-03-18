@@ -894,10 +894,10 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
       <div className="flex-1 px-4 py-4 md:px-0 overflow-y-auto touch-scroll">
         <div className={`${compactView ? 'space-y-1' : 'space-y-4 md:space-y-6'} max-w-2xl mx-auto pb-32 md:pb-6`}>
           {groupedItems.map((group) => (
-            <div key={group.category} className="space-y-3">
+            <div key={group.category} className={compactView ? 'space-y-0.5' : 'space-y-3'}>
               {/* Category header */}
-              <div className="flex items-center gap-2 px-1 sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-5">
-                <span className="text-lg">{group.emoji}</span>
+              <div className={`flex items-center gap-2 px-1 sticky top-0 bg-background/95 backdrop-blur-sm z-5 ${compactView ? 'py-1.5' : 'py-2'}`}>
+                <span className={compactView ? 'text-base' : 'text-lg'}>{group.emoji}</span>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   {group.category}
                 </h2>
