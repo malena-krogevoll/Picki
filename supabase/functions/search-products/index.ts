@@ -1467,6 +1467,11 @@ function processProductWithIntent(
     }
   }
 
+  // Fresh produce boost / baby food penalty
+  const queryLower2 = query.toLowerCase().trim();
+  const categoryLower2 = category.toLowerCase();
+  score = applyProduceScoring(score, queryLower2, nameLower, categoryLower2);
+
   const renvareScore = calculateRenvareScore(ingredients, filters);
   const priceNumeric = parsePrice(price);
   const availability = product.Tilgjengelighet || "unknown";
