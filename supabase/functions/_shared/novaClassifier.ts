@@ -94,7 +94,7 @@ export const REAL_FOOD_RULES: Rule[] = [
   { id: "REAL_FOOD_SMOKED", pattern: /\brøkt\b(?!\s*aroma)/gi, type: 'real_food', description: "Røkt (ikke røkaroma)" },
 ];
 
-export const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon'];
+export const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon', 'nuggets', 'fiskepinner', 'fiskegrateng', 'grandiosa', 'pølsebrød', 'ketchup', 'majones', 'dressing'];
 
 const NO_INGREDIENTS_PHRASES = [
   'ingen ingrediensinformasjon tilgjengelig',

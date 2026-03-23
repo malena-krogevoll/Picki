@@ -286,10 +286,18 @@ describe("classifyNova – result structure", () => {
 // 10. HIGH_RISK_CATEGORIES — verify the constant is sensible
 // =============================================================================
 describe("HIGH_RISK_CATEGORIES", () => {
-  it("should contain common ultra-processed food categories", () => {
-    expect(HIGH_RISK_CATEGORIES).toContain("pizza");
-    expect(HIGH_RISK_CATEGORIES).toContain("chips");
-    expect(HIGH_RISK_CATEGORIES).toContain("brus");
-    expect(HIGH_RISK_CATEGORIES).toContain("godteri");
+  it.each([
+    "pizza", "chips", "brus", "godteri", "nuggets", "fiskepinner",
+    "fiskegrateng", "grandiosa", "pølsebrød", "ketchup", "majones", "dressing",
+  ])("should contain '%s'", (cat) => {
+    expect(HIGH_RISK_CATEGORIES).toContain(cat);
+  });
+
+  it("should estimate NOVA 4 for new high-risk categories without ingredients", () => {
+    for (const cat of ["nuggets", "fiskepinner", "ketchup", "majones"]) {
+      const result = classify("", { category: cat });
+      expect(result.nova_group).toBe(4);
+      expect(result.is_estimated).toBe(true);
+    }
   });
 });
