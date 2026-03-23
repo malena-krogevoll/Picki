@@ -41,6 +41,20 @@ export const UPF_STRONG_RULES: Rule[] = [
   { id: "UPF_STRONG_ISOLATED_GLUTEN", pattern: /\b(hvete|seitan)?gluten\b/gi, type: 'strong', description: "Isolert gluten" },
   { id: "UPF_STRONG_PROTEIN_ISOLATE", pattern: /\bprotein(konsentrat|isolat|pulver)\b/gi, type: 'strong', description: "Proteinisolat/-konsentrat" },
   { id: "UPF_STRONG_INVERT_SUGAR", pattern: /\binvertsukker\b/gi, type: 'strong', description: "Invertsukker" },
+  { id: "UPF_STRONG_LECITHIN", pattern: /\b(lesitin|lecithin|soyalesitin|E ?322)\b/gi, type: 'strong', description: "Industriell emulgator (lesitin)" },
+  { id: "UPF_STRONG_CASEIN", pattern: /\b(kasein|kaseinat)\b/gi, type: 'strong', description: "Isolert melkeprotein (kasein)" },
+  { id: "UPF_STRONG_MONO_DI_GLYCERIDES", pattern: /\b(mono-?\s*og\s*di\s*glycerider|E ?471)\b/gi, type: 'strong', description: "Industriell emulgator (mono/diglycerider)" },
+  { id: "UPF_STRONG_NITRITE", pattern: /\b(natriumnitritt|kaliumnitritt|E ?250|E ?249)\b/gi, type: 'strong', description: "Industrielt konserveringsmiddel (nitritt)" },
+  { id: "UPF_STRONG_PHOSPHATE", pattern: /\b(di|tri|poly)?fosfat(er)?|E ?45[0-2]\b/gi, type: 'strong', description: "Industrielt fosfat" },
+  { id: "UPF_STRONG_FLAVOR_ENHANCER", pattern: /\bsmaksforsterker(e)?\b/gi, type: 'strong', description: "Industriell smaksforsterker" },
+  { id: "UPF_STRONG_CELLULOSE", pattern: /\b(cellulose|E ?460)\b/gi, type: 'strong', description: "Industrielt fyllstoff (cellulose)" },
+  { id: "UPF_STRONG_GELATIN", pattern: /\bgelatin\b/gi, type: 'strong', description: "Industrielt ekstrahert gelatin" },
+  { id: "UPF_STRONG_GENERIC_SYRUP", pattern: /(?<!(glukose|fruktose|invertert)[-\s]?)\bsirup\b/gi, type: 'strong', description: "Industriell sirup" },
+  { id: "UPF_STRONG_POLYDEXTROSE", pattern: /\bpolydekstrose\b/gi, type: 'strong', description: "Syntetisk fiber (polydekstrose)" },
+  { id: "UPF_STRONG_INULIN", pattern: /\binulin\b/gi, type: 'strong', description: "Industrielt ekstrahert fiber (inulin)" },
+  { id: "UPF_STRONG_CITRIC_ACID_E", pattern: /\bE ?330\b/gi, type: 'strong', description: "Industrielt fremstilt sitronsyre (E330)" },
+  { id: "UPF_STRONG_SODIUM_ALGINATE", pattern: /\b(natriumalginat|E ?401)\b/gi, type: 'strong', description: "Fortykningsmiddel (natriumalginat)" },
+  { id: "UPF_STRONG_CALCIUM_CHLORIDE", pattern: /\b(kalsiumklorid|E ?509)\b/gi, type: 'strong', description: "Industriell tilsetning (kalsiumklorid)" },
 ];
 
 export const UPF_WEAK_RULES: Rule[] = [
