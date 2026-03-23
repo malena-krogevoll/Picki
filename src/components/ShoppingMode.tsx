@@ -112,30 +112,39 @@ const getNovaLabel = (score: number | null, hasIngredients: boolean = true) => {
 };
 
 // Helper to batch classify NOVA for multiple products at once
-async function batchClassifyNova(products: { ingredienser: string; category: string }[]): Promise<Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>> {
+async function batchClassifyNova(products: { ingredienser: string; category: string; productName?: string }[]): Promise<Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>> {
   const results = new Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>();
   
-  // Filter out products without ingredients to save API calls
-  const productsWithIngredients = products
-    .map((p, idx) => ({ ...p, originalIndex: idx }))
-    .filter(p => p.ingredienser && p.ingredienser.trim().length > 0);
+  // Filter out products without ingredients UNLESS they are fresh produce (FG category)
+  const freshProduceCategories = ['fg', 'frukt og grønt', 'frukt', 'grønt', 'grønnsaker', 'bær', 'ferske grønnsaker', 'fersk frukt', 'poteter', 'løk', 'salat', 'urter', 'sopp', 'rotgrønnsaker'];
   
-  // Set defaults for products without ingredients
+  const productsToClassify = products
+    .map((p, idx) => ({ ...p, originalIndex: idx }))
+    .filter(p => {
+      const hasIngredients = p.ingredienser && p.ingredienser.trim().length > 0;
+      const isFreshProduce = freshProduceCategories.some(cat => (p.category || '').toLowerCase().includes(cat));
+      return hasIngredients || isFreshProduce;
+    });
+  
+  // Set defaults for products that won't be classified
   products.forEach((p, idx) => {
-    if (!p.ingredienser || p.ingredienser.trim().length === 0) {
+    const hasIngredients = p.ingredienser && p.ingredienser.trim().length > 0;
+    const isFreshProduce = freshProduceCategories.some(cat => (p.category || '').toLowerCase().includes(cat));
+    if (!hasIngredients && !isFreshProduce) {
       results.set(idx, { novaScore: null, isEstimated: true, hasIngredients: false });
     }
   });
   
-  if (productsWithIngredients.length === 0) {
+  if (productsToClassify.length === 0) {
     return results;
   }
 
   try {
     // Use supabase.functions.invoke to include user JWT automatically
-    const batchPayload = productsWithIngredients.map(p => ({
+    const batchPayload = productsToClassify.map(p => ({
       ingredients_text: p.ingredienser,
-      product_category: p.category
+      product_category: p.category,
+      product_name: p.productName || '',
     }));
 
     const { data, error } = await supabase.functions.invoke('classify-nova/classify-batch', {
