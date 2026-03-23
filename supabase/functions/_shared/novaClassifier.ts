@@ -205,6 +205,9 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
   } else if (isHighRiskCategory && weakHits >= 2) {
     novaGroup = 4;
     baseConfidence = 0.55 + Math.min(weakHits * 0.05, 0.2);
+  } else if (ingredientsCount >= 15) {
+    novaGroup = 4;
+    baseConfidence = 0.5 + Math.min(ingredientsCount * 0.01, 0.15);
   } else if (weakHits >= 1 || hasENumbers) {
     novaGroup = 3;
     baseConfidence = 0.5 + Math.min(weakHits * 0.05, 0.2) + (hasENumbers ? 0.1 : 0);
