@@ -415,7 +415,8 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
               
               const productsForNova = filteredResults.map((r: any) => ({
                 ingredienser: r.product.Ingrediensliste || '',
-                category: r.product.Kategori || ''
+                category: r.product.Kategori || '',
+                productName: r.product.Produktnavn || '',
               }));
               
               const novaResults = await batchClassifyNova(productsForNova);
