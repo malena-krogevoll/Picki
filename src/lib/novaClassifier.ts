@@ -67,6 +67,12 @@ export const UPF_WEAK_RULES: Rule[] = [
   { id: "UPF_WEAK_GLYCEROL", pattern: /\b(glyserol|E ?422)\b/gi, type: 'weak', description: "Glyserol" },
   { id: "UPF_WEAK_PALM_OIL", pattern: /\bpalmeolje\b/gi, type: 'weak', description: "Palmeolje" },
   { id: "UPF_WEAK_REFINED_OIL", pattern: /\braffinert(e)? vegetabilsk(e)? olje(r)?\b/gi, type: 'weak', description: "Raffinert vegetabilsk olje" },
+  { id: "UPF_WEAK_PLAIN_STARCH", pattern: /(?<!modifisert(e)?\s)\bstivelse\b/gi, type: 'weak', description: "Raffinert stivelse" },
+  { id: "UPF_WEAK_CITRIC_ACID", pattern: /\bsitronsyre\b/gi, type: 'weak', description: "Sitronsyre (tilsetning)" },
+  { id: "UPF_WEAK_ASCORBIC_ACID", pattern: /\b(askorbinsyre|vitamin c)\b/gi, type: 'weak', description: "Askorbinsyre (tilsetning)" },
+  { id: "UPF_WEAK_SODIUM_CITRATE", pattern: /\bnatriumsitrat\b/gi, type: 'weak', description: "Natriumsitrat (regulator)" },
+  { id: "UPF_WEAK_CALCIUM_CARBONATE", pattern: /\b(kalsiumkarbonat|E ?170)\b/gi, type: 'weak', description: "Kalsiumkarbonat (tilsetning)" },
+  { id: "UPF_WEAK_LACTIC_ACID", pattern: /\bmelkesyre\b(?!\s*(bakterie|kultur))/gi, type: 'weak', description: "Melkesyre (industrielt fremstilt)" },
 ];
 
 export const REAL_FOOD_RULES: Rule[] = [
