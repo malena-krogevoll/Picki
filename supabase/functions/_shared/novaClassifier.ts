@@ -6,8 +6,8 @@
  * Both files must produce identical classification results.
  */
 
-export const VERSION = "1.1.0";
-export const RULESET_DATE = "2025-01-15";
+export const VERSION = "1.2.0";
+export const RULESET_DATE = "2026-03-23";
 
 export interface Rule {
   id: string;
@@ -46,6 +46,20 @@ export const UPF_STRONG_RULES: Rule[] = [
   { id: "UPF_STRONG_ISOLATED_GLUTEN", pattern: /\b(hvete|seitan)?gluten\b/gi, type: 'strong', description: "Isolert gluten" },
   { id: "UPF_STRONG_PROTEIN_ISOLATE", pattern: /\bprotein(konsentrat|isolat|pulver)\b/gi, type: 'strong', description: "Proteinisolat/-konsentrat" },
   { id: "UPF_STRONG_INVERT_SUGAR", pattern: /\binvertsukker\b/gi, type: 'strong', description: "Invertsukker" },
+  { id: "UPF_STRONG_LECITHIN", pattern: /\b(lesitin|lecithin|soyalesitin|E ?322)\b/gi, type: 'strong', description: "Industriell emulgator (lesitin)" },
+  { id: "UPF_STRONG_CASEIN", pattern: /\b(kasein|kaseinat)\b/gi, type: 'strong', description: "Isolert melkeprotein (kasein)" },
+  { id: "UPF_STRONG_MONO_DI_GLYCERIDES", pattern: /\b(mono-?\s*og\s*di\s*glycerider|E ?471)\b/gi, type: 'strong', description: "Industriell emulgator (mono/diglycerider)" },
+  { id: "UPF_STRONG_NITRITE", pattern: /\b(natriumnitritt|kaliumnitritt|E ?250|E ?249)\b/gi, type: 'strong', description: "Industrielt konserveringsmiddel (nitritt)" },
+  { id: "UPF_STRONG_PHOSPHATE", pattern: /\b(di|tri|poly)?fosfat(er)?|E ?45[0-2]\b/gi, type: 'strong', description: "Industrielt fosfat" },
+  { id: "UPF_STRONG_FLAVOR_ENHANCER", pattern: /\bsmaksforsterker(e)?\b/gi, type: 'strong', description: "Industriell smaksforsterker" },
+  { id: "UPF_STRONG_CELLULOSE", pattern: /\b(cellulose|E ?460)\b/gi, type: 'strong', description: "Industrielt fyllstoff (cellulose)" },
+  { id: "UPF_STRONG_GELATIN", pattern: /\bgelatin\b/gi, type: 'strong', description: "Industrielt ekstrahert gelatin" },
+  { id: "UPF_STRONG_GENERIC_SYRUP", pattern: /(?<!(glukose|fruktose|invertert)[-\s]?)\bsirup\b/gi, type: 'strong', description: "Industriell sirup" },
+  { id: "UPF_STRONG_POLYDEXTROSE", pattern: /\bpolydekstrose\b/gi, type: 'strong', description: "Syntetisk fiber (polydekstrose)" },
+  { id: "UPF_STRONG_INULIN", pattern: /\binulin\b/gi, type: 'strong', description: "Industrielt ekstrahert fiber (inulin)" },
+  { id: "UPF_STRONG_CITRIC_ACID_E", pattern: /\bE ?330\b/gi, type: 'strong', description: "Industrielt fremstilt sitronsyre (E330)" },
+  { id: "UPF_STRONG_SODIUM_ALGINATE", pattern: /\b(natriumalginat|E ?401)\b/gi, type: 'strong', description: "Fortykningsmiddel (natriumalginat)" },
+  { id: "UPF_STRONG_CALCIUM_CHLORIDE", pattern: /\b(kalsiumklorid|E ?509)\b/gi, type: 'strong', description: "Industriell tilsetning (kalsiumklorid)" },
 ];
 
 export const UPF_WEAK_RULES: Rule[] = [
@@ -58,6 +72,12 @@ export const UPF_WEAK_RULES: Rule[] = [
   { id: "UPF_WEAK_GLYCEROL", pattern: /\b(glyserol|E ?422)\b/gi, type: 'weak', description: "Glyserol" },
   { id: "UPF_WEAK_PALM_OIL", pattern: /\bpalmeolje\b/gi, type: 'weak', description: "Palmeolje" },
   { id: "UPF_WEAK_REFINED_OIL", pattern: /\braffinert(e)? vegetabilsk(e)? olje(r)?\b/gi, type: 'weak', description: "Raffinert vegetabilsk olje" },
+  { id: "UPF_WEAK_PLAIN_STARCH", pattern: /(?<!modifisert(e)?\s)\bstivelse\b/gi, type: 'weak', description: "Raffinert stivelse" },
+  { id: "UPF_WEAK_CITRIC_ACID", pattern: /\bsitronsyre\b/gi, type: 'weak', description: "Sitronsyre (tilsetning)" },
+  { id: "UPF_WEAK_ASCORBIC_ACID", pattern: /\b(askorbinsyre|vitamin c)\b/gi, type: 'weak', description: "Askorbinsyre (tilsetning)" },
+  { id: "UPF_WEAK_SODIUM_CITRATE", pattern: /\bnatriumsitrat\b/gi, type: 'weak', description: "Natriumsitrat (regulator)" },
+  { id: "UPF_WEAK_CALCIUM_CARBONATE", pattern: /\b(kalsiumkarbonat|E ?170)\b/gi, type: 'weak', description: "Kalsiumkarbonat (tilsetning)" },
+  { id: "UPF_WEAK_LACTIC_ACID", pattern: /\bmelkesyre\b(?!\s*(bakterie|kultur))/gi, type: 'weak', description: "Melkesyre (industrielt fremstilt)" },
 ];
 
 export const REAL_FOOD_RULES: Rule[] = [
@@ -74,7 +94,7 @@ export const REAL_FOOD_RULES: Rule[] = [
   { id: "REAL_FOOD_SMOKED", pattern: /\brøkt\b(?!\s*aroma)/gi, type: 'real_food', description: "Røkt (ikke røkaroma)" },
 ];
 
-export const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon'];
+export const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon', 'nuggets', 'fiskepinner', 'fiskegrateng', 'grandiosa', 'pølsebrød', 'ketchup', 'majones', 'dressing'];
 
 const NO_INGREDIENTS_PHRASES = [
   'ingen ingrediensinformasjon tilgjengelig',

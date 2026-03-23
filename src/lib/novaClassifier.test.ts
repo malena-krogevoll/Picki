@@ -71,6 +71,33 @@ describe("classifyNova – strong UPF signals → NOVA 4", () => {
     ["hvetegluten (isolert)", "mel, hvetegluten, vann"],
     ["proteinkonsentrat", "vann, proteinkonsentrat, salt"],
     ["invertsukker", "mel, invertsukker, smør"],
+    // === New v1.2.0 rules ===
+    ["lesitin", "sjokolade, kakaosmør, lesitin"],
+    ["lecithin", "mel, smør, lecithin"],
+    ["soyalesitin", "kakao, sukker, soyalesitin"],
+    ["E322 (lecithin)", "mel, E322, sukker"],
+    ["kasein", "vann, kasein, salt"],
+    ["kaseinat", "mel, kaseinat, sukker"],
+    ["mono- og diglycerider", "mel, mono- og diglycerider, vann"],
+    ["E471", "mel, E471, sukker"],
+    ["natriumnitritt", "svinekjøtt, natriumnitritt, salt"],
+    ["E250", "kjøtt, E250, vann"],
+    ["E249 (kaliumnitritt)", "kjøtt, E249, salt"],
+    ["fosfat", "kjøtt, fosfat, vann"],
+    ["difosfat", "mel, difosfat, salt"],
+    ["E451 (trifosfat)", "kjøtt, E451, salt"],
+    ["smaksforsterker", "mel, smaksforsterker, salt"],
+    ["cellulose", "mel, cellulose, vann"],
+    ["E460", "mel, E460, sukker"],
+    ["gelatin", "sukker, gelatin, vann"],
+    ["sirup (generisk)", "mel, sirup, smør"],
+    ["polydekstrose", "mel, polydekstrose, vann"],
+    ["inulin", "yoghurt, inulin, sukker"],
+    ["E330 (sitronsyre)", "vann, E330, sukker"],
+    ["natriumalginat", "vann, natriumalginat, sukker"],
+    ["E401", "vann, E401, salt"],
+    ["kalsiumklorid", "ost, kalsiumklorid, salt"],
+    ["E509", "melk, E509, salt"],
   ])("should classify as NOVA 4 when '%s' is present", (_label, text) => {
     const result = classify(text);
     expect(result.nova_group).toBe(4);
@@ -89,15 +116,23 @@ describe("classifyNova – strong UPF signals → NOVA 4", () => {
   });
 
   it("should classify real-world fish product with industrial ingredients as NOVA 4", () => {
-    // This is the exact product that was misclassified as NOVA 2
     const result = classify(
       "Alaskapollock (FISK) 40%, mel (HVETE-, ris-, mais-), vann, rapsolje, brokkoli 5%, cheddarost (MELK) 3,6%, stivelse( HVETE -, mais-, potet-), MELK, gulrot 1%, HVETEGLUTEN, smør (MELK), ostepulver (MELK), salt, gjær, myseprotein (MELK), druesukker, fløte(MELK), sitronsaft fra konsentrat, krydder (bl.a. gurkemeie, kajennepepper), SENNEPSFRØ."
     );
     expect(result.nova_group).toBe(4);
     expect(result.signals.some(s => s.type === "strong")).toBe(true);
-    // Should detect multiple industrial markers
     const strongIds = result.signals.filter(s => s.type === "strong").map(s => s.rule_id);
     expect(strongIds.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("should classify typical Norwegian pølse with nitrite as NOVA 4", () => {
+    const result = classify("svinekjøtt 60%, vann, stivelse, salt, natriumnitritt, krydder");
+    expect(result.nova_group).toBe(4);
+  });
+
+  it("should classify industrial candy with gelatin as NOVA 4", () => {
+    const result = classify("sukker, glukosesirup, gelatin, sitronsyre, aroma, fargestoff");
+    expect(result.nova_group).toBe(4);
   });
 });
 
@@ -109,8 +144,26 @@ describe("classifyNova – weak signals → NOVA 3", () => {
     ["konserveringsmiddel", "tomat, salt, konserveringsmiddel"],
     ["palmeolje", "mel, palmeolje, sukker"],
     ["E200-series preservative", "ost, E202"],
+    // === New v1.2.0 weak rules ===
+    ["stivelse (uten modifisert)", "mel, vann, stivelse"],
+    ["sitronsyre", "tomat, vann, sitronsyre"],
+    ["askorbinsyre", "juice, vann, askorbinsyre"],
+    ["natriumsitrat", "ost, vann, natriumsitrat"],
+    ["kalsiumkarbonat", "mel, vann, kalsiumkarbonat"],
+    ["E170", "mel, vann, E170"],
+    ["melkesyre (industriell)", "agurk, vann, melkesyre"],
   ])("should classify as NOVA 3 when '%s' is present (no strong signal)", (_label, text) => {
     expect(classify(text).nova_group).toBe(3);
+  });
+
+  it("should NOT flag melkesyrebakterier as weak signal", () => {
+    const result = classify("melk, melkesyrebakterier");
+    expect(result.signals.some(s => s.rule_id === "UPF_WEAK_LACTIC_ACID")).toBe(false);
+  });
+
+  it("should NOT flag melkesyrekultur as weak signal", () => {
+    const result = classify("melk, melkesyrekultur");
+    expect(result.signals.some(s => s.rule_id === "UPF_WEAK_LACTIC_ACID")).toBe(false);
   });
 });
 
@@ -233,10 +286,18 @@ describe("classifyNova – result structure", () => {
 // 10. HIGH_RISK_CATEGORIES — verify the constant is sensible
 // =============================================================================
 describe("HIGH_RISK_CATEGORIES", () => {
-  it("should contain common ultra-processed food categories", () => {
-    expect(HIGH_RISK_CATEGORIES).toContain("pizza");
-    expect(HIGH_RISK_CATEGORIES).toContain("chips");
-    expect(HIGH_RISK_CATEGORIES).toContain("brus");
-    expect(HIGH_RISK_CATEGORIES).toContain("godteri");
+  it.each([
+    "pizza", "chips", "brus", "godteri", "nuggets", "fiskepinner",
+    "fiskegrateng", "grandiosa", "pølsebrød", "ketchup", "majones", "dressing",
+  ])("should contain '%s'", (cat) => {
+    expect(HIGH_RISK_CATEGORIES).toContain(cat);
+  });
+
+  it("should estimate NOVA 4 for new high-risk categories without ingredients", () => {
+    for (const cat of ["nuggets", "fiskepinner", "ketchup", "majones"]) {
+      const result = classify("", { category: cat });
+      expect(result.nova_group).toBe(4);
+      expect(result.is_estimated).toBe(true);
+    }
   });
 });
