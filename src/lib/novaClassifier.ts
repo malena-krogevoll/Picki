@@ -2,7 +2,7 @@
 // The canonical backend version lives at supabase/functions/_shared/novaClassifier.ts.
 // IMPORTANT: Keep both files in sync — any rule changes must be applied to both.
 
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 
 export interface Rule {
   id: string;
@@ -30,11 +30,17 @@ export const UPF_STRONG_RULES: Rule[] = [
   { id: "UPF_STRONG_MODIFIED_STARCH", pattern: /\bmodifisert(e)? stivelse\b/gi, type: 'strong', description: "Modifisert stivelse" },
   { id: "UPF_STRONG_MODIFIED_STARCH_E", pattern: /\bE ?1(404|4[1-5]\d)\b/gi, type: 'strong', description: "E-nummer modifisert stivelse" },
   { id: "UPF_STRONG_HYDROGENATED_FAT", pattern: /\b(hydrogenert|delvis herdet|interesterifisert)\b/gi, type: 'strong', description: "Industrielt bearbeidet fett" },
-  { id: "UPF_STRONG_WHEY_ISOLATE", pattern: /\b(myseprotein(konsentrat|isolat)|whey protein( isolate)?)\b/gi, type: 'strong', description: "Myseproteinisolat" },
-  { id: "UPF_STRONG_SOY_ISOLATE", pattern: /\bsoyaprotein( isolat)?\b/gi, type: 'strong', description: "Soyaproteinisolat" },
+  { id: "UPF_STRONG_WHEY_PROTEIN", pattern: /\b(myseprotein\w*|whey protein\w*)\b/gi, type: 'strong', description: "Myseprotein (industrielt ekstrahert)" },
+  { id: "UPF_STRONG_SOY_ISOLATE", pattern: /\bsoyaprotein\w*\b/gi, type: 'strong', description: "Soyaproteinisolat" },
   { id: "UPF_STRONG_COLORANT", pattern: /\bfargestoff\b/gi, type: 'strong', description: "Fargestoff" },
   { id: "UPF_STRONG_CARAMEL_COLOR", pattern: /\b(karamellfarge|E ?150[a-d])\b/gi, type: 'strong', description: "Karamellfarge" },
   { id: "UPF_STRONG_CARMINE", pattern: /\b(karmin|E ?120|annatto|E ?160b)\b/gi, type: 'strong', description: "Karmin/Annatto" },
+  { id: "UPF_STRONG_POWDER_DAIRY", pattern: /\b(ostepulver|melkepulver|fløtepulver|smørpulver|mysepulver)\b/gi, type: 'strong', description: "Industrielt meieripulver" },
+  { id: "UPF_STRONG_DEXTROSE", pattern: /\b(druesukker|dekstrose|dextrose|glukose(?![-\s]?sirup))\b/gi, type: 'strong', description: "Industrielt sukker (druesukker/dekstrose)" },
+  { id: "UPF_STRONG_CONCENTRATE", pattern: /\bfra konsentrat\b/gi, type: 'strong', description: "Fra konsentrat (industriell prosess)" },
+  { id: "UPF_STRONG_ISOLATED_GLUTEN", pattern: /\b(hvete|seitan)?gluten\b/gi, type: 'strong', description: "Isolert gluten" },
+  { id: "UPF_STRONG_PROTEIN_ISOLATE", pattern: /\bprotein(konsentrat|isolat|pulver)\b/gi, type: 'strong', description: "Proteinisolat/-konsentrat" },
+  { id: "UPF_STRONG_INVERT_SUGAR", pattern: /\binvertsukker\b/gi, type: 'strong', description: "Invertsukker" },
 ];
 
 export const UPF_WEAK_RULES: Rule[] = [
@@ -194,6 +200,11 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
   } else if (isHighRiskCategory && weakHits >= 2) {
     novaGroup = 4;
     baseConfidence = 0.55 + Math.min(weakHits * 0.05, 0.2);
+  } else if (ingredientsCount >= 15) {
+    // Very many ingredients without any detected signals is still industrial
+    // Real home-cooked food rarely has 15+ distinct ingredients listed
+    novaGroup = 4;
+    baseConfidence = 0.5 + Math.min(ingredientsCount * 0.01, 0.15);
   } else if (weakHits >= 1 || hasENumbers) {
     novaGroup = 3;
     baseConfidence = 0.5 + Math.min(weakHits * 0.05, 0.2) + (hasENumbers ? 0.1 : 0);
