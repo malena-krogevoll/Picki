@@ -6,6 +6,7 @@ import {
   UPF_WEAK_RULES,
   REAL_FOOD_RULES,
   HIGH_RISK_CATEGORIES,
+  FRESH_PRODUCE_CATEGORIES,
 } from "./novaClassifier";
 
 // =============================================================================
