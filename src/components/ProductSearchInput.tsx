@@ -104,6 +104,7 @@ export const ProductSearchInput = ({ storeId, onAddProduct, disabled }: ProductS
           const batchInput = rawProducts.map((r: any) => ({
             ingredients_text: r.product?.Ingrediensliste || '',
             product_category: r.product?.Kategori || '',
+            product_name: r.product?.Produktnavn || '',
           }));
           
           // Use supabase.functions.invoke to include user JWT automatically
