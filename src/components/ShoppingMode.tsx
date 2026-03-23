@@ -153,7 +153,7 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
 
     if (!error && Array.isArray(data)) {
       data.forEach((result: any, idx: number) => {
-        const originalIdx = productsWithIngredients[idx].originalIndex;
+        const originalIdx = productsToClassify[idx].originalIndex;
         results.set(originalIdx, {
           novaScore: result.nova_group ?? null,
           isEstimated: result.is_estimated ?? false,
@@ -162,13 +162,13 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
       });
     } else {
       console.warn('Batch NOVA classification failed:', error);
-      productsWithIngredients.forEach(p => {
+      productsToClassify.forEach(p => {
         results.set(p.originalIndex, { novaScore: 4, isEstimated: true, hasIngredients: true });
       });
     }
   } catch (err) {
     console.error('Batch NOVA classification error:', err);
-    productsWithIngredients.forEach(p => {
+    productsToClassify.forEach(p => {
       results.set(p.originalIndex, { novaScore: 4, isEstimated: true, hasIngredients: true });
     });
   }
