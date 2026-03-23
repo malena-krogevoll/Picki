@@ -515,6 +515,29 @@ const excludedCategories = [
   "plastposer",
 ];
 
+// Simple produce terms — when user searches these, they want fresh produce, not baby food
+const SIMPLE_PRODUCE_TERMS = new Set([
+  "eple", "epler", "banan", "bananer", "appelsin", "appelsiner", "pære", "pærer",
+  "druer", "drue", "mango", "ananas", "sitron", "sitroner", "lime", "kiwi",
+  "avokado", "melon", "vannmelon", "jordbær", "bringebær", "blåbær",
+  "brokkoli", "blomkål", "gulrot", "gulrøtter", "tomat", "tomater",
+  "agurk", "paprika", "spinat", "salat", "løk", "hvitløk", "squash",
+  "sopp", "sjampinjong", "mais", "erter", "poteter", "potet",
+]);
+
+// Baby food / squeeze pouch patterns — penalize heavily for produce queries
+const BABY_FOOD_PATTERNS = [
+  "barnemat", "babymat", "klemmepose", "smoothie barn", "baby",
+  "ella's", "ellas", "hipp", "nestlé baby", "nestle baby",
+  "godbit barn", "fruktpose", "grøtpose", "fra 4 mnd", "fra 6 mnd",
+  "fra 8 mnd", "fra 12 mnd", "småfolk",
+];
+
+// Fresh produce category markers
+const FRESH_PRODUCE_CATEGORY_MARKERS = [
+  "fg", "frukt", "grønt", "grønnsaker", "frukt og grønt", "bær",
+];
+
 // Synonym- og variantmapping for bedre søketreff
 const searchSynonyms: Record<string, string[]> = {
   // === MEIERIPRODUKTER ===
