@@ -6,7 +6,7 @@
  * Both files must produce identical classification results.
  */
 
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 export const RULESET_DATE = "2025-01-15";
 
 export interface Rule {
