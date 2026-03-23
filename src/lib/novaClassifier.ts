@@ -91,6 +91,13 @@ export const REAL_FOOD_RULES: Rule[] = [
 
 export const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon', 'nuggets', 'fiskepinner', 'fiskegrateng', 'grandiosa', 'pølsebrød', 'ketchup', 'majones', 'dressing'];
 
+// Fresh produce categories — products here with no ingredients are single-ingredient NOVA 1
+export const FRESH_PRODUCE_CATEGORIES = [
+  'fg', 'frukt og grønt', 'frukt', 'grønt', 'grønnsaker', 'bær',
+  'ferske grønnsaker', 'fersk frukt', 'poteter', 'løk', 'salat',
+  'urter', 'sopp', 'rotgrønnsaker',
+];
+
 const NO_INGREDIENTS_PHRASES = [
   'ingen ingrediensinformasjon tilgjengelig',
   'ingen ingrediensinformasjon',
