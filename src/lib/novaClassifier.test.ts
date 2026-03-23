@@ -60,7 +60,17 @@ describe("classifyNova – strong UPF signals → NOVA 4", () => {
     ["hydrogenert fett", "mel, hydrogenert fett, sukker"],
     ["fargestoff", "vann, sukker, fargestoff, aroma"],
     ["maltodekstrin", "maltodekstrin, salt, krydder"],
-    ["soyaproteinisolat", "vann, soyaprotein isolat, olje"],
+    ["soyaprotein", "vann, soyaprotein, olje"],
+    ["myseprotein (bare)", "mel, myseprotein, vann"],
+    ["myseproteinkonsentrat", "mel, myseproteinkonsentrat, vann"],
+    ["ostepulver", "mel, ostepulver, salt"],
+    ["melkepulver", "mel, melkepulver, sukker"],
+    ["druesukker", "mel, druesukker, vann"],
+    ["dekstrose", "mel, dekstrose, salt"],
+    ["fra konsentrat", "sitronsaft fra konsentrat, vann, sukker"],
+    ["hvetegluten (isolert)", "mel, hvetegluten, vann"],
+    ["proteinkonsentrat", "vann, proteinkonsentrat, salt"],
+    ["invertsukker", "mel, invertsukker, smør"],
   ])("should classify as NOVA 4 when '%s' is present", (_label, text) => {
     const result = classify(text);
     expect(result.nova_group).toBe(4);
@@ -76,6 +86,18 @@ describe("classifyNova – strong UPF signals → NOVA 4", () => {
   it("should have confidence ≤ 0.98 (never certain)", () => {
     const result = classify("aroma, emulgator, fargestoff, modifisert stivelse, aspartam");
     expect(result.confidence).toBeLessThanOrEqual(0.98);
+  });
+
+  it("should classify real-world fish product with industrial ingredients as NOVA 4", () => {
+    // This is the exact product that was misclassified as NOVA 2
+    const result = classify(
+      "Alaskapollock (FISK) 40%, mel (HVETE-, ris-, mais-), vann, rapsolje, brokkoli 5%, cheddarost (MELK) 3,6%, stivelse( HVETE -, mais-, potet-), MELK, gulrot 1%, HVETEGLUTEN, smør (MELK), ostepulver (MELK), salt, gjær, myseprotein (MELK), druesukker, fløte(MELK), sitronsaft fra konsentrat, krydder (bl.a. gurkemeie, kajennepepper), SENNEPSFRØ."
+    );
+    expect(result.nova_group).toBe(4);
+    expect(result.signals.some(s => s.type === "strong")).toBe(true);
+    // Should detect multiple industrial markers
+    const strongIds = result.signals.filter(s => s.type === "strong").map(s => s.rule_id);
+    expect(strongIds.length).toBeGreaterThanOrEqual(3);
   });
 });
 
