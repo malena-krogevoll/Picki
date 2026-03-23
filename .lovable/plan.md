@@ -1,27 +1,56 @@
 
 
+## Utvid NOVA-klassifiseringsregler
 
-## Plan: Bedre utnyttelse av VDA+ API og universelle produkter
+### Analyse av mangler
 
-### Implementert
+Gjennomgang av vanlige norske ingredienslister avslører flere industrielle markører som ikke fanges opp i dag:
 
-1. **VDA+ berikelse forbedret** — Økt fra 5 til 10 EANs per søk, med detaljert logging (DNS, token, HTTP status, felt-tilgjengelighet)
-2. **Kassalapp detalj-fallback** — Produkter som mangler ingredienser/bilde berikers via `kassal.app/api/v1/products/ean/{ean}` (maks 5 per søk)
-3. **Auto masterprodukt-recompute** — `recompute-master-product` trigges automatisk for alle berikede EANs etter EPD + Kassalapp enrichment
-4. **DB-fallback søk** — Når Kassalapp returnerer < 10 treff, søkes `product_sources` for cachede produkter (f.eks. Tine-produkter funnet i Meny vises for Kiwi-brukere via offers-tabellen)
-5. **Universelle merkevarer** — Produkter fra Tine, Gilde, Prior, Stabburet, Norvegia, Jarlsberg, m.fl. får automatisk offers-oppføringer i alle kjeder
-6. **Kolonihagen-integrasjon** — ~90 Kolonihagen-produkter (Rema 1000-eksklusive, økologiske) seedet fra PDF-katalog med EAN-numre. Edge function `seed-kolonihagen` upsert-er til `product_sources`, `products` og `offers`. VDA+/EPD-berikelse kjøres automatisk. Søkelogikken gir Kolonihagen-produkter 15% boost for Rema 1000-brukere og ytterligere 20% for brukere med økologisk-preferanse.
-7. **Kolonihagen.no scraping** — Seed-funksjonen scraper kolonihagen.no for ingredienser, allergener, næringsinnhold, bilder og beskrivelser. ~115 produkter totalt inkl. nye produkter fra nettsiden (te, tex mex, pasta, is, nøtter, guanciale, yoghurt gresk type). Data lagres i `product_sources` (payload med nutrition/allergens) og `products` (ingredients_raw, image_url). Recompute-master-product trigges for NOVA-klassifisering.
+### Nye sterke UPF-regler (NOVA 4)
 
-### Bakgrunn-pipeline (ikke-blokkerende)
-```
-Kassalapp-søk → DB-fallback → Score & Sorter → Returner
-                                                    ↓ (bakgrunn)
-                                              EPD-berikelse
-                                                    ↓
-                                           Kassalapp detalj-fallback
-                                                    ↓
-                                         Recompute master product
-                                                    ↓
-                                       Utvid universelle offers
-```
+| ID | Mønster | Beskrivelse |
+|---|---|---|
+| LESITIN | `lesitin`, `lecithin`, `E322` | Industriell emulgator, svært vanlig |
+| KASEIN | `kasein`, `kaseinat` | Isolert melkeprotein |
+| MONO_DI_GLYCERIDES | `mono- og diglycerider`, `E471` | Industriell emulgator |
+| NITRITE | `natriumnitritt`, `kaliumnitritt`, `E250`, `E249` | Industrielt konserveringsmiddel (pølse/bacon) |
+| PHOSPHATE | `fosfat`, `difosfat`, `trifosfat`, `E450-E452` | Vanlig i prosessert kjøtt |
+| FLAVOR_ENHANCER | `smaksforsterker` | Industriell smakstilsetning |
+| CELLULOSE | `cellulose`, `E460` | Industrielt fyllstoff |
+| GELATIN | `gelatin` | Industrielt ekstrahert |
+| GENERIC_SYRUP | `sirup` (uten prefix allerede dekket) | Industriell søtning |
+| POLYDEXTROSE | `polydekstrose` | Syntetisk fiber |
+| INULIN | `inulin` | Industrielt ekstrahert fiber |
+| CITRIC_ACID_E | `E330` | Industrielt fremstilt sitronsyre |
+| SOY_LECITHIN | `soyalesitin` | Vanlig industriell emulgator |
+| SODIUM_ALGINATE | `natriumalginat`, `E401` | Fortykningsmiddel |
+| CALCIUM_CHLORIDE | `kalsiumklorid`, `E509` | Industriell tilsetning |
+
+### Nye svake UPF-regler (NOVA 3)
+
+| ID | Mønster | Beskrivelse |
+|---|---|---|
+| PLAIN_STARCH | `stivelse` (uten "modifisert") | Raffinert stivelse |
+| CITRIC_ACID | `sitronsyre` | Vanlig tilsetning, lav risiko alene |
+| ASCORBIC_ACID | `askorbinsyre` | Tilsetning, ofte som antioksidant |
+| SODIUM_CITRATE | `natriumsitrat` | Industriell regulator |
+| CALCIUM_CARBONATE | `kalsiumkarbonat`, `E170` | Tilsetning |
+| LACTIC_ACID | `melkesyre` (uten "bakterier/kultur") | Industrielt fremstilt |
+
+### Utvidet HIGH_RISK_CATEGORIES
+
+Legg til: `nuggets`, `fiskepinner`, `fiskegrateng`, `grandiosa`, `pølsebrød`, `ketchup`, `majones`, `dressing`
+
+### Filer som endres
+
+1. `src/lib/novaClassifier.ts` — legg til nye regler, bump versjon til 1.2.0
+2. `supabase/functions/_shared/novaClassifier.ts` — identiske endringer
+3. `src/lib/novaClassifier.test.ts` — nye testcases for alle nye regler
+
+### Viktige hensyn
+
+- `stivelse` som svak regel må bruke negativ lookahead for å unngå treff på "modifisert stivelse" (allerede dekket som sterk)
+- `sirup` som sterk regel må bruke negativ lookbehind for å unngå dobbelttreff med eksisterende "glukose-sirup"-regel
+- `melkesyre` som svak regel må ekskludere "melkesyrebakterier" og "melkesyrekultur" (naturlige prosesser)
+- Gelatin-regelen bør ekskludere "bladgelatin" som er mer tradisjonelt, men begge er industrielle — behold som sterk
+
