@@ -1298,6 +1298,9 @@ function processProduct(product: Product, query: string, userPreferences?: any):
     }
   }
 
+  // Fresh produce boost / baby food penalty
+  score = applyProduceScoring(score, queryLower, nameLower, categoryLower);
+
   const renvareScore = calculateRenvareScore(ingredients, filters);
   const priceNumeric = parsePrice(price);
   const availability = product.Tilgjengelighet || "unknown";
@@ -1310,6 +1313,40 @@ function processProduct(product: Product, query: string, userPreferences?: any):
     availability,
     matchReason: getMatchReason(productName, query, score),
   };
+}
+
+// Apply fresh produce boost and baby food penalty for simple produce queries
+function applyProduceScoring(score: number, queryLower: string, nameLower: string, categoryLower: string): number {
+  const isProduceQuery = SIMPLE_PRODUCE_TERMS.has(queryLower);
+  if (!isProduceQuery) return score;
+
+  // Penalize baby food products heavily
+  const isBabyFood = BABY_FOOD_PATTERNS.some(p => nameLower.includes(p));
+  if (isBabyFood) {
+    console.log(`Baby food penalty for "${nameLower}" (query: "${queryLower}")`);
+    return Math.min(score * 0.1, 10);
+  }
+
+  // Boost fresh produce categories
+  const isFreshCategory = FRESH_PRODUCE_CATEGORY_MARKERS.some(m => categoryLower === m || categoryLower.includes(m));
+  if (isFreshCategory) {
+    score += 40;
+  }
+
+  // Boost short, simple product names (likely the actual produce, not a processed product containing it)
+  const wordCount = nameLower.split(/\s+/).length;
+  if (wordCount <= 4) {
+    score += 15;
+  }
+
+  // Penalize products that are clearly processed/flavored versions (juice, yoghurt, etc.)
+  const processedIndicators = ["juice", "smoothie", "yoghurt", "yogurt", "drikke", "saft", "müsli", "musli", "grøt", "syltetøy", "marmelade", "chips", "snacks", "mos"];
+  const isProcessed = processedIndicators.some(p => nameLower.includes(p));
+  if (isProcessed) {
+    score *= 0.5;
+  }
+
+  return score;
 }
 
 // NEW: Intent-based product scoring for semantic search
