@@ -125,6 +125,7 @@ export interface ClassificationInput {
   ingredients_text: string;
   additives?: string[];
   product_category?: string;
+  product_name?: string;
   language?: string;
 }
 
