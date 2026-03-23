@@ -515,6 +515,29 @@ const excludedCategories = [
   "plastposer",
 ];
 
+// Simple produce terms — when user searches these, they want fresh produce, not baby food
+const SIMPLE_PRODUCE_TERMS = new Set([
+  "eple", "epler", "banan", "bananer", "appelsin", "appelsiner", "pære", "pærer",
+  "druer", "drue", "mango", "ananas", "sitron", "sitroner", "lime", "kiwi",
+  "avokado", "melon", "vannmelon", "jordbær", "bringebær", "blåbær",
+  "brokkoli", "blomkål", "gulrot", "gulrøtter", "tomat", "tomater",
+  "agurk", "paprika", "spinat", "salat", "løk", "hvitløk", "squash",
+  "sopp", "sjampinjong", "mais", "erter", "poteter", "potet",
+]);
+
+// Baby food / squeeze pouch patterns — penalize heavily for produce queries
+const BABY_FOOD_PATTERNS = [
+  "barnemat", "babymat", "klemmepose", "smoothie barn", "baby",
+  "ella's", "ellas", "hipp", "nestlé baby", "nestle baby",
+  "godbit barn", "fruktpose", "grøtpose", "fra 4 mnd", "fra 6 mnd",
+  "fra 8 mnd", "fra 12 mnd", "småfolk",
+];
+
+// Fresh produce category markers
+const FRESH_PRODUCE_CATEGORY_MARKERS = [
+  "fg", "frukt", "grønt", "grønnsaker", "frukt og grønt", "bær",
+];
+
 // Synonym- og variantmapping for bedre søketreff
 const searchSynonyms: Record<string, string[]> = {
   // === MEIERIPRODUKTER ===
@@ -1275,6 +1298,9 @@ function processProduct(product: Product, query: string, userPreferences?: any):
     }
   }
 
+  // Fresh produce boost / baby food penalty
+  score = applyProduceScoring(score, queryLower, nameLower, categoryLower);
+
   const renvareScore = calculateRenvareScore(ingredients, filters);
   const priceNumeric = parsePrice(price);
   const availability = product.Tilgjengelighet || "unknown";
@@ -1287,6 +1313,40 @@ function processProduct(product: Product, query: string, userPreferences?: any):
     availability,
     matchReason: getMatchReason(productName, query, score),
   };
+}
+
+// Apply fresh produce boost and baby food penalty for simple produce queries
+function applyProduceScoring(score: number, queryLower: string, nameLower: string, categoryLower: string): number {
+  const isProduceQuery = SIMPLE_PRODUCE_TERMS.has(queryLower);
+  if (!isProduceQuery) return score;
+
+  // Penalize baby food products heavily
+  const isBabyFood = BABY_FOOD_PATTERNS.some(p => nameLower.includes(p));
+  if (isBabyFood) {
+    console.log(`Baby food penalty for "${nameLower}" (query: "${queryLower}")`);
+    return Math.min(score * 0.1, 10);
+  }
+
+  // Boost fresh produce categories
+  const isFreshCategory = FRESH_PRODUCE_CATEGORY_MARKERS.some(m => categoryLower === m || categoryLower.includes(m));
+  if (isFreshCategory) {
+    score += 40;
+  }
+
+  // Boost short, simple product names (likely the actual produce, not a processed product containing it)
+  const wordCount = nameLower.split(/\s+/).length;
+  if (wordCount <= 4) {
+    score += 15;
+  }
+
+  // Penalize products that are clearly processed/flavored versions (juice, yoghurt, etc.)
+  const processedIndicators = ["juice", "smoothie", "yoghurt", "yogurt", "drikke", "saft", "müsli", "musli", "grøt", "syltetøy", "marmelade", "chips", "snacks", "mos"];
+  const isProcessed = processedIndicators.some(p => nameLower.includes(p));
+  if (isProcessed) {
+    score *= 0.5;
+  }
+
+  return score;
 }
 
 // NEW: Intent-based product scoring for semantic search
@@ -1406,6 +1466,11 @@ function processProductWithIntent(
       }
     }
   }
+
+  // Fresh produce boost / baby food penalty
+  const queryLower2 = query.toLowerCase().trim();
+  const categoryLower2 = category.toLowerCase();
+  score = applyProduceScoring(score, queryLower2, nameLower, categoryLower2);
 
   const renvareScore = calculateRenvareScore(ingredients, filters);
   const priceNumeric = parsePrice(price);
