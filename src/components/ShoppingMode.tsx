@@ -313,18 +313,12 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
         const cachedSelections: Record<string, number> = {};
         
         for (const item of items) {
-          // On store change, skip all caches - fetch everything fresh
-          if (cacheKeyChanged) {
-            itemsNeedingFetch.push(item);
-            continue;
-          }
-          
           // Skip if already fetched in this session
           if (fetchedItemsRef.current.has(item.id)) {
             continue;
           }
           
-          // Check DB-cached product data for the same store
+          // Check DB-cached product data for the same store (even on cacheKey change)
           if (item.product_data) {
             try {
               const cached = item.product_data as unknown as CachedItemData;
@@ -337,6 +331,12 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                   fetchedItemsRef.current.add(item.id);
                   if (typeof cached.selectedIndex === 'number') {
                     cachedSelections[item.id] = cached.selectedIndex;
+                  } else if (item.selected_product_ean) {
+                    // Fallback: derive selectedIndex from selected_product_ean
+                    const eanIndex = cached.products.findIndex(p => p.ean === item.selected_product_ean);
+                    if (eanIndex !== -1) {
+                      cachedSelections[item.id] = eanIndex;
+                    }
                   }
                   continue;
                 }
