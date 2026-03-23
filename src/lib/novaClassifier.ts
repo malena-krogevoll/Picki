@@ -2,7 +2,7 @@
 // The canonical backend version lives at supabase/functions/_shared/novaClassifier.ts.
 // IMPORTANT: Keep both files in sync — any rule changes must be applied to both.
 
-export const VERSION = "1.2.0";
+export const VERSION = "1.3.0";
 
 export interface Rule {
   id: string;
@@ -91,6 +91,13 @@ export const REAL_FOOD_RULES: Rule[] = [
 
 export const HIGH_RISK_CATEGORIES = ['pizza', 'ferdigrett', 'chips', 'godteri', 'snacks', 'brus', 'kjeks', 'is', 'pølse', 'bacon', 'nuggets', 'fiskepinner', 'fiskegrateng', 'grandiosa', 'pølsebrød', 'ketchup', 'majones', 'dressing'];
 
+// Fresh produce categories — products here with no ingredients are single-ingredient NOVA 1
+export const FRESH_PRODUCE_CATEGORIES = [
+  'fg', 'frukt og grønt', 'frukt', 'grønt', 'grønnsaker', 'bær',
+  'ferske grønnsaker', 'fersk frukt', 'poteter', 'løk', 'salat',
+  'urter', 'sopp', 'rotgrønnsaker',
+];
+
 const NO_INGREDIENTS_PHRASES = [
   'ingen ingrediensinformasjon tilgjengelig',
   'ingen ingrediensinformasjon',
@@ -113,6 +120,7 @@ export interface ClassificationInput {
   ingredients_text: string;
   additives?: string[];
   product_category?: string;
+  product_name?: string;
   language?: string;
 }
 
@@ -165,7 +173,7 @@ export function matchRules(text: string, rules: Rule[]): Signal[] {
 }
 
 export function classifyNova(input: ClassificationInput): ClassificationResult {
-  const { ingredients_text, additives = [], product_category } = input;
+  const { ingredients_text, additives = [], product_category, product_name } = input;
   
   const normalizedInput = (ingredients_text || '').trim().toLowerCase();
   const isMissingIngredients = !ingredients_text || 
@@ -175,6 +183,22 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
   if (isMissingIngredients) {
     const categoryLower = (product_category || '').toLowerCase();
     const isHighRiskCategory = HIGH_RISK_CATEGORIES.some(cat => categoryLower.includes(cat));
+    const isFreshProduce = FRESH_PRODUCE_CATEGORIES.some(cat => categoryLower === cat || categoryLower.includes(cat));
+    
+    // Fresh produce without ingredients → NOVA 1, use product name as ingredient
+    if (isFreshProduce && product_name) {
+      const syntheticIngredients = product_name.trim();
+      return {
+        nova_group: 1,
+        confidence: 0.85,
+        has_ingredients: true,
+        is_estimated: false,
+        reasoning: `Fersk frukt/grønt (${syntheticIngredients}) er ubearbeidet mat og klassifiseres som NOVA 1.`,
+        signals: [{ type: 'real_food', rule_id: 'FRESH_PRODUCE_CATEGORY', match: syntheticIngredients, description: 'Fersk frukt/grønt' }],
+        debug: { ingredients_count: 1, has_e_numbers: false, e_numbers: [], strong_hits: 0, weak_hits: 0, real_food_hits: 1, normalized_text_sample: syntheticIngredients.substring(0, 100) },
+        version: VERSION, timestamp: new Date().toISOString()
+      };
+    }
     
     return {
       nova_group: isHighRiskCategory ? 4 : null,

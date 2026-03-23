@@ -6,6 +6,7 @@ import {
   UPF_WEAK_RULES,
   REAL_FOOD_RULES,
   HIGH_RISK_CATEGORIES,
+  FRESH_PRODUCE_CATEGORIES,
 } from "./novaClassifier";
 
 // =============================================================================
@@ -40,8 +41,29 @@ describe("classifyNova – missing ingredients", () => {
     }
   });
 
-  it("should return null for non-high-risk category without ingredients", () => {
-    const result = classify("", { category: "frukt" });
+  it("should return null for non-high-risk, non-fresh-produce category without ingredients", () => {
+    const result = classify("", { category: "diverse" });
+    expect(result.nova_group).toBeNull();
+  });
+
+  // Fresh produce tests
+  it.each([
+    ["FG", "Brokkoli"],
+    ["frukt", "Eple"],
+    ["grønnsaker", "Blomkål"],
+    ["grønt", "Agurk"],
+    ["frukt og grønt", "Banan"],
+    ["poteter", "Poteter"],
+  ])("should classify fresh produce (category '%s', name '%s') as NOVA 1 even without ingredients", (category, name) => {
+    const result = classifyNova({ ingredients_text: '', product_category: category, product_name: name });
+    expect(result.nova_group).toBe(1);
+    expect(result.confidence).toBeGreaterThanOrEqual(0.8);
+    expect(result.is_estimated).toBe(false);
+    expect(result.has_ingredients).toBe(true);
+  });
+
+  it("should NOT classify fresh produce as NOVA 1 without product_name", () => {
+    const result = classifyNova({ ingredients_text: '', product_category: 'FG' });
     expect(result.nova_group).toBeNull();
   });
 });

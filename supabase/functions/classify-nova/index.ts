@@ -8,6 +8,7 @@ const ClassifyInputSchema = z.object({
   ingredients_text: z.string().max(5000),
   additives: z.array(z.string()).optional(),
   product_category: z.string().optional(),
+  product_name: z.string().max(500).optional(),
   language: z.string().default('no').optional()
 });
 
