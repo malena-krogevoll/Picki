@@ -503,6 +503,20 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
             results[itemId] = products;
           });
           setProductData(prev => ({ ...prev, ...results }));
+          
+          // Restore selections from selected_product_ean after fresh fetch
+          const restoredSelections: Record<string, number> = { ...cachedSelections };
+          for (const item of items) {
+            if (item.selected_product_ean && results[item.id]?.length) {
+              const eanIndex = results[item.id].findIndex(p => p.ean === item.selected_product_ean);
+              if (eanIndex !== -1) {
+                restoredSelections[item.id] = eanIndex;
+              }
+            }
+          }
+          if (Object.keys(restoredSelections).length > 0) {
+            setSelectedProducts(prev => ({ ...prev, ...restoredSelections }));
+          }
         }
       } catch (error) {
         console.error('Error in fetchProducts:', error);
