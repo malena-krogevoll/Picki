@@ -197,10 +197,13 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
   } else if (weakHits >= 1 || hasENumbers) {
     novaGroup = 3;
     baseConfidence = 0.5 + Math.min(weakHits * 0.05, 0.2) + (hasENumbers ? 0.1 : 0);
-  } else if (ingredientsCount <= 3 && realFoodHits >= 1) {
+  } else if (ingredientsCount <= 3) {
+    // Few ingredients with no UPF signals = unprocessed/minimally processed (NOVA 1)
+    // This covers single-ingredient whole foods like "brokkoli", "eple", "kyllingfilet"
     novaGroup = 1;
-    baseConfidence = 0.7 + Math.min(realFoodHits * 0.1, 0.25);
+    baseConfidence = 0.7 + Math.min(realFoodHits * 0.1, 0.25) + (ingredientsCount === 1 ? 0.1 : 0);
   } else {
+    // 4+ ingredients but no UPF signals = likely processed culinary foods (NOVA 2)
     novaGroup = 2;
     baseConfidence = 0.4 + Math.min(realFoodHits * 0.05, 0.2);
   }
