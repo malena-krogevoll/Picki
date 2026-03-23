@@ -71,6 +71,33 @@ describe("classifyNova – strong UPF signals → NOVA 4", () => {
     ["hvetegluten (isolert)", "mel, hvetegluten, vann"],
     ["proteinkonsentrat", "vann, proteinkonsentrat, salt"],
     ["invertsukker", "mel, invertsukker, smør"],
+    // === New v1.2.0 rules ===
+    ["lesitin", "sjokolade, kakaosmør, lesitin"],
+    ["lecithin", "mel, smør, lecithin"],
+    ["soyalesitin", "kakao, sukker, soyalesitin"],
+    ["E322 (lecithin)", "mel, E322, sukker"],
+    ["kasein", "vann, kasein, salt"],
+    ["kaseinat", "mel, kaseinat, sukker"],
+    ["mono- og diglycerider", "mel, mono- og diglycerider, vann"],
+    ["E471", "mel, E471, sukker"],
+    ["natriumnitritt", "svinekjøtt, natriumnitritt, salt"],
+    ["E250", "kjøtt, E250, vann"],
+    ["E249 (kaliumnitritt)", "kjøtt, E249, salt"],
+    ["fosfat", "kjøtt, fosfat, vann"],
+    ["difosfat", "mel, difosfat, salt"],
+    ["E451 (trifosfat)", "kjøtt, E451, salt"],
+    ["smaksforsterker", "mel, smaksforsterker, salt"],
+    ["cellulose", "mel, cellulose, vann"],
+    ["E460", "mel, E460, sukker"],
+    ["gelatin", "sukker, gelatin, vann"],
+    ["sirup (generisk)", "mel, sirup, smør"],
+    ["polydekstrose", "mel, polydekstrose, vann"],
+    ["inulin", "yoghurt, inulin, sukker"],
+    ["E330 (sitronsyre)", "vann, E330, sukker"],
+    ["natriumalginat", "vann, natriumalginat, sukker"],
+    ["E401", "vann, E401, salt"],
+    ["kalsiumklorid", "ost, kalsiumklorid, salt"],
+    ["E509", "melk, E509, salt"],
   ])("should classify as NOVA 4 when '%s' is present", (_label, text) => {
     const result = classify(text);
     expect(result.nova_group).toBe(4);
@@ -89,15 +116,23 @@ describe("classifyNova – strong UPF signals → NOVA 4", () => {
   });
 
   it("should classify real-world fish product with industrial ingredients as NOVA 4", () => {
-    // This is the exact product that was misclassified as NOVA 2
     const result = classify(
       "Alaskapollock (FISK) 40%, mel (HVETE-, ris-, mais-), vann, rapsolje, brokkoli 5%, cheddarost (MELK) 3,6%, stivelse( HVETE -, mais-, potet-), MELK, gulrot 1%, HVETEGLUTEN, smør (MELK), ostepulver (MELK), salt, gjær, myseprotein (MELK), druesukker, fløte(MELK), sitronsaft fra konsentrat, krydder (bl.a. gurkemeie, kajennepepper), SENNEPSFRØ."
     );
     expect(result.nova_group).toBe(4);
     expect(result.signals.some(s => s.type === "strong")).toBe(true);
-    // Should detect multiple industrial markers
     const strongIds = result.signals.filter(s => s.type === "strong").map(s => s.rule_id);
     expect(strongIds.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("should classify typical Norwegian pølse with nitrite as NOVA 4", () => {
+    const result = classify("svinekjøtt 60%, vann, stivelse, salt, natriumnitritt, krydder");
+    expect(result.nova_group).toBe(4);
+  });
+
+  it("should classify industrial candy with gelatin as NOVA 4", () => {
+    const result = classify("sukker, glukosesirup, gelatin, sitronsyre, aroma, fargestoff");
+    expect(result.nova_group).toBe(4);
   });
 });
 
