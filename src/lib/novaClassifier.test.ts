@@ -152,6 +152,12 @@ describe("classifyNova – escalation to NOVA 4", () => {
     const result = classify("mel, sukker, vann, salt, olje, melk, egg, kakao, palmeolje, konserveringsmiddel");
     expect(result.nova_group).toBe(4);
   });
+
+  it("should upgrade to NOVA 4 with 15+ ingredients even without any detected signals", () => {
+    // A product with 15+ ingredients is almost certainly industrial
+    const result = classify("mel, vann, salt, olje, melk, egg, kakao, smør, ost, løk, hvitløk, pepper, oregano, basilikum, tomat, paprika");
+    expect(result.nova_group).toBe(4);
+  });
 });
 
 // =============================================================================
