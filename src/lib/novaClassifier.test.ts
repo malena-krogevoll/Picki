@@ -144,8 +144,26 @@ describe("classifyNova – weak signals → NOVA 3", () => {
     ["konserveringsmiddel", "tomat, salt, konserveringsmiddel"],
     ["palmeolje", "mel, palmeolje, sukker"],
     ["E200-series preservative", "ost, E202"],
+    // === New v1.2.0 weak rules ===
+    ["stivelse (uten modifisert)", "mel, vann, stivelse"],
+    ["sitronsyre", "tomat, vann, sitronsyre"],
+    ["askorbinsyre", "juice, vann, askorbinsyre"],
+    ["natriumsitrat", "ost, vann, natriumsitrat"],
+    ["kalsiumkarbonat", "mel, vann, kalsiumkarbonat"],
+    ["E170", "mel, vann, E170"],
+    ["melkesyre (industriell)", "agurk, vann, melkesyre"],
   ])("should classify as NOVA 3 when '%s' is present (no strong signal)", (_label, text) => {
     expect(classify(text).nova_group).toBe(3);
+  });
+
+  it("should NOT flag melkesyrebakterier as weak signal", () => {
+    const result = classify("melk, melkesyrebakterier");
+    expect(result.signals.some(s => s.rule_id === "UPF_WEAK_LACTIC_ACID")).toBe(false);
+  });
+
+  it("should NOT flag melkesyrekultur as weak signal", () => {
+    const result = classify("melk, melkesyrekultur");
+    expect(result.signals.some(s => s.rule_id === "UPF_WEAK_LACTIC_ACID")).toBe(false);
   });
 });
 
