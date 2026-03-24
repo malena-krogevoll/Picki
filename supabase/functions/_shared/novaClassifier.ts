@@ -248,12 +248,14 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
     const isFreshProduceByCategory = FRESH_PRODUCE_CATEGORIES.some(cat => categoryLower === cat || categoryLower.includes(cat));
     // Also detect "FG" prefix in product name (common Coop naming for fresh produce)
     const isFreshProduceByName = /^fg\b/i.test(nameLower);
-    const isFreshProduce = isFreshProduceByCategory || isFreshProduceByName;
+    const isFreshProduceByBrand = detectFreshProduceByBrand(nameLower);
+    const isPrKg = /\bpr\.?\s*kg\b/i.test(nameLower) || /\b\d+\s*kg\b/i.test(nameLower);
+    const isFreshProduceByWeight = isPrKg && containsProduceTerm(nameLower);
+    const isFreshProduce = isFreshProduceByCategory || isFreshProduceByName || isFreshProduceByBrand || isFreshProduceByWeight;
     
     // Fresh produce without ingredients → NOVA 1, use product name as ingredient
     if (isFreshProduce && product_name) {
-      // Strip "FG" prefix and descriptors like "delt", "hel" to get the actual produce name
-      const syntheticIngredients = product_name.trim().replace(/^FG\s+/i, '').replace(/^(delt|hel|fersk|stor|liten|norsk|økologisk)\s+/i, '').trim() || product_name.trim();
+      const syntheticIngredients = extractProduceName(product_name);
       return {
         nova_group: 1,
         confidence: 0.85,
