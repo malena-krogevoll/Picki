@@ -81,6 +81,52 @@ describe("classifyNova – missing ingredients", () => {
     const result = classifyNova({ ingredients_text: '', product_category: 'FG' });
     expect(result.nova_group).toBeNull();
   });
+
+  // Brand-based fresh produce detection
+  it.each([
+    ["Bama Epler", "Bama Epler"],
+    ["Bama Bananer", "Bama Bananer"],
+    ["Prima Gulrot 1kg", "Prima Gulrot 1kg"],
+    ["Vilje Tomat", "Vilje Tomat"],
+    ["First Price Agurk", "First Price Agurk"],
+    ["Änglamark Brokkoli", "Änglamark Brokkoli"],
+    ["Xtra Løk 1kg", "Xtra Løk 1kg"],
+  ])("should classify brand produce '%s' as NOVA 1 without ingredients", (_label, name) => {
+    const result = classifyNova({ ingredients_text: '', product_category: '', product_name: name });
+    expect(result.nova_group).toBe(1);
+    expect(result.confidence).toBeGreaterThanOrEqual(0.8);
+    expect(result.is_estimated).toBe(false);
+    expect(result.has_ingredients).toBe(true);
+  });
+
+  // Brand products that are processed should NOT get NOVA 1
+  it.each([
+    ["Bama Juice Eple", "Bama Juice Eple"],
+    ["Bama Smoothie Mango", "Bama Smoothie Mango"],
+    ["Vilje Syltetøy Jordbær", "Vilje Syltetøy Jordbær"],
+    ["Prima Chips Paprika", "Prima Chips Paprika"],
+  ])("should NOT classify processed brand product '%s' as NOVA 1", (_label, name) => {
+    const result = classifyNova({ ingredients_text: '', product_category: '', product_name: name });
+    expect(result.nova_group).not.toBe(1);
+  });
+
+  // Weight-based fresh produce
+  it.each([
+    ["Gulrot pr kg", "Gulrot pr kg"],
+    ["Epler 1kg", "Epler 1kg"],
+  ])("should classify weight-based produce '%s' as NOVA 1", (_label, name) => {
+    const result = classifyNova({ ingredients_text: '', product_category: '', product_name: name });
+    expect(result.nova_group).toBe(1);
+    expect(result.is_estimated).toBe(false);
+  });
+
+  // extractProduceName strips brand and descriptors
+  it("should strip brand name from reasoning", () => {
+    const result = classifyNova({ ingredients_text: '', product_category: '', product_name: 'Bama Epler Røde 1kg' });
+    expect(result.nova_group).toBe(1);
+    expect(result.reasoning).not.toContain('Bama');
+    expect(result.reasoning).not.toContain('1kg');
+  });
 });
 
 // =============================================================================
