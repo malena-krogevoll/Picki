@@ -1333,6 +1333,20 @@ function applyProduceScoring(score: number, queryLower: string, nameLower: strin
     score += 40;
   }
 
+  // Boost known fresh produce brands with produce term
+  const FRESH_BRANDS = ['bama', 'vilje', 'prima', 'first price', 'änglamark', 'xtra', 'grønn&frisk'];
+  const isFreshBrand = FRESH_BRANDS.some(b => nameLower.includes(b));
+  const processedIndicators = ["juice", "smoothie", "drikke", "saft", "nektar", "salat med", "dressing", "mos", "puré", "syltetøy", "marmelade", "chips", "snacks"];
+  const isProcessedVariant = processedIndicators.some(p => nameLower.includes(p));
+  if (isFreshBrand && !isProcessedVariant) {
+    score += 30; // Boost fresh brand produce
+  }
+
+  // Boost products priced by weight (typically bulk fresh produce)
+  if (/\bpr\.?\s*kg\b/i.test(nameLower) || /\bløsvekt\b/i.test(nameLower)) {
+    score += 20;
+  }
+
   // Boost short, simple product names (likely the actual produce, not a processed product containing it)
   const wordCount = nameLower.split(/\s+/).length;
   if (wordCount <= 4) {
@@ -1340,9 +1354,7 @@ function applyProduceScoring(score: number, queryLower: string, nameLower: strin
   }
 
   // Penalize products that are clearly processed/flavored versions (juice, yoghurt, etc.)
-  const processedIndicators = ["juice", "smoothie", "yoghurt", "yogurt", "drikke", "saft", "müsli", "musli", "grøt", "syltetøy", "marmelade", "chips", "snacks", "mos"];
-  const isProcessed = processedIndicators.some(p => nameLower.includes(p));
-  if (isProcessed) {
+  if (isProcessedVariant) {
     score *= 0.5;
   }
 
