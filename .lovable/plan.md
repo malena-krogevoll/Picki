@@ -1,56 +1,59 @@
 
 
-## Utvid NOVA-klassifiseringsregler
+## Utvide fersk-produkt-gjenkjenning til flere merker og butikker
 
-### Analyse av mangler
+### Problem
+Merker som Bama, Vilje, Prima og "kg pris"-produkter selger fersk frukt/grønt uten ingrediensliste, men disse merkene har OGSÅ prosesserte produkter (f.eks. Bama juice, Bama salater med dressing). Enkel merke-matching fungerer derfor ikke.
 
-Gjennomgang av vanlige norske ingredienslister avslører flere industrielle markører som ikke fanges opp i dag:
+### Løsning: Kombinert merke + kategori/navnesjekk
 
-### Nye sterke UPF-regler (NOVA 4)
+I stedet for å bare sjekke "FG"-prefiks, bruker vi en **to-trinns logikk**:
 
-| ID | Mønster | Beskrivelse |
-|---|---|---|
-| LESITIN | `lesitin`, `lecithin`, `E322` | Industriell emulgator, svært vanlig |
-| KASEIN | `kasein`, `kaseinat` | Isolert melkeprotein |
-| MONO_DI_GLYCERIDES | `mono- og diglycerider`, `E471` | Industriell emulgator |
-| NITRITE | `natriumnitritt`, `kaliumnitritt`, `E250`, `E249` | Industrielt konserveringsmiddel (pølse/bacon) |
-| PHOSPHATE | `fosfat`, `difosfat`, `trifosfat`, `E450-E452` | Vanlig i prosessert kjøtt |
-| FLAVOR_ENHANCER | `smaksforsterker` | Industriell smakstilsetning |
-| CELLULOSE | `cellulose`, `E460` | Industrielt fyllstoff |
-| GELATIN | `gelatin` | Industrielt ekstrahert |
-| GENERIC_SYRUP | `sirup` (uten prefix allerede dekket) | Industriell søtning |
-| POLYDEXTROSE | `polydekstrose` | Syntetisk fiber |
-| INULIN | `inulin` | Industrielt ekstrahert fiber |
-| CITRIC_ACID_E | `E330` | Industrielt fremstilt sitronsyre |
-| SOY_LECITHIN | `soyalesitin` | Vanlig industriell emulgator |
-| SODIUM_ALGINATE | `natriumalginat`, `E401` | Fortykningsmiddel |
-| CALCIUM_CHLORIDE | `kalsiumklorid`, `E509` | Industriell tilsetning |
-
-### Nye svake UPF-regler (NOVA 3)
-
-| ID | Mønster | Beskrivelse |
-|---|---|---|
-| PLAIN_STARCH | `stivelse` (uten "modifisert") | Raffinert stivelse |
-| CITRIC_ACID | `sitronsyre` | Vanlig tilsetning, lav risiko alene |
-| ASCORBIC_ACID | `askorbinsyre` | Tilsetning, ofte som antioksidant |
-| SODIUM_CITRATE | `natriumsitrat` | Industriell regulator |
-| CALCIUM_CARBONATE | `kalsiumkarbonat`, `E170` | Tilsetning |
-| LACTIC_ACID | `melkesyre` (uten "bakterier/kultur") | Industrielt fremstilt |
-
-### Utvidet HIGH_RISK_CATEGORIES
-
-Legg til: `nuggets`, `fiskepinner`, `fiskegrateng`, `grandiosa`, `pølsebrød`, `ketchup`, `majones`, `dressing`
+1. **Kjente ferskvare-merker** defineres i en liste: `Bama`, `Vilje`, `Prima`, `First Price` (Coop), `Änglamark`, `Xtra`
+2. Et produkt fra disse merkene klassifiseres som fersk NOVA 1 **kun hvis**:
+   - Det er i en fersk kategori (fg, frukt, grønt, etc.), **ELLER**
+   - Produktnavnet matcher et kjent ferskvare-mønster (f.eks. inneholder et frukt/grønnsak-ord fra `SIMPLE_PRODUCE_TERMS` og IKKE inneholder prosesserte indikatorer som "juice", "smoothie", "salat med", "dressing")
+3. **"kg pris"**-produkter: Produkter med "kg" i pris-feltet eller "pr kg" i navnet er typisk løsvekt ferskvare og gis ekstra boost
 
 ### Filer som endres
 
-1. `src/lib/novaClassifier.ts` — legg til nye regler, bump versjon til 1.2.0
-2. `supabase/functions/_shared/novaClassifier.ts` — identiske endringer
-3. `src/lib/novaClassifier.test.ts` — nye testcases for alle nye regler
+**1. `src/lib/novaClassifier.ts` + `supabase/functions/_shared/novaClassifier.ts`** (synkronisert)
+- Utvide `isFreshProduceByName`-sjekken fra bare `/^fg\b/` til også å matche kjente ferskvare-merker + produksjonsord
+- Ny liste: `FRESH_PRODUCE_BRAND_PREFIXES` med merker som kan ha ferskvarer
+- Ny liste: `PROCESSED_PRODUCT_INDICATORS` (juice, smoothie, salat med, dressing, etc.) for å ekskludere prosesserte produkter fra samme merke
+- Logikk: `isFreshProduce = isFreshProduceByCategory || (isFreshProduceBrand && containsProduceName && !hasProcessedIndicator) || isFGPrefix`
 
-### Viktige hensyn
+**2. `src/components/ShoppingMode.tsx`**
+- Oppdatere `isFreshProduceProduct()` med samme logikk som klassifisereren
 
-- `stivelse` som svak regel må bruke negativ lookahead for å unngå treff på "modifisert stivelse" (allerede dekket som sterk)
-- `sirup` som sterk regel må bruke negativ lookbehind for å unngå dobbelttreff med eksisterende "glukose-sirup"-regel
-- `melkesyre` som svak regel må ekskludere "melkesyrebakterier" og "melkesyrekultur" (naturlige prosesser)
-- Gelatin-regelen bør ekskludere "bladgelatin" som er mer tradisjonelt, men begge er industrielle — behold som sterk
+**3. `supabase/functions/search-products/index.ts`**
+- Legge til "kg pris"-boost i `applyProduceScoring`
+- Legge til merkevare-boost for ferskvare-merker i riktig kategori
+
+**4. `src/lib/novaClassifier.test.ts`**
+- Nye tester: "Bama Epler" → NOVA 1, "Bama Juice Eple" → IKKE NOVA 1 (vanlig klassifisering)
+- "Prima Bananer" → NOVA 1, "Vilje Gulrot 1kg" → NOVA 1
+
+### Teknisk design
+
+```text
+Product arrives without ingredients
+  │
+  ├─ Category matches FRESH_PRODUCE_CATEGORIES? → NOVA 1
+  │
+  ├─ Name starts with "FG"? → NOVA 1
+  │
+  ├─ Brand in FRESH_PRODUCE_BRANDS?
+  │   ├─ Name contains known produce term (eple, banan, gulrot...)?
+  │   │   ├─ Name contains processed indicator (juice, smoothie...)? → Normal flow
+  │   │   └─ No processed indicator → NOVA 1
+  │   └─ No produce term → Normal flow
+  │
+  ├─ Has "pr kg" or "kg" pricing pattern? 
+  │   └─ + category/name suggests produce → NOVA 1
+  │
+  └─ High risk category? → NOVA 4 estimate
+```
+
+Syntetisk ingrediens-navn utledes ved å strippe merkevare-prefiks og deskriptorer (f.eks. "Bama Epler Røde 1kg" → "epler").
 
