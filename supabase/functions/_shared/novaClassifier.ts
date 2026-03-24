@@ -6,8 +6,8 @@
  * Both files must produce identical classification results.
  */
 
-export const VERSION = "1.3.0";
-export const RULESET_DATE = "2026-03-23";
+export const VERSION = "1.4.0";
+export const RULESET_DATE = "2026-03-24";
 
 export interface Rule {
   id: string;
@@ -103,6 +103,35 @@ export const FRESH_PRODUCE_CATEGORIES = [
   'urter', 'sopp', 'rotgrønnsaker',
 ];
 
+export const FRESH_PRODUCE_BRANDS = [
+  'bama', 'vilje', 'prima', 'first price', 'änglamark', 'xtra',
+  'grønn&frisk', 'coop', 'rema',
+];
+
+export const SIMPLE_PRODUCE_TERMS = new Set([
+  'eple', 'epler', 'banan', 'bananer', 'appelsin', 'appelsiner', 'pære', 'pærer',
+  'druer', 'drue', 'mango', 'ananas', 'sitron', 'sitroner', 'lime', 'kiwi',
+  'avokado', 'melon', 'vannmelon', 'honningmelon', 'jordbær', 'bringebær', 'blåbær',
+  'brokkoli', 'blomkål', 'gulrot', 'gulrøtter', 'tomat', 'tomater',
+  'agurk', 'paprika', 'spinat', 'salat', 'løk', 'hvitløk', 'squash',
+  'sopp', 'sjampinjong', 'mais', 'erter', 'poteter', 'potet',
+  'klementiner', 'klementiner', 'nektarin', 'fersken', 'plomme', 'plommer',
+  'kirsebær', 'granateple', 'passion', 'pasjonsfrukt', 'kokos',
+  'ingefær', 'chili', 'persille', 'dill', 'basilikum', 'koriander',
+  'purre', 'selleri', 'rødbete', 'søtpotet', 'gresskar',
+  'reddik', 'fennikkel', 'artisjokk', 'aubergine', 'sukkererter',
+]);
+
+export const PROCESSED_PRODUCT_INDICATORS = [
+  'juice', 'smoothie', 'drikke', 'saft', 'nektar',
+  'salat med', 'salatmix med', 'dressing',
+  'chips', 'snacks', 'tørket', 'syltetøy', 'marmelade',
+  'mos', 'puré', 'grøt', 'yoghurt', 'is', 'sorbet',
+  'hermetisk', 'konserv', 'boks',
+  'frosne', 'frossen', 'panert', 'stekt',
+  'ferdigskåret med', 'wok med',
+];
+
 const NO_INGREDIENTS_PHRASES = [
   'ingen ingrediensinformasjon tilgjengelig',
   'ingen ingrediensinformasjon',
@@ -163,6 +192,33 @@ function extractENumbers(text: string): string[] {
   return [...new Set(matches.map(e => e.replace(/\s+/g, '').toUpperCase()))];
 }
 
+function containsProduceTerm(nameLower: string): boolean {
+  for (const term of SIMPLE_PRODUCE_TERMS) {
+    if (nameLower.includes(term)) return true;
+  }
+  return false;
+}
+
+function detectFreshProduceByBrand(nameLower: string): boolean {
+  const matchesBrand = FRESH_PRODUCE_BRANDS.some(brand => nameLower.includes(brand));
+  if (!matchesBrand) return false;
+  const hasProduce = containsProduceTerm(nameLower);
+  if (!hasProduce) return false;
+  const hasProcessedIndicator = PROCESSED_PRODUCT_INDICATORS.some(ind => nameLower.includes(ind));
+  return !hasProcessedIndicator;
+}
+
+function extractProduceName(productName: string): string {
+  let name = productName.trim();
+  name = name.replace(/^FG\s+/i, '');
+  for (const brand of FRESH_PRODUCE_BRANDS) {
+    name = name.replace(new RegExp(`^${brand}\\s+`, 'i'), '');
+  }
+  name = name.replace(/^(delt|hel|fersk|stor|liten|norsk|økologisk|rød|røde|grønn|grønne|gul|gule)\s+/gi, '');
+  name = name.replace(/\s+\d+\s*(kg|g|stk|pk)\b.*$/i, '');
+  return name.trim() || productName.trim();
+}
+
 export function matchRules(text: string, rules: Rule[]): Signal[] {
   const signals: Signal[] = [];
   for (const rule of rules) {
@@ -192,12 +248,14 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
     const isFreshProduceByCategory = FRESH_PRODUCE_CATEGORIES.some(cat => categoryLower === cat || categoryLower.includes(cat));
     // Also detect "FG" prefix in product name (common Coop naming for fresh produce)
     const isFreshProduceByName = /^fg\b/i.test(nameLower);
-    const isFreshProduce = isFreshProduceByCategory || isFreshProduceByName;
+    const isFreshProduceByBrand = detectFreshProduceByBrand(nameLower);
+    const isPrKg = /\bpr\.?\s*kg\b/i.test(nameLower) || /\b\d+\s*kg\b/i.test(nameLower);
+    const isFreshProduceByWeight = isPrKg && containsProduceTerm(nameLower);
+    const isFreshProduce = isFreshProduceByCategory || isFreshProduceByName || isFreshProduceByBrand || isFreshProduceByWeight;
     
     // Fresh produce without ingredients → NOVA 1, use product name as ingredient
     if (isFreshProduce && product_name) {
-      // Strip "FG" prefix and descriptors like "delt", "hel" to get the actual produce name
-      const syntheticIngredients = product_name.trim().replace(/^FG\s+/i, '').replace(/^(delt|hel|fersk|stor|liten|norsk|økologisk)\s+/i, '').trim() || product_name.trim();
+      const syntheticIngredients = extractProduceName(product_name);
       return {
         nova_group: 1,
         confidence: 0.85,

@@ -115,12 +115,29 @@ const getNovaLabel = (score: number | null, hasIngredients: boolean = true) => {
 async function batchClassifyNova(products: { ingredienser: string; category: string; productName?: string }[]): Promise<Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>> {
   const results = new Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>();
   
-  // Filter out products without ingredients UNLESS they are fresh produce (FG category or FG name prefix)
+  // Filter out products without ingredients UNLESS they are fresh produce (FG category, FG name prefix, or known fresh brand)
   const freshProduceCategories = ['fg', 'frukt og grønt', 'frukt', 'grønt', 'grønnsaker', 'bær', 'ferske grønnsaker', 'fersk frukt', 'poteter', 'løk', 'salat', 'urter', 'sopp', 'rotgrønnsaker'];
+  const freshProduceBrands = ['bama', 'vilje', 'prima', 'first price', 'änglamark', 'xtra', 'grønn&frisk', 'coop', 'rema'];
+  const simpleProduceTerms = ['eple', 'epler', 'banan', 'bananer', 'appelsin', 'appelsiner', 'pære', 'pærer', 'druer', 'mango', 'ananas', 'sitron', 'lime', 'kiwi', 'avokado', 'melon', 'vannmelon', 'jordbær', 'bringebær', 'blåbær', 'brokkoli', 'blomkål', 'gulrot', 'gulrøtter', 'tomat', 'tomater', 'agurk', 'paprika', 'spinat', 'salat', 'løk', 'hvitløk', 'squash', 'sopp', 'sjampinjong', 'mais', 'erter', 'poteter', 'potet', 'klementiner', 'nektarin', 'fersken', 'plomme', 'plommer', 'kirsebær', 'ingefær', 'chili', 'persille', 'dill', 'basilikum', 'koriander', 'purre', 'selleri', 'rødbete', 'søtpotet', 'gresskar'];
+  const processedIndicators = ['juice', 'smoothie', 'drikke', 'saft', 'nektar', 'salat med', 'dressing', 'chips', 'snacks', 'tørket', 'syltetøy', 'marmelade', 'mos', 'puré', 'grøt', 'yoghurt', 'is', 'sorbet', 'hermetisk', 'konserv', 'boks', 'frosne', 'frossen', 'panert', 'stekt'];
+  
   const isFreshProduceProduct = (category: string, name?: string) => {
     const catLower = (category || '').toLowerCase();
     const nameLower = (name || '').toLowerCase().trim();
-    return freshProduceCategories.some(cat => catLower.includes(cat)) || /^fg\b/i.test(nameLower);
+    // Category match
+    if (freshProduceCategories.some(cat => catLower.includes(cat))) return true;
+    // FG prefix
+    if (/^fg\b/i.test(nameLower)) return true;
+    // Brand + produce term (not processed)
+    const matchesBrand = freshProduceBrands.some(brand => nameLower.includes(brand));
+    if (matchesBrand) {
+      const hasProduce = simpleProduceTerms.some(term => nameLower.includes(term));
+      const hasProcessed = processedIndicators.some(ind => nameLower.includes(ind));
+      if (hasProduce && !hasProcessed) return true;
+    }
+    // Weight-based + produce term
+    if ((/\bpr\.?\s*kg\b/i.test(nameLower) || /\b\d+\s*kg\b/i.test(nameLower)) && simpleProduceTerms.some(term => nameLower.includes(term))) return true;
+    return false;
   };
   
   const productsToClassify = products
