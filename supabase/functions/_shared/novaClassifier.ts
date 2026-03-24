@@ -103,6 +103,35 @@ export const FRESH_PRODUCE_CATEGORIES = [
   'urter', 'sopp', 'rotgrønnsaker',
 ];
 
+export const FRESH_PRODUCE_BRANDS = [
+  'bama', 'vilje', 'prima', 'first price', 'änglamark', 'xtra',
+  'grønn&frisk', 'coop', 'rema',
+];
+
+export const SIMPLE_PRODUCE_TERMS = new Set([
+  'eple', 'epler', 'banan', 'bananer', 'appelsin', 'appelsiner', 'pære', 'pærer',
+  'druer', 'drue', 'mango', 'ananas', 'sitron', 'sitroner', 'lime', 'kiwi',
+  'avokado', 'melon', 'vannmelon', 'honningmelon', 'jordbær', 'bringebær', 'blåbær',
+  'brokkoli', 'blomkål', 'gulrot', 'gulrøtter', 'tomat', 'tomater',
+  'agurk', 'paprika', 'spinat', 'salat', 'løk', 'hvitløk', 'squash',
+  'sopp', 'sjampinjong', 'mais', 'erter', 'poteter', 'potet',
+  'klementiner', 'klementiner', 'nektarin', 'fersken', 'plomme', 'plommer',
+  'kirsebær', 'granateple', 'passion', 'pasjonsfrukt', 'kokos',
+  'ingefær', 'chili', 'persille', 'dill', 'basilikum', 'koriander',
+  'purre', 'selleri', 'rødbete', 'søtpotet', 'gresskar',
+  'reddik', 'fennikkel', 'artisjokk', 'aubergine', 'sukkererter',
+]);
+
+export const PROCESSED_PRODUCT_INDICATORS = [
+  'juice', 'smoothie', 'drikke', 'saft', 'nektar',
+  'salat med', 'salatmix med', 'dressing',
+  'chips', 'snacks', 'tørket', 'syltetøy', 'marmelade',
+  'mos', 'puré', 'grøt', 'yoghurt', 'is', 'sorbet',
+  'hermetisk', 'konserv', 'boks',
+  'frosne', 'frossen', 'panert', 'stekt',
+  'ferdigskåret med', 'wok med',
+];
+
 const NO_INGREDIENTS_PHRASES = [
   'ingen ingrediensinformasjon tilgjengelig',
   'ingen ingrediensinformasjon',
