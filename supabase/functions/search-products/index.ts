@@ -1407,10 +1407,9 @@ function processProduct(product: Product, query: string, userPreferences?: any):
     }
   }
 
-  // Fresh produce boost / baby food penalty
-  score = applyProduceScoring(score, queryLower, nameLower, categoryLower);
-
   const renvareScore = calculateRenvareScore(ingredients, filters);
+  // Fresh produce boost / baby food penalty
+  score = applyProduceScoring(score, queryLower, nameLower, categoryLower, ingredients, renvareScore);
   const priceNumeric = parsePrice(price);
   const availability = product.Tilgjengelighet || "unknown";
 
@@ -1595,12 +1594,11 @@ function processProductWithIntent(
     }
   }
 
-  // Fresh produce boost / baby food penalty
   const queryLower2 = query.toLowerCase().trim();
   const categoryLower2 = category.toLowerCase();
-  score = applyProduceScoring(score, queryLower2, nameLower, categoryLower2);
-
   const renvareScore = calculateRenvareScore(ingredients, filters);
+  // Fresh produce boost / baby food penalty
+  score = applyProduceScoring(score, queryLower2, nameLower, categoryLower2, ingredients, renvareScore);
   const priceNumeric = parsePrice(price);
   const availability = product.Tilgjengelighet || "unknown";
 
