@@ -133,8 +133,7 @@ async function batchClassifyNova(products: { ingredienser: string; category: str
   // Set defaults for products that won't be classified
   products.forEach((p, idx) => {
     const hasIngredients = p.ingredienser && p.ingredienser.trim().length > 0;
-    const isFreshProduce = freshProduceCategories.some(cat => (p.category || '').toLowerCase().includes(cat));
-    if (!hasIngredients && !isFreshProduce) {
+    if (!hasIngredients && !isFreshProduceProduct(p.category, p.productName)) {
       results.set(idx, { novaScore: null, isEstimated: true, hasIngredients: false });
     }
   });
