@@ -62,6 +62,21 @@ describe("classifyNova – missing ingredients", () => {
     expect(result.has_ingredients).toBe(true);
   });
 
+  it.each([
+    ["FG blomkål", "blomkål"],
+    ["FG delt vannmelon", "vannmelon"],
+    ["FG eple rød", "eple rød"],
+    ["FG norsk agurk", "agurk"],
+  ])("should classify FG-prefixed product name '%s' as NOVA 1 even without category match", (name) => {
+    const result = classifyNova({ ingredients_text: '', product_category: '', product_name: name });
+    expect(result.nova_group).toBe(1);
+    expect(result.confidence).toBeGreaterThanOrEqual(0.8);
+    expect(result.is_estimated).toBe(false);
+    expect(result.has_ingredients).toBe(true);
+    // Should strip FG prefix from reasoning
+    expect(result.reasoning).not.toContain('FG ');
+  });
+
   it("should NOT classify fresh produce as NOVA 1 without product_name", () => {
     const result = classifyNova({ ingredients_text: '', product_category: 'FG' });
     expect(result.nova_group).toBeNull();
