@@ -538,6 +538,105 @@ const FRESH_PRODUCE_CATEGORY_MARKERS = [
   "fg", "frukt", "grønt", "grønnsaker", "frukt og grønt", "bær",
 ];
 
+const FRESH_PRODUCE_BRANDS = [
+  "bama", "vilje", "prima", "first price", "änglamark", "xtra", "grønn&frisk",
+];
+
+const PROCESSED_PRODUCE_INDICATORS = [
+  "juice", "smoothie", "drikke", "saft", "nektar", "salat med", "dressing",
+  "mos", "puré", "pure", "syltetøy", "marmelade", "chips", "snacks",
+  "yoghurt", "yogurt", "is", "sorbet", "energidrikk", "brus",
+];
+
+const BEVERAGE_PENALTY_PATTERNS = [
+  "red bull", "monster", "burn", "battery", "nocco", "celsius",
+  "energidrikk", "energy drink", "energy", "cola", "pepsi", "fanta",
+  "sprite", "solo", "brus", "vodka", "gin", "rum", "øl", "beer",
+  "cider", "seltzer", "hard seltzer",
+];
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsStandaloneTerm(text: string, term: string): boolean {
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(term)}([^\\p{L}\\p{N}]|$)`, "iu").test(text);
+}
+
+function getQueryVariants(queryLower: string): string[] {
+  const variants = new Set([queryLower]);
+
+  if (queryLower.endsWith("er") && queryLower.length > 4) {
+    variants.add(queryLower.slice(0, -2));
+  }
+  if (queryLower.endsWith("ene") && queryLower.length > 5) {
+    variants.add(queryLower.slice(0, -3));
+  }
+  if (!queryLower.endsWith("er")) {
+    variants.add(`${queryLower}er`);
+  }
+
+  return Array.from(variants).filter(Boolean);
+}
+
+function matchesProduceQuery(nameLower: string, queryLower: string): boolean {
+  return getQueryVariants(queryLower).some((variant) => containsStandaloneTerm(nameLower, variant));
+}
+
+function isFreshProduceLike(nameLower: string, categoryLower: string): boolean {
+  const isFreshCategory = FRESH_PRODUCE_CATEGORY_MARKERS.some((marker) => categoryLower === marker || categoryLower.includes(marker));
+  const hasProduceTerm = Array.from(SIMPLE_PRODUCE_TERMS).some((term) => containsStandaloneTerm(nameLower, term));
+  const isFreshBrand = FRESH_PRODUCE_BRANDS.some((brand) => nameLower.includes(brand));
+  const isProcessedVariant = PROCESSED_PRODUCE_INDICATORS.some((indicator) => nameLower.includes(indicator));
+  const isPrKg = /\bpr\.?\s*kg\b/i.test(nameLower) || /\b\d+\s*kg\b/i.test(nameLower) || /\bløsvekt\b/i.test(nameLower);
+
+  return isFreshCategory || /^fg\b/i.test(nameLower) || (isFreshBrand && hasProduceTerm && !isProcessedVariant) || (isPrKg && hasProduceTerm);
+}
+
+function isProcessedProduceVariant(nameLower: string, categoryLower: string): boolean {
+  const isBeverageProduct = BEVERAGE_PENALTY_PATTERNS.some((pattern) => nameLower.includes(pattern));
+  const isBeverageCategory = ["drikke", "brus", "energidrikk", "drikkevarer"].some((category) => categoryLower.includes(category));
+  const isProcessedVariant = PROCESSED_PRODUCE_INDICATORS.some((indicator) => nameLower.includes(indicator));
+
+  return isBeverageProduct || isProcessedVariant || (isBeverageCategory && !categoryLower.includes("juice"));
+}
+
+function hasSimpleIngredientProfile(ingredients: string): boolean {
+  const cleaned = ingredients.trim().toLowerCase();
+  if (!cleaned) return false;
+
+  const parts = cleaned
+    .split(/[,;]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.length > 0 && parts.length <= 3;
+}
+
+function getProducePriority(candidate: ProductCandidate, queryLower: string, novaMap: Map<string, number>): number {
+  const nameLower = (candidate.product.Produktnavn || "").toLowerCase();
+  const categoryLower = (candidate.product.Kategori || "").toLowerCase();
+  const ingredients = candidate.product.Ingrediensliste || "";
+  const ean = candidate.product.EAN ? String(candidate.product.EAN) : "";
+  const nova = novaMap.get(ean) ?? 99;
+
+  let priority = 0;
+
+  if (isFreshProduceLike(nameLower, categoryLower)) priority += 180;
+  if (matchesProduceQuery(nameLower, queryLower)) priority += 110;
+  if (hasSimpleIngredientProfile(ingredients)) priority += 60;
+  if (candidate.renvareScore >= 90) priority += 40;
+  if (nameLower.split(/\s+/).filter(Boolean).length <= 4) priority += 20;
+
+  if (nova === 1) priority += 120;
+  else if (nova === 2) priority += 50;
+  else if (nova >= 4 && nova < 99) priority -= 180;
+
+  if (isProcessedProduceVariant(nameLower, categoryLower)) priority -= 220;
+
+  return priority;
+}
+
 // Synonym- og variantmapping for bedre søketreff
 const searchSynonyms: Record<string, string[]> = {
   // === MEIERIPRODUKTER ===
@@ -900,8 +999,18 @@ serve(async (req) => {
       }
     }
 
+    const isProduceQuery = SIMPLE_PRODUCE_TERMS.has(originalQuery.toLowerCase().trim());
+
     // Sort: NOVA-aware ranking prioritizing clean products
     candidates.sort((a, b) => {
+      if (isProduceQuery) {
+        const aProducePriority = getProducePriority(a, originalQuery.toLowerCase().trim(), novaMap);
+        const bProducePriority = getProducePriority(b, originalQuery.toLowerCase().trim(), novaMap);
+        if (aProducePriority !== bProducePriority) {
+          return bProducePriority - aProducePriority;
+        }
+      }
+
       const aEan = a.product.EAN ? String(a.product.EAN) : "";
       const bEan = b.product.EAN ? String(b.product.EAN) : "";
       const aNova = novaMap.get(aEan) ?? 99;
@@ -1316,7 +1425,7 @@ function processProduct(product: Product, query: string, userPreferences?: any):
 }
 
 // Apply fresh produce boost and baby food penalty for simple produce queries
-function applyProduceScoring(score: number, queryLower: string, nameLower: string, categoryLower: string): number {
+function applyProduceScoring(score: number, queryLower: string, nameLower: string, categoryLower: string, ingredients = "", renvareScore = 0): number {
   const isProduceQuery = SIMPLE_PRODUCE_TERMS.has(queryLower);
   if (!isProduceQuery) return score;
 
@@ -1327,51 +1436,42 @@ function applyProduceScoring(score: number, queryLower: string, nameLower: strin
     return Math.min(score * 0.1, 10);
   }
 
-  // Penalize energy drinks / sodas / non-produce beverages very heavily
-  const BEVERAGE_PENALTY_PATTERNS = [
-    "red bull", "monster", "burn", "battery", "nocco", "celsius",
-    "energidrikk", "energy drink", "energy",
-    "cola", "pepsi", "fanta", "sprite", "solo", "brus",
-    "vodka", "gin", "rum", "øl", "beer", "cider",
-    "seltzer", "hard seltzer",
-  ];
-  const isBeverageProduct = BEVERAGE_PENALTY_PATTERNS.some(p => nameLower.includes(p));
-  // Also check category for beverages
-  const isBeverageCategory = ["drikke", "brus", "energidrikk", "drikkevarer"].some(c => categoryLower.includes(c));
-  if (isBeverageProduct || (isBeverageCategory && !categoryLower.includes("juice"))) {
+  if (isProcessedProduceVariant(nameLower, categoryLower)) {
     console.log(`Beverage penalty for "${nameLower}" (query: "${queryLower}")`);
     return Math.min(score * 0.05, 5); // 95% reduction — even harder than baby food
   }
 
-  // Boost fresh produce categories
   const isFreshCategory = FRESH_PRODUCE_CATEGORY_MARKERS.some(m => categoryLower === m || categoryLower.includes(m));
+  const exactProduceMatch = matchesProduceQuery(nameLower, queryLower);
+  const freshProduceLike = isFreshProduceLike(nameLower, categoryLower);
+
   if (isFreshCategory) {
     score += 40;
   }
 
-  // Boost known fresh produce brands with produce term
-  const FRESH_BRANDS = ['bama', 'vilje', 'prima', 'first price', 'änglamark', 'xtra', 'grønn&frisk'];
-  const isFreshBrand = FRESH_BRANDS.some(b => nameLower.includes(b));
-  const processedIndicators = ["juice", "smoothie", "drikke", "saft", "nektar", "salat med", "dressing", "mos", "puré", "syltetøy", "marmelade", "chips", "snacks"];
-  const isProcessedVariant = processedIndicators.some(p => nameLower.includes(p));
-  if (isFreshBrand && !isProcessedVariant) {
-    score += 30; // Boost fresh brand produce
+  if (freshProduceLike) {
+    score += 55;
   }
 
-  // Boost products priced by weight (typically bulk fresh produce)
-  if (/\bpr\.?\s*kg\b/i.test(nameLower) || /\bløsvekt\b/i.test(nameLower)) {
+  if (exactProduceMatch) {
+    score += 70;
+  }
+
+  if (hasSimpleIngredientProfile(ingredients)) {
+    score += 35;
+  }
+
+  if (renvareScore >= 90) {
     score += 20;
   }
 
-  // Boost short, simple product names (likely the actual produce, not a processed product containing it)
   const wordCount = nameLower.split(/\s+/).length;
   if (wordCount <= 4) {
     score += 15;
   }
 
-  // Penalize products that are clearly processed/flavored versions (juice, yoghurt, etc.)
-  if (isProcessedVariant) {
-    score *= 0.5;
+  if (!freshProduceLike && exactProduceMatch) {
+    score *= 0.65;
   }
 
   return score;
