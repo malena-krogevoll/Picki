@@ -192,6 +192,33 @@ function extractENumbers(text: string): string[] {
   return [...new Set(matches.map(e => e.replace(/\s+/g, '').toUpperCase()))];
 }
 
+function containsProduceTerm(nameLower: string): boolean {
+  for (const term of SIMPLE_PRODUCE_TERMS) {
+    if (nameLower.includes(term)) return true;
+  }
+  return false;
+}
+
+function detectFreshProduceByBrand(nameLower: string): boolean {
+  const matchesBrand = FRESH_PRODUCE_BRANDS.some(brand => nameLower.includes(brand));
+  if (!matchesBrand) return false;
+  const hasProduce = containsProduceTerm(nameLower);
+  if (!hasProduce) return false;
+  const hasProcessedIndicator = PROCESSED_PRODUCT_INDICATORS.some(ind => nameLower.includes(ind));
+  return !hasProcessedIndicator;
+}
+
+function extractProduceName(productName: string): string {
+  let name = productName.trim();
+  name = name.replace(/^FG\s+/i, '');
+  for (const brand of FRESH_PRODUCE_BRANDS) {
+    name = name.replace(new RegExp(`^${brand}\\s+`, 'i'), '');
+  }
+  name = name.replace(/^(delt|hel|fersk|stor|liten|norsk|økologisk|rød|røde|grønn|grønne|gul|gule)\s+/gi, '');
+  name = name.replace(/\s+\d+\s*(kg|g|stk|pk)\b.*$/i, '');
+  return name.trim() || productName.trim();
+}
+
 export function matchRules(text: string, rules: Rule[]): Signal[] {
   const signals: Signal[] = [];
   for (const rule of rules) {
