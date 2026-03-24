@@ -115,22 +115,25 @@ const getNovaLabel = (score: number | null, hasIngredients: boolean = true) => {
 async function batchClassifyNova(products: { ingredienser: string; category: string; productName?: string }[]): Promise<Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>> {
   const results = new Map<number, { novaScore: number | null; isEstimated: boolean; hasIngredients: boolean }>();
   
-  // Filter out products without ingredients UNLESS they are fresh produce (FG category)
+  // Filter out products without ingredients UNLESS they are fresh produce (FG category or FG name prefix)
   const freshProduceCategories = ['fg', 'frukt og grønt', 'frukt', 'grønt', 'grønnsaker', 'bær', 'ferske grønnsaker', 'fersk frukt', 'poteter', 'løk', 'salat', 'urter', 'sopp', 'rotgrønnsaker'];
+  const isFreshProduceProduct = (category: string, name?: string) => {
+    const catLower = (category || '').toLowerCase();
+    const nameLower = (name || '').toLowerCase().trim();
+    return freshProduceCategories.some(cat => catLower.includes(cat)) || /^fg\b/i.test(nameLower);
+  };
   
   const productsToClassify = products
     .map((p, idx) => ({ ...p, originalIndex: idx }))
     .filter(p => {
       const hasIngredients = p.ingredienser && p.ingredienser.trim().length > 0;
-      const isFreshProduce = freshProduceCategories.some(cat => (p.category || '').toLowerCase().includes(cat));
-      return hasIngredients || isFreshProduce;
+      return hasIngredients || isFreshProduceProduct(p.category, p.productName);
     });
   
   // Set defaults for products that won't be classified
   products.forEach((p, idx) => {
     const hasIngredients = p.ingredienser && p.ingredienser.trim().length > 0;
-    const isFreshProduce = freshProduceCategories.some(cat => (p.category || '').toLowerCase().includes(cat));
-    if (!hasIngredients && !isFreshProduce) {
+    if (!hasIngredients && !isFreshProduceProduct(p.category, p.productName)) {
       results.set(idx, { novaScore: null, isEstimated: true, hasIngredients: false });
     }
   });

@@ -187,12 +187,17 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
   
   if (isMissingIngredients) {
     const categoryLower = (product_category || '').toLowerCase();
+    const nameLower = (product_name || '').toLowerCase().trim();
     const isHighRiskCategory = HIGH_RISK_CATEGORIES.some(cat => categoryLower.includes(cat));
-    const isFreshProduce = FRESH_PRODUCE_CATEGORIES.some(cat => categoryLower === cat || categoryLower.includes(cat));
+    const isFreshProduceByCategory = FRESH_PRODUCE_CATEGORIES.some(cat => categoryLower === cat || categoryLower.includes(cat));
+    // Also detect "FG" prefix in product name (common Coop naming for fresh produce)
+    const isFreshProduceByName = /^fg\b/i.test(nameLower);
+    const isFreshProduce = isFreshProduceByCategory || isFreshProduceByName;
     
     // Fresh produce without ingredients → NOVA 1, use product name as ingredient
     if (isFreshProduce && product_name) {
-      const syntheticIngredients = product_name.trim();
+      // Strip "FG" prefix and descriptors like "delt", "hel" to get the actual produce name
+      const syntheticIngredients = product_name.trim().replace(/^FG\s+/i, '').replace(/^(delt|hel|fersk|stor|liten|norsk|økologisk)\s+/i, '').trim() || product_name.trim();
       return {
         nova_group: 1,
         confidence: 0.85,
