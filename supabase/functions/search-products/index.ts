@@ -1327,6 +1327,22 @@ function applyProduceScoring(score: number, queryLower: string, nameLower: strin
     return Math.min(score * 0.1, 10);
   }
 
+  // Penalize energy drinks / sodas / non-produce beverages very heavily
+  const BEVERAGE_PENALTY_PATTERNS = [
+    "red bull", "monster", "burn", "battery", "nocco", "celsius",
+    "energidrikk", "energy drink", "energy",
+    "cola", "pepsi", "fanta", "sprite", "solo", "brus",
+    "vodka", "gin", "rum", "øl", "beer", "cider",
+    "seltzer", "hard seltzer",
+  ];
+  const isBeverageProduct = BEVERAGE_PENALTY_PATTERNS.some(p => nameLower.includes(p));
+  // Also check category for beverages
+  const isBeverageCategory = ["drikke", "brus", "energidrikk", "drikkevarer"].some(c => categoryLower.includes(c));
+  if (isBeverageProduct || (isBeverageCategory && !categoryLower.includes("juice"))) {
+    console.log(`Beverage penalty for "${nameLower}" (query: "${queryLower}")`);
+    return Math.min(score * 0.05, 5); // 95% reduction — even harder than baby food
+  }
+
   // Boost fresh produce categories
   const isFreshCategory = FRESH_PRODUCE_CATEGORY_MARKERS.some(m => categoryLower === m || categoryLower.includes(m));
   if (isFreshCategory) {
