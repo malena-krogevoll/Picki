@@ -545,8 +545,25 @@ const FRESH_PRODUCE_BRANDS = [
 const PROCESSED_PRODUCE_INDICATORS = [
   "juice", "smoothie", "drikke", "saft", "nektar", "salat med", "dressing",
   "mos", "puré", "pure", "syltetøy", "marmelade", "chips", "snacks",
-  "yoghurt", "yogurt", "is", "sorbet", "energidrikk", "brus",
+  "yoghurt", "yogurt", "is", "sorbet", "energidrikk", "brus", "most", "smak av", "sirup",
 ];
+
+const NO_INGREDIENTS_PHRASES = [
+  "ingen ingrediensinformasjon tilgjengelig",
+  "ingen ingrediensinformasjon",
+  "ingredienser ikke tilgjengelig",
+  "not available",
+  "n/a",
+  "ingen data",
+  "mangler ingredienser",
+  "ukjent",
+];
+
+const PRODUCE_QUALIFIER_TERMS = new Set([
+  "hel", "hele", "delt", "halv", "halve", "fersk", "ferske", "stor", "store", "liten", "små",
+  "norsk", "økologisk", "rød", "røde", "grønn", "grønne", "gul", "gule", "moden", "modne",
+  "søt", "søte", "uten", "kjerner", "kjernefri", "kjernefritt", "løsvekt",
+]);
 
 const BEVERAGE_PENALTY_PATTERNS = [
   "red bull", "monster", "burn", "battery", "nocco", "celsius",
@@ -583,6 +600,43 @@ function matchesProduceQuery(nameLower: string, queryLower: string): boolean {
   return getQueryVariants(queryLower).some((variant) => containsStandaloneTerm(nameLower, variant));
 }
 
+function extractProduceName(productName: string): string {
+  let name = productName.trim();
+  name = name.replace(/^FG\s+/i, "");
+  for (const brand of FRESH_PRODUCE_BRANDS) {
+    name = name.replace(new RegExp(`^${escapeRegExp(brand)}\\s+`, "i"), "");
+  }
+  name = name.replace(/^(delt|hel|hele|fersk|ferske|stor|store|liten|små|norsk|økologisk|rød|røde|grønn|grønne|gul|gule)\s+/gi, "");
+  name = name.replace(/\s+\d+\s*(kg|g|stk|pk)\b.*$/i, "");
+  return name.trim() || productName.trim();
+}
+
+function inferSingleProduceName(productName: string): string | null {
+  if (!productName) return null;
+  const normalizedName = productName.toLowerCase().trim();
+  if (!normalizedName || PROCESSED_PRODUCE_INDICATORS.some((indicator) => normalizedName.includes(indicator))) return null;
+
+  const extracted = extractProduceName(productName)
+    .toLowerCase()
+    .replace(/[()]/g, " ")
+    .replace(/[\-_/]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!extracted) return null;
+  const tokens = extracted.split(" ").filter(Boolean);
+  const hasProduceTerm = tokens.some((token) => SIMPLE_PRODUCE_TERMS.has(token)) || Array.from(SIMPLE_PRODUCE_TERMS).some((term) => containsStandaloneTerm(extracted, term));
+  if (!hasProduceTerm) return null;
+
+  const allTokensAllowed = tokens.every((token) => SIMPLE_PRODUCE_TERMS.has(token) || PRODUCE_QUALIFIER_TERMS.has(token) || /^\d+$/.test(token));
+  return allTokensAllowed ? extracted : null;
+}
+
+function hasMissingIngredientsData(ingredients: string): boolean {
+  const normalized = ingredients.trim().toLowerCase();
+  return !normalized || NO_INGREDIENTS_PHRASES.some((phrase) => normalized.includes(phrase));
+}
+
 function isFreshProduceLike(nameLower: string, categoryLower: string): boolean {
   const isFreshCategory = FRESH_PRODUCE_CATEGORY_MARKERS.some((marker) => categoryLower === marker || categoryLower.includes(marker));
   const hasProduceTerm = Array.from(SIMPLE_PRODUCE_TERMS).some((term) => containsStandaloneTerm(nameLower, term));
@@ -590,7 +644,7 @@ function isFreshProduceLike(nameLower: string, categoryLower: string): boolean {
   const isProcessedVariant = PROCESSED_PRODUCE_INDICATORS.some((indicator) => nameLower.includes(indicator));
   const isPrKg = /\bpr\.?\s*kg\b/i.test(nameLower) || /\b\d+\s*kg\b/i.test(nameLower) || /\bløsvekt\b/i.test(nameLower);
 
-  return isFreshCategory || /^fg\b/i.test(nameLower) || (isFreshBrand && hasProduceTerm && !isProcessedVariant) || (isPrKg && hasProduceTerm);
+  return isFreshCategory || (Boolean(inferSingleProduceName(nameLower)) && /^fg\b/i.test(nameLower)) || (isFreshBrand && hasProduceTerm && !isProcessedVariant) || (isPrKg && hasProduceTerm) || Boolean(inferSingleProduceName(nameLower));
 }
 
 function isProcessedProduceVariant(nameLower: string, categoryLower: string): boolean {
@@ -613,16 +667,29 @@ function hasSimpleIngredientProfile(ingredients: string): boolean {
   return parts.length > 0 && parts.length <= 3;
 }
 
+function inferNovaForProduceCandidate(candidate: ProductCandidate, novaMap: Map<string, number>): number {
+  const ean = candidate.product.EAN ? String(candidate.product.EAN) : "";
+  const persistedNova = novaMap.get(ean);
+  if (typeof persistedNova === "number") return persistedNova;
+
+  const nameLower = (candidate.product.Produktnavn || "").toLowerCase();
+  const categoryLower = (candidate.product.Kategori || "").toLowerCase();
+  const ingredients = candidate.product.Ingrediensliste || "";
+
+  return hasMissingIngredientsData(ingredients) && isFreshProduceLike(nameLower, categoryLower) ? 1 : 99;
+}
+
 function getProducePriority(candidate: ProductCandidate, queryLower: string, novaMap: Map<string, number>): number {
   const nameLower = (candidate.product.Produktnavn || "").toLowerCase();
   const categoryLower = (candidate.product.Kategori || "").toLowerCase();
   const ingredients = candidate.product.Ingrediensliste || "";
-  const ean = candidate.product.EAN ? String(candidate.product.EAN) : "";
-  const nova = novaMap.get(ean) ?? 99;
+  const inferredProduceName = inferSingleProduceName(nameLower);
+  const nova = inferNovaForProduceCandidate(candidate, novaMap);
 
   let priority = 0;
 
   if (isFreshProduceLike(nameLower, categoryLower)) priority += 180;
+  if (inferredProduceName && hasMissingIngredientsData(ingredients)) priority += 220;
   if (matchesProduceQuery(nameLower, queryLower)) priority += 110;
   if (hasSimpleIngredientProfile(ingredients)) priority += 60;
   if (candidate.renvareScore >= 90) priority += 40;
@@ -1011,10 +1078,8 @@ serve(async (req) => {
         }
       }
 
-      const aEan = a.product.EAN ? String(a.product.EAN) : "";
-      const bEan = b.product.EAN ? String(b.product.EAN) : "";
-      const aNova = novaMap.get(aEan) ?? 99;
-      const bNova = novaMap.get(bEan) ?? 99;
+      const aNova = inferNovaForProduceCandidate(a, novaMap);
+      const bNova = inferNovaForProduceCandidate(b, novaMap);
 
       // 1. Both have relevance scores above threshold? Compare NOVA first
       const bothRelevant = a.score >= 50 && b.score >= 50;
@@ -1427,6 +1492,8 @@ function processProduct(product: Product, query: string, userPreferences?: any):
 function applyProduceScoring(score: number, queryLower: string, nameLower: string, categoryLower: string, ingredients = "", renvareScore = 0): number {
   const isProduceQuery = SIMPLE_PRODUCE_TERMS.has(queryLower);
   if (!isProduceQuery) return score;
+  const inferredProduceName = inferSingleProduceName(nameLower);
+  const inferredFreshProduce = Boolean(inferredProduceName) && hasMissingIngredientsData(ingredients);
 
   // Penalize baby food products heavily
   const isBabyFood = BABY_FOOD_PATTERNS.some(p => nameLower.includes(p));
@@ -1450,6 +1517,10 @@ function applyProduceScoring(score: number, queryLower: string, nameLower: strin
 
   if (freshProduceLike) {
     score += 55;
+  }
+
+  if (inferredFreshProduce) {
+    score += 120;
   }
 
   if (exactProduceMatch) {
