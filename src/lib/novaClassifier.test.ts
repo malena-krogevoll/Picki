@@ -67,6 +67,8 @@ describe("classifyNova – missing ingredients", () => {
     ["FG delt vannmelon", "vannmelon"],
     ["FG eple rød", "eple rød"],
     ["FG norsk agurk", "agurk"],
+    ["FG hel vannmelon", "vannmelon"],
+    ["FG vannmelon rød", "vannmelon rød"],
   ])("should classify FG-prefixed product name '%s' as NOVA 1 even without category match", (name) => {
     const result = classifyNova({ ingredients_text: '', product_category: '', product_name: name });
     expect(result.nova_group).toBe(1);
@@ -105,6 +107,7 @@ describe("classifyNova – missing ingredients", () => {
     ["Bama Smoothie Mango", "Bama Smoothie Mango"],
     ["Vilje Syltetøy Jordbær", "Vilje Syltetøy Jordbær"],
     ["Prima Chips Paprika", "Prima Chips Paprika"],
+    ["FG saft smak av vannmelon", "FG saft smak av vannmelon"],
   ])("should NOT classify processed brand product '%s' as NOVA 1", (_label, name) => {
     const result = classifyNova({ ingredients_text: '', product_category: '', product_name: name });
     expect(result.nova_group).not.toBe(1);
