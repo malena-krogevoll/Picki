@@ -6,7 +6,7 @@
  * Both files must produce identical classification results.
  */
 
-export const VERSION = "1.4.0";
+export const VERSION = "1.4.1";
 export const RULESET_DATE = "2026-03-24";
 
 export interface Rule {
@@ -130,7 +130,14 @@ export const PROCESSED_PRODUCT_INDICATORS = [
   'hermetisk', 'konserv', 'boks',
   'frosne', 'frossen', 'panert', 'stekt',
   'ferdigskåret med', 'wok med',
+  'most', 'smak av', 'energidrikk', 'brus', 'sirup',
 ];
+
+const PRODUCE_QUALIFIER_TERMS = new Set([
+  'hel', 'hele', 'delt', 'halv', 'halve', 'fersk', 'ferske', 'stor', 'store', 'liten', 'små',
+  'norsk', 'økologisk', 'rød', 'røde', 'grønn', 'grønne', 'gul', 'gule', 'moden', 'modne',
+  'søt', 'søte', 'uten', 'kjerner', 'kjernefri', 'kjernefritt', 'løsvekt',
+]);
 
 const NO_INGREDIENTS_PHRASES = [
   'ingen ingrediensinformasjon tilgjengelig',
@@ -219,6 +226,28 @@ function extractProduceName(productName: string): string {
   return name.trim() || productName.trim();
 }
 
+function inferSingleProduceName(productName: string): string | null {
+  const normalizedName = normalizeText(productName);
+  if (!normalizedName) return null;
+  if (PROCESSED_PRODUCT_INDICATORS.some(indicator => normalizedName.includes(indicator))) return null;
+
+  const extracted = extractProduceName(productName)
+    .toLowerCase()
+    .replace(/[()]/g, ' ')
+    .replace(/[\-_/]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!extracted || !containsProduceTerm(extracted)) return null;
+
+  const tokens = extracted.split(' ').filter(Boolean);
+  const allTokensAllowed = tokens.every(token =>
+    SIMPLE_PRODUCE_TERMS.has(token) || PRODUCE_QUALIFIER_TERMS.has(token) || /^\d+$/.test(token)
+  );
+
+  return allTokensAllowed ? extracted : null;
+}
+
 export function matchRules(text: string, rules: Rule[]): Signal[] {
   const signals: Signal[] = [];
   for (const rule of rules) {
@@ -244,18 +273,19 @@ export function classifyNova(input: ClassificationInput): ClassificationResult {
   if (isMissingIngredients) {
     const categoryLower = (product_category || '').toLowerCase();
     const nameLower = (product_name || '').toLowerCase().trim();
+    const inferredFreshProduceName = product_name ? inferSingleProduceName(product_name) : null;
     const isHighRiskCategory = HIGH_RISK_CATEGORIES.some(cat => categoryLower.includes(cat));
     const isFreshProduceByCategory = FRESH_PRODUCE_CATEGORIES.some(cat => categoryLower === cat || categoryLower.includes(cat));
     // Also detect "FG" prefix in product name (common Coop naming for fresh produce)
-    const isFreshProduceByName = /^fg\b/i.test(nameLower);
+    const isFreshProduceByName = /^fg\b/i.test(nameLower) && Boolean(inferredFreshProduceName);
     const isFreshProduceByBrand = detectFreshProduceByBrand(nameLower);
     const isPrKg = /\bpr\.?\s*kg\b/i.test(nameLower) || /\b\d+\s*kg\b/i.test(nameLower);
     const isFreshProduceByWeight = isPrKg && containsProduceTerm(nameLower);
-    const isFreshProduce = isFreshProduceByCategory || isFreshProduceByName || isFreshProduceByBrand || isFreshProduceByWeight;
+    const isFreshProduce = isFreshProduceByCategory || isFreshProduceByName || isFreshProduceByBrand || isFreshProduceByWeight || Boolean(inferredFreshProduceName);
     
     // Fresh produce without ingredients → NOVA 1, use product name as ingredient
     if (isFreshProduce && product_name) {
-      const syntheticIngredients = extractProduceName(product_name);
+      const syntheticIngredients = inferredFreshProduceName || extractProduceName(product_name);
       return {
         nova_group: 1,
         confidence: 0.85,
