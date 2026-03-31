@@ -96,6 +96,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
+  const { isFavorite, toggleFavorite } = useFavoriteProducts(user?.id);
   const searchParams = new URLSearchParams(window.location.search);
   const listId = searchParams.get('listId');
   const storeId = searchParams.get('storeId');
