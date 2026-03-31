@@ -299,11 +299,13 @@ const Explore = () => {
                               </p>
                             )}
                           </div>
-                          <Badge
-                            className="flex-shrink-0 bg-primary/10 text-primary border-primary/20 text-xs"
-                          >
-                            NOVA {product.nova_class}
-                          </Badge>
+                          {product.nova_class && product.nova_class <= 2 && (
+                            <Badge
+                              className="flex-shrink-0 bg-primary/10 text-primary border-primary/20 text-xs"
+                            >
+                              NOVA {product.nova_class}
+                            </Badge>
+                          )}
                         </div>
 
                         {/* Chain badges */}
