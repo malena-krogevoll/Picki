@@ -482,9 +482,19 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 profile?.preferences as UserPreferences | null
               );
               
-              cacheItemProducts(item.id, storeId, sortedProducts);
+              // Promote favorite product to top if matched
+              const favorite = getFavoriteForQuery(item.name);
+              let finalProducts = sortedProducts;
+              if (favorite) {
+                const favIdx = sortedProducts.findIndex(p => p.ean === favorite.ean);
+                if (favIdx > 0) {
+                  finalProducts = [sortedProducts[favIdx], ...sortedProducts.filter((_, i) => i !== favIdx)];
+                }
+              }
+              
+              cacheItemProducts(item.id, storeId, finalProducts);
               fetchedItemsRef.current.add(item.id);
-              return { itemId: item.id, products: sortedProducts };
+              return { itemId: item.id, products: finalProducts };
             } else {
               // Don't mark as fetched — empty results may be due to temporary API failure
               // so the item should be retried on next visit
