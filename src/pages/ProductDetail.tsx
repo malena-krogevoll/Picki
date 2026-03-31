@@ -114,6 +114,22 @@ export default function ProductDetail() {
     novaScore: number | null;
   }>>([]);
   const [swapping, setSwapping] = useState(false);
+  const listItemName = searchParams.get('itemName');
+  const isFav = ean ? isFavorite(ean) : false;
+
+  const handleToggleFavorite = async () => {
+    if (!ean || !product) return;
+    const success = await toggleFavorite({
+      ean,
+      productName: `${product.brand || ''} ${product.name || ''}`.trim(),
+      brand: product.brand,
+      imageUrl: product.image,
+      listItemName: listItemName || undefined,
+    });
+    if (success) {
+      toast(isFav ? "Fjernet fra favoritter" : "Lagt til som favoritt ❤️");
+    }
+  };
 
   // Convert profile preferences to UserPreferences format
   const userPreferences: UserPreferences | null = profile?.preferences ? {
