@@ -131,16 +131,16 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
             <Card 
               className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer"
               onClick={() => navigate("/cookbook")}
             >
-              <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-3">
+              <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-2">
                 <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
                   <ChefHat className="h-6 w-6 text-secondary-foreground" />
                 </div>
-                <h3 className="text-base font-semibold text-center">Min kokebok</h3>
+                <h3 className="text-sm md:text-base font-semibold text-center">Min kokebok</h3>
               </CardContent>
             </Card>
 
@@ -148,11 +148,23 @@ const Dashboard = () => {
               className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" 
               onClick={() => navigate("/dinner-explorer")}
             >
-              <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-3">
+              <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-2">
                 <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
                   <BookOpen className="h-6 w-6 text-secondary-foreground" />
                 </div>
-                <h3 className="text-base font-semibold text-center">Oppskrifter</h3>
+                <h3 className="text-sm md:text-base font-semibold text-center">Oppskrifter</h3>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="border-2 border-dashed border-secondary/30 bg-secondary/5 hover:border-secondary/50 transition-colors cursor-pointer" 
+              onClick={() => navigate("/explore")}
+            >
+              <CardContent className="flex flex-col items-center justify-center py-5 md:py-6 px-2">
+                <div className="bg-secondary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+                  <Leaf className="h-6 w-6 text-secondary-foreground" />
+                </div>
+                <h3 className="text-sm md:text-base font-semibold text-center">Utforsk renvarer</h3>
               </CardContent>
             </Card>
           </div>
