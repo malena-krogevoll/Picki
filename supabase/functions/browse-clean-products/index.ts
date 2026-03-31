@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     };
 
     // Build WHERE clauses
-    let whereConditions = "p.name IS NOT NULL";
+    let whereConditions = "p.name IS NOT NULL AND p.nova_class IS NOT NULL AND p.nova_class <= 2";
 
     const params: string[] = [];
     let paramIndex = 1;
