@@ -12,6 +12,8 @@ Deno.serve(async (req) => {
   // This is an admin-only batch operation
   // Accept any authenticated request for now (deploy, run once, then delete)
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceKey);
 
   // Fetch products missing nova_class that have ingredients
