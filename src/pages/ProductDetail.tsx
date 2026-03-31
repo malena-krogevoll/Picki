@@ -132,10 +132,7 @@ export default function ProductDetail() {
       if (result.action === 'removed') {
         toast("Fjernet fra favoritter");
       } else if (result.wasFirstFavorite) {
-        toast("Lagt til som favoritt ❤️", {
-          description: "Neste gang du handler denne varen, vil dette produktet automatisk vises som førstevalg i butikker der det er tilgjengelig.",
-          duration: 6000,
-        });
+        setShowFirstFavoriteDialog(true);
       } else {
         toast("Lagt til som favoritt ❤️");
       }
