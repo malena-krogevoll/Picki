@@ -99,8 +99,6 @@ Deno.serve(async (req) => {
       .from("products")
       .select("ean, name, brand, image_url, nova_class")
       .not("name", "is", null)
-      .lte("nova_class", 2)
-      .gte("nova_class", 1)
       .order("nova_class", { ascending: true })
       .order("name", { ascending: true })
       .range(offset, offset + limit - 1);
