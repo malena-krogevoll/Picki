@@ -6,6 +6,162 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/**
+ * Category keywords with word-boundary-safe patterns.
+ * Each entry is either a plain keyword (matched with word-boundary regex)
+ * or a { term, exclude } object for terms that need negative filtering.
+ */
+interface CategoryRule {
+  /** Keywords to match (OR). Matched as word-boundary regex against product name. */
+  include: string[];
+  /** If any of these match the product name, exclude the product from this category. */
+  exclude?: string[];
+}
+
+const categoryRules: Record<string, CategoryRule> = {
+  "frukt-gront": {
+    include: [
+      "eple", "epler", "banan", "bananer", "appelsin", "appelsiner",
+      "sitron", "sitroner", "druer", "melon", "mango", "avokado",
+      "kiwi", "pære", "pærer", "tomat", "tomater", "agurk", "agurker",
+      "paprika", "løk", "hvitløk", "gulrot", "gulrøtter",
+      "brokkoli", "blomkål", "spinat", "salat", "potet", "poteter",
+      "sopp", "squash", "mais", "bær", "jordbær", "bringebær",
+      "blåbær", "kirsebær", "plommer", "fersken", "nektarin",
+      "ingefær", "persille", "dill", "basilikum", "reddik",
+      "selleri", "purre", "purreløk", "rødbet", "kål", "hodekål",
+      "grønnkål", "rosenkål", "sukkererter", "asparges",
+      "lime", "grapefrukt", "ananas", "granateplet", "fiken",
+      "sjampinjong", "kantarell", "ruccola", "babyspinat",
+    ],
+    exclude: ["juice", "saft", "smoothie", "chips", "snacks", "dressing", "saus", "ketchup", "puré", "syltetøy", "grøt"],
+  },
+  "meieri": {
+    include: [
+      "melk", "helmelk", "lettmelk", "skummet",
+      "fløte", "kremfløte", "matfløte", "lettrømme", "seterrømme",
+      "rømme", "yoghurt", "skyr", "kesam",
+      "smør", "meierismør", "egg",
+      "kulturmelk", "kefir", "mysost",
+    ],
+    exclude: ["grøt", "is", "iskrem", "sjokolade", "pudding", "kaffe"],
+  },
+  "palegg": {
+    include: [
+      "hvitost", "gulost", "brunost", "norvegia", "jarlsberg",
+      "mozzarella", "parmesan", "feta", "brie", "camembert",
+      "nøkkelost", "edamer", "gouda", "cheddar", "kremost",
+      "cottage cheese", "ricotta", "mascarpone",
+      "fløtemysost", "gudbrandsdalsost", "prim",
+      "skinke", "kokt skinke", "spekeskinke",
+      "salami", "serranoskinke", "bresaola",
+      "leverpostei", "kaviar", "makrell i tomat",
+      "syltetøy", "marmelade", "honning",
+      "peanøttsmør", "nøttepålegg",
+      "hummus", "avokadopålegg",
+      "røkelaks", "gravet laks",
+      "salatost", "middagsost", "blåmuggost",
+    ],
+    exclude: ["kaffe", "grøt", "chips", "pizza", "kiddylicious", "potetstaver", "knekkebrød"],
+  },
+  "kjott": {
+    include: [
+      "kylling", "kyllingfilet", "kyllingbryst", "kyllinglår",
+      "svinekjøtt", "svinefilet", "koteletter",
+      "bacon", "pølse", "pølser", "grillpølse", "wienerpølse",
+      "kjøttdeig", "biff", "entrecote", "ytrefilet", "indrefilet",
+      "lammekjøtt", "lammelår", "lammekotelett",
+      "oksekjøtt", "storfe", "roastbiff",
+      "ribbe", "pinnekjøtt", "fenalår",
+      "kalkun", "kalkunfilet", "and",
+      "kjøttkaker", "karbonade", "medisterkake",
+      "farse", "hamburger",
+    ],
+    exclude: ["smak", "buljong", "fond"],
+  },
+  "fisk": {
+    include: [
+      "laks", "laksefilet", "røkelaks", "gravet laks",
+      "ørret", "ørretfilet",
+      "torsk", "torskefilet", "torskeloins",
+      "sei", "seifilet", "hyse", "kolje",
+      "reker", "scampi", "kreps",
+      "fiskekaker", "fiskepudding", "fiskeboller",
+      "makrell", "sild", "sardiner", "ansjos",
+      "tunfisk", "kveite", "steinbit", "breiflabb",
+      "blåskjell", "kamskjell",
+    ],
+    exclude: ["kaffe", "fiskeolje", "omega"],
+  },
+  "barnemat": {
+    include: [
+      "barnemat", "barnegrøt", "velling",
+      "småbarn", "baby", "fra 6 mnd", "fra 8 mnd", "fra 12 mnd",
+      "hipp", "nestlé", "semper", "ella's kitchen",
+      "fruktmos", "fruktpuré",
+      "lillego", "organix",
+    ],
+    exclude: [],
+  },
+  "ferdigmat": {
+    include: [
+      "ferdigmat", "ferdigrett",
+      "pizza", "lasagne", "wok", "gryte",
+      "suppe", "pytt i panne",
+      "taco", "burrito", "wrap",
+    ],
+    exclude: ["krydder", "saus", "buljong"],
+  },
+  "hermetikk": {
+    include: [
+      "hermetikk", "hermetiske", "hakkede tomater",
+      "tomatpuré", "tomater på boks",
+      "kikerter", "bønner", "linser",
+      "mais på boks", "erter",
+      "tunfisk på boks", "sardiner",
+      "kokosmilk", "kokosmelk",
+    ],
+    exclude: [],
+  },
+  "pasta-ris": {
+    include: [
+      "pasta", "spaghetti", "penne", "fusilli", "tagliatelle",
+      "makaroni", "lasagneplater",
+      "ris", "basmati", "jasminris", "fullkornsris",
+      "couscous", "bulgur", "quinoa",
+      "havregryn", "müsli", "granola",
+      "nudler", "glassnudler",
+      "mel", "hvetemel", "speltsmel",
+    ],
+    exclude: ["risotto", "rispudding"],
+  },
+  "sauser-krydder": {
+    include: [
+      "ketchup", "sennep", "pesto",
+      "soyasaus", "sriracha", "tabasco",
+      "buljong", "fond",
+      "salt", "pepper", "paprikapulver",
+      "kanel", "kardemomme", "ingefærpulver",
+      "oregano", "timian", "rosmarin",
+      "karri", "gurkemeie", "spisskummen",
+      "dressing", "vinaigrette",
+      "tomatpuré", "tacosaus",
+    ],
+    exclude: [],
+  },
+  "drikkevarer": {
+    include: [
+      "juice", "appelsinjuice", "eplejuice",
+      "saft", "nektar",
+      "vann", "mineralvann", "kildevann",
+      "kaffe", "kaffefilter", "kaffebønner", "kaffekapsel",
+      "te", "grønn te", "svart te", "urtete",
+      "smoothie", "kombucha",
+    ],
+    exclude: ["kaffefløte"],
+  },
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -17,84 +173,13 @@ Deno.serve(async (req) => {
     const category = url.searchParams.get("category") || "";
     const chain = url.searchParams.get("chain") || "";
     const offset = parseInt(url.searchParams.get("offset") || "0", 10);
-    const limit = parseInt(url.searchParams.get("limit") || "20", 10);
+    const limit = parseInt(url.searchParams.get("limit") || "40", 10);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Category keyword mapping (mirrors storeLayoutSort.ts)
-    const categoryKeywords: Record<string, string[]> = {
-      "frukt-gront": ["eple", "banan", "appelsin", "sitron", "druer", "melon", "mango", "avokado", "kiwi", "pære", "tomat", "agurk", "paprika", "løk", "hvitløk", "gulrot", "brokkoli", "blomkål", "spinat", "salat", "potet", "sopp", "squash", "frukt", "grønt", "grønnsak", "bær"],
-      "meieri": ["melk", "fløte", "rømme", "yoghurt", "skyr", "kesam", "smør", "egg", "kremfløte", "matfløte", "havremelk", "kulturmelk"],
-      "palegg": ["ost", "brunost", "gulost", "norvegia", "jarlsberg", "mozzarella", "parmesan", "feta", "skinke", "salami", "leverpostei", "kaviar", "syltetøy", "honning", "pålegg", "kremost"],
-      "kjott": ["kylling", "kyllingfilet", "svin", "bacon", "pølse", "kjøttdeig", "biff", "entrecote", "lam", "okse", "storfe", "kjøttkaker", "karbonade"],
-      "fisk": ["laks", "laksefilet", "ørret", "torsk", "sei", "reker", "scampi", "fiskekaker", "fiskepudding", "sjømat", "fisk"],
-      "barnemat": ["barnemat", "grøt", "velling", "barnegrøt", "småbarn", "baby", "morsmelk"],
-      "ferdigmat": ["ferdigmat", "ferdigrett", "ferdig", "middag", "pizza", "lasagne", "wok", "gryte", "suppe", "pytt"],
-      "hermetikk": ["hermetikk", "boks", "konserv", "tunfisk", "sardiner", "tomatpuré", "tomater", "kikerter", "bønner"],
-      "pasta-ris": ["pasta", "spaghetti", "penne", "ris", "basmati", "couscous", "bulgur", "quinoa", "havregryn", "müsli", "granola", "nudler"],
-      "sauser-krydder": ["saus", "ketchup", "sennep", "pesto", "soyasaus", "krydder", "salt", "pepper", "buljong", "dressing"],
-      "drikkevarer": ["juice", "saft", "vann", "kaffe", "te", "brus", "smoothie", "drikke"],
-    };
-
-    // Build WHERE clauses
-    let whereConditions = "p.name IS NOT NULL AND p.nova_class IS NOT NULL AND p.nova_class <= 2";
-
-    const params: string[] = [];
-    let paramIndex = 1;
-
-    if (search) {
-      whereConditions += ` AND p.name ILIKE $${paramIndex}`;
-      params.push(`%${search}%`);
-      paramIndex++;
-    }
-
-    if (category && categoryKeywords[category]) {
-      const keywords = categoryKeywords[category];
-      const keywordConditions = keywords
-        .map(() => {
-          params.push(`%${keywords[params.length - (paramIndex - 1) + (params.length - (paramIndex - 1))]}`);
-          return "";
-        });
-      // Reset and build properly
-      params.length = search ? 1 : 0;
-      paramIndex = search ? 2 : 1;
-
-      const kwClauses = keywords.map((kw) => {
-        params.push(`%${kw}%`);
-        const idx = paramIndex;
-        paramIndex++;
-        return `p.name ILIKE $${idx}`;
-      });
-      whereConditions += ` AND (${kwClauses.join(" OR ")})`;
-    }
-
-    if (chain) {
-      whereConditions += ` AND c.name ILIKE $${paramIndex}`;
-      params.push(`%${chain}%`);
-      paramIndex++;
-    }
-
-    const query = `
-      SELECT p.ean, p.name, p.brand, p.image_url, p.nova_class,
-             array_agg(DISTINCT c.name) as chains
-      FROM products p
-      JOIN offers o ON o.ean = p.ean
-      JOIN chains c ON c.id = o.chain_id
-      WHERE ${whereConditions}
-      GROUP BY p.ean, p.name, p.brand, p.image_url, p.nova_class
-      ORDER BY p.nova_class ASC, p.name ASC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-
-    const { data, error } = await supabase.rpc("", {}).then(() => ({ data: null, error: null }));
-
-    // Use raw SQL via supabase-js postgres
-    // Actually, we need to use the REST API approach with filters
-    // Let's use a simpler approach with the Supabase client
-
-    // Rebuild using supabase client queries
+    // Build query
     let productsQuery = supabase
       .from("products")
       .select("ean, name, brand, image_url, nova_class")
@@ -102,19 +187,22 @@ Deno.serve(async (req) => {
       .not("nova_class", "is", null)
       .lte("nova_class", 2)
       .order("nova_class", { ascending: true })
-      .order("name", { ascending: true })
-      .range(offset, offset + limit - 1);
+      .order("name", { ascending: true });
 
     if (search) {
       productsQuery = productsQuery.ilike("name", `%${search}%`);
     }
 
-    if (category && categoryKeywords[category]) {
-      const keywords = categoryKeywords[category];
-      // Use OR filter for category keywords matching product name
-      const orFilter = keywords.map(kw => `name.ilike.%${kw}%`).join(",");
+    if (category && categoryRules[category]) {
+      const rule = categoryRules[category];
+      // Use OR filter for include keywords
+      const orFilter = rule.include.map(kw => `name.ilike.%${kw}%`).join(",");
       productsQuery = productsQuery.or(orFilter);
     }
+
+    // Fetch more than needed so we can post-filter excludes
+    const fetchLimit = category ? Math.min(limit * 3, 200) : limit;
+    productsQuery = productsQuery.range(offset, offset + fetchLimit - 1);
 
     const { data: products, error: productsError } = await productsQuery;
 
@@ -132,8 +220,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Apply exclude rules (post-filter)
+    let filtered = products;
+    if (category && categoryRules[category]) {
+      const rule = categoryRules[category];
+      if (rule.exclude && rule.exclude.length > 0) {
+        filtered = products.filter((p: any) => {
+          const nameLower = (p.name || "").toLowerCase();
+          return !rule.exclude!.some(ex => nameLower.includes(ex.toLowerCase()));
+        });
+      }
+      // Trim to requested limit
+      filtered = filtered.slice(0, limit);
+    }
+
     // Fetch chain availability for these products
-    const eans = products.map((p: any) => p.ean);
+    const eans = filtered.map((p: any) => p.ean);
     const { data: offers, error: offersError } = await supabase
       .from("offers")
       .select("ean, chain_id")
@@ -159,15 +261,15 @@ Deno.serve(async (req) => {
     }
 
     // If chain filter is active, filter products to only those available at that chain
-    let filteredProducts = products;
+    let finalProducts = filtered;
     if (chain) {
-      filteredProducts = products.filter((p: any) => {
+      finalProducts = filtered.filter((p: any) => {
         const productChains = eanChains.get(p.ean) || [];
         return productChains.some((cn: string) => cn.toLowerCase().includes(chain.toLowerCase()));
       });
     }
 
-    const result = filteredProducts.map((p: any) => ({
+    const result = finalProducts.map((p: any) => ({
       ...p,
       chains: eanChains.get(p.ean) || [],
     }));
