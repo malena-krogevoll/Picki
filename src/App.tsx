@@ -11,6 +11,7 @@ import Cookbook from "./pages/Cookbook";
 import ProductDetail from "./pages/ProductDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
+import Explore from "./pages/Explore";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/list/:listId" element={<ListEditor />} />
             <Route path="/dinner-explorer" element={<DinnerExplorer />} />
             <Route path="/cookbook" element={<Cookbook />} />
+            <Route path="/explore" element={<Explore />} />
             <Route path="/product/:ean" element={<ProductDetail />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/auth" element={<Auth />} />
