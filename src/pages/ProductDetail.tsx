@@ -10,6 +10,7 @@ import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/
 import { CountryFlag } from "@/components/CountryFlag";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { useFavoriteProducts } from "@/hooks/useFavoriteProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
