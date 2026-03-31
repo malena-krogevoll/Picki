@@ -12,9 +12,13 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // Service-role only
+  // Verify caller has service role key via query param or auth header
+  const url = new URL(req.url);
+  const keyParam = url.searchParams.get("key");
   const authHeader = req.headers.get("Authorization");
-  if (authHeader !== `Bearer ${serviceKey}`) {
+  const isServiceRole = authHeader === `Bearer ${serviceKey}` || keyParam === serviceKey;
+  
+  if (!isServiceRole) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
