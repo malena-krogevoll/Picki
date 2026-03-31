@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,6 +115,7 @@ export default function ProductDetail() {
     novaScore: number | null;
   }>>([]);
   const [swapping, setSwapping] = useState(false);
+  const [showFirstFavoriteDialog, setShowFirstFavoriteDialog] = useState(false);
   const listItemName = searchParams.get('itemName');
   const isFav = ean ? isFavorite(ean) : false;
 
@@ -130,10 +132,7 @@ export default function ProductDetail() {
       if (result.action === 'removed') {
         toast("Fjernet fra favoritter");
       } else if (result.wasFirstFavorite) {
-        toast("Lagt til som favoritt ❤️", {
-          description: "Neste gang du handler denne varen, vil dette produktet automatisk vises som førstevalg i butikker der det er tilgjengelig.",
-          duration: 6000,
-        });
+        setShowFirstFavoriteDialog(true);
       } else {
         toast("Lagt til som favoritt ❤️");
       }
@@ -819,6 +818,20 @@ export default function ProductDetail() {
           </Card>
         )}
       </div>
+
+      <AlertDialog open={showFirstFavoriteDialog} onOpenChange={setShowFirstFavoriteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Favoritt lagt til ❤️</AlertDialogTitle>
+            <AlertDialogDescription>
+              Neste gang du handler denne varen, vil dette produktet automatisk vises som førstevalg i butikker der det er tilgjengelig.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowFirstFavoriteDialog(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
