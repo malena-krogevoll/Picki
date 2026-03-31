@@ -79,8 +79,8 @@ export const useFavoriteProducts = (userId: string | undefined) => {
       brand?: string;
       imageUrl?: string;
       listItemName?: string;
-    }) => {
-      if (!userId) return;
+    }): Promise<{ success: boolean; action: 'added' | 'removed'; wasFirstFavorite: boolean }> => {
+      if (!userId) return { success: false, action: 'removed', wasFirstFavorite: false };
 
       const existing = favorites.find(f => f.ean === params.ean);
       if (existing) {
@@ -92,9 +92,10 @@ export const useFavoriteProducts = (userId: string | undefined) => {
         if (!error) {
           setFavorites(prev => prev.filter(f => f.id !== existing.id));
         }
-        return !error;
+        return { success: !error, action: 'removed' as const, wasFirstFavorite: false };
       } else {
         // Add
+        const wasFirstFavorite = favorites.length === 0;
         const searchTerms = deriveSearchTerms(params.productName, params.listItemName);
         const { data, error } = await supabase
           .from('user_favorite_products')
@@ -112,7 +113,7 @@ export const useFavoriteProducts = (userId: string | undefined) => {
         if (!error && data) {
           setFavorites(prev => [...prev, data as unknown as FavoriteProduct]);
         }
-        return !error;
+        return { success: !error, action: 'added' as const, wasFirstFavorite };
       }
     },
     [userId, favorites]
