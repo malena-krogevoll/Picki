@@ -181,19 +181,28 @@ Deno.serve(async (req) => {
     let vdaCount = 0;
     let kassalCount = 0;
 
-    // Search VDA+ with delays to avoid rate limiting
-    for (const term of DISCOVERY_TERMS) {
-      const vdaResults = await searchVda(term);
-      for (const p of vdaResults) {
-        if (!existingEans.has(p.ean) && !allDiscovered.has(p.ean)) {
-          allDiscovered.set(p.ean, p);
-          vdaCount++;
-        }
+    // Try VDA+ with canary check — skip all if first search fails
+    let vdaAvailable = true;
+    const firstVdaResult = await searchVda(DISCOVERY_TERMS[0]);
+    if (firstVdaResult.length === 0) {
+      console.warn("VDA+ unavailable (canary failed), skipping all VDA+ searches");
+      vdaAvailable = false;
+    } else {
+      for (const p of firstVdaResult) {
+        if (!existingEans.has(p.ean)) { allDiscovered.set(p.ean, p); vdaCount++; }
       }
-      await new Promise(r => setTimeout(r, 200));
+      for (let i = 1; i < DISCOVERY_TERMS.length; i++) {
+        const vdaResults = await searchVda(DISCOVERY_TERMS[i]);
+        for (const p of vdaResults) {
+          if (!existingEans.has(p.ean) && !allDiscovered.has(p.ean)) {
+            allDiscovered.set(p.ean, p); vdaCount++;
+          }
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
     }
 
-    // Search Kassalapp with longer delays
+    // Search Kassalapp
     for (const term of DISCOVERY_TERMS) {
       const kassalResults = await searchKassalapp(term);
       for (const p of kassalResults) {
@@ -201,16 +210,19 @@ Deno.serve(async (req) => {
           allDiscovered.set(p.ean, p);
           kassalCount++;
         } else if (!existingEans.has(p.ean) && allDiscovered.has(p.ean)) {
-          // Merge: prefer EPD ingredients but Kassalapp images
           const existing = allDiscovered.get(p.ean)!;
           if (!existing.image_url && p.image_url) existing.image_url = p.image_url;
           if (!existing.ingredients_raw && p.ingredients_raw) existing.ingredients_raw = p.ingredients_raw;
         }
       }
-      await new Promise(r => setTimeout(r, 1500)); // Kassalapp rate limit
+      await new Promise(r => setTimeout(r, 1000));
     }
 
     console.log(`Discovered ${allDiscovered.size} new products (VDA+: ${vdaCount}, Kassalapp: ${kassalCount})`);
+
+    // Fetch chains once for universal offers
+    const { data: chains } = await supabase.from("chains").select("id");
+    const chainIds = (chains || []).map((c: any) => c.id);
 
     // Classify and store NOVA 1-2 products
     let nova1Count = 0;
@@ -224,7 +236,6 @@ Deno.serve(async (req) => {
       });
 
       if (result.nova_group === 1 || result.nova_group === 2) {
-        // Upsert into products table
         const { error: productError } = await supabase
           .from("products")
           .upsert({
@@ -257,11 +268,10 @@ Deno.serve(async (req) => {
         }, { onConflict: "ean,source", ignoreDuplicates: false });
 
         // Create universal offers for all chains
-        const { data: chains } = await supabase.from("chains").select("id");
-        if (chains && chains.length > 0) {
-          const offerRows = chains.map((c: any) => ({
+        if (chainIds.length > 0) {
+          const offerRows = chainIds.map((chainId: string) => ({
             ean,
-            chain_id: c.id,
+            chain_id: chainId,
             source: "DISCOVERY",
             last_seen_at: new Date().toISOString(),
           }));
