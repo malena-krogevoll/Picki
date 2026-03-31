@@ -9,7 +9,7 @@ import { getStoreName } from "@/components/StoreSelectorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useShoppingList } from "@/hooks/useShoppingList";
-import { ShoppingCart, Clock, Copy, ChevronRight, Package, BookOpen, Trash2, Plus, UserCog, X, ChefHat } from "lucide-react";
+import { ShoppingCart, Clock, Copy, ChevronRight, Package, BookOpen, Trash2, Plus, UserCog, X, ChefHat, Leaf } from "lucide-react";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
