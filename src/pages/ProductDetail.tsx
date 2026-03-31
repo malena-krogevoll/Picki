@@ -119,15 +119,24 @@ export default function ProductDetail() {
 
   const handleToggleFavorite = async () => {
     if (!ean || !product) return;
-    const success = await toggleFavorite({
+    const result = await toggleFavorite({
       ean,
       productName: `${product.brand || ''} ${product.name || ''}`.trim(),
       brand: product.brand,
       imageUrl: product.image,
       listItemName: listItemName || undefined,
     });
-    if (success) {
-      toast(isFav ? "Fjernet fra favoritter" : "Lagt til som favoritt ❤️");
+    if (result.success) {
+      if (result.action === 'removed') {
+        toast("Fjernet fra favoritter");
+      } else if (result.wasFirstFavorite) {
+        toast("Lagt til som favoritt ❤️", {
+          description: "Neste gang du handler denne varen, vil dette produktet automatisk vises som førstevalg – uansett butikk.",
+          duration: 6000,
+        });
+      } else {
+        toast("Lagt til som favoritt ❤️");
+      }
     }
   };
 
