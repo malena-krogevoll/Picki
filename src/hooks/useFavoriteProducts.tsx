@@ -79,8 +79,8 @@ export const useFavoriteProducts = (userId: string | undefined) => {
       brand?: string;
       imageUrl?: string;
       listItemName?: string;
-    }) => {
-      if (!userId) return;
+    }): Promise<{ success: boolean; action: 'added' | 'removed'; wasFirstFavorite: boolean }> => {
+      if (!userId) return { success: false, action: 'removed', wasFirstFavorite: false };
 
       const existing = favorites.find(f => f.ean === params.ean);
       if (existing) {
