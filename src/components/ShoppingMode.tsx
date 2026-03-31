@@ -1200,11 +1200,15 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                {selectedProduct.hasIngredients && selectedProduct.novaScore !== null && selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
-                                {!selectedProduct.hasIngredients && <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                                <span className="text-xs font-medium text-muted-foreground truncate">
-                                  {getNovaLabel(selectedProduct.novaScore, selectedProduct.hasIngredients)}
-                                </span>
+                                {isFavoriteEan(selectedProduct.ean) && <Heart className="h-3.5 w-3.5 fill-red-500 text-red-500 flex-shrink-0" />}
+                                {isFavoriteEan(selectedProduct.ean) && <span className="text-xs font-medium text-red-500">Din favoritt</span>}
+                                {!isFavoriteEan(selectedProduct.ean) && selectedProduct.hasIngredients && selectedProduct.novaScore !== null && selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
+                                {!isFavoriteEan(selectedProduct.ean) && !selectedProduct.hasIngredients && <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                                {!isFavoriteEan(selectedProduct.ean) && (
+                                  <span className="text-xs font-medium text-muted-foreground truncate">
+                                    {getNovaLabel(selectedProduct.novaScore, selectedProduct.hasIngredients)}
+                                  </span>
+                                )}
                               </div>
                               <p className="font-semibold text-foreground mb-1 truncate">
                                 {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <CountryFlag alpha2={c.alpha2} name={c.name} size="sm" className="mr-1" /> : null; })()}
