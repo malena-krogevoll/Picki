@@ -1,77 +1,95 @@
 
 
-## Favoritt-produkter
+## Utforsk renvarer
 
-### Konsept
-Brukeren kan markere et produkt som favoritt fra produktdetaljer-siden. Når en vare som matcher favoritten legges i handlelisten (f.eks. "tomatsaus"), blir favorittproduktet alltid vist som førstevalg -- uavhengig av Picki sin rangering. Alternativene er fortsatt tilgjengelige under.
+En ny seksjon der brukere kan bla gjennom, søke og oppdage renvare-produkter (NOVA 1-2) kategorisert etter type, med butikktilgjengelighet tydelig vist.
 
-### Databaseendringer
+### Ny side: `/explore`
 
-**Ny tabell: `user_favorite_products`**
-```sql
-create table public.user_favorite_products (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  ean text not null,
-  product_name text not null,
-  brand text,
-  image_url text,
-  search_terms text[] not null default '{}',
-  created_at timestamptz not null default now(),
-  unique (user_id, ean)
-);
-alter table public.user_favorite_products enable row level security;
--- RLS: brukere kan bare se/endre sine egne favoritter
-```
+**Rute**: `src/pages/Explore.tsx`
 
-`search_terms` er nøkkelen: når brukeren favorittmarkerer "Mutti Polpa Finknust Tomat", lagres automatisk avledede søketermer som `['tomatsaus', 'tomat', 'polpa']` basert på produktnavn + den opprinnelige handleliste-varen. Dette gjør at systemet vet hvilke handleliste-oppføringer som skal matche favoritten.
+Hovedstruktur:
+1. **Søkefelt** øverst for fri-tekst filtrering
+2. **Butikkfilter** (valgfritt) -- dropdown/chips med butikkjeder fra `StoreSelectorDialog`-listen
+3. **Kategorivisning** -- grid med kategorikort som barnemat, ferdigmat, pålegg, meieri, frukt og grønt etc.
+4. **Produktliste** -- når en kategori er valgt, vises produkter med bilde, navn, merke, NOVA-badge, og butikkjede-badges
+
+### Datahenting
+
+Ny edge function `browse-clean-products`:
+- Henter fra `products`-tabellen filtrert på `nova_class <= 2`
+- Joiner med `offers` + `chains` for butikktilgjengelighet
+- Støtter kategori-filter (basert på nøkkelord-matching fra `storeLayoutSort.ts`-logikken) og butikk-filter
+- Støtter søketekst-filter
+- Paginering (20 produkter per side)
+
+### Produktkort i listen
+
+Hvert kort viser:
+- Produktbilde (fra `products.image_url`)
+- Merke + produktnavn
+- NOVA-badge (1 eller 2)
+- Butikkjede-ikoner/badges (fra `offers` → `chains`)
+- Favoritt-hjerte (gjenbruker `useFavoriteProducts`)
+- "Legg til i handleliste"-knapp
+
+### Handleliste-integrasjon
+
+Når brukeren trykker "Legg til", vises en enkel dialog:
+- Velg hvilken aktiv handleliste (eller opprett ny)
+- Varen legges til med produktnavn som `name`
+
+Gjenbruker `useShoppingList.addItem()`.
+
+### Kategorier
+
+Definert som en statisk liste med emoji + norsk navn, bruker utvidede nøkkelord for å matche produkter:
+- 🍎 Frukt og grønt
+- 🥛 Meieri
+- 🧀 Pålegg
+- 🥩 Kjøtt og ferskvare
+- 🐟 Fisk og sjømat
+- 🍼 Barnemat
+- 🍽️ Ferdigmat
+- 🥫 Hermetikk
+- 🍝 Pasta, ris og korn
+- 🧂 Sauser og krydder
+- 🥤 Drikkevarer
+
+### Navigasjon
+
+- Ny knapp på Dashboard i grid-en ved siden av "Min kokebok" og "Oppskrifter"
+- Ikon: `Leaf` (renvare-konsept)
+- Tekst: "Utforsk renvarer"
 
 ### Endringer per fil
 
-**1. `src/pages/ProductDetail.tsx`**
-- Ny favorittknapp (hjerte-ikon, allerede importert som `Heart`) i produkt-headeren
-- Hook for å sjekke/toggle favoritt-status mot `user_favorite_products`
-- Når man favorittmarkerer: lagrer EAN, produktnavn, merke, bilde, og utleder `search_terms` fra produktnavn (splitter på ord, fjerner støy)
+| Fil | Endring |
+|-----|---------|
+| `supabase/functions/browse-clean-products/index.ts` | Ny edge function: henter NOVA ≤ 2 produkter med butikk-join, kategori/butikk/søk-filter, paginering |
+| `src/pages/Explore.tsx` | Ny side med kategorivisning, søk, butikkfilter, produktliste med favoritt + legg-til-liste |
+| `src/App.tsx` | Ny rute `/explore` |
+| `src/pages/Dashboard.tsx` | Ny knapp i grid: "Utforsk renvarer" → `/explore` |
 
-**2. Ny hook: `src/hooks/useFavoriteProducts.tsx`**
-- `getFavoriteForQuery(query: string)` -- sjekker om en handleliste-vare matcher en favoritt via `search_terms`
-- `toggleFavorite(ean, productName, brand, imageUrl, searchTerms)` -- legger til/fjerner favoritt
-- `isFavorite(ean)` -- sjekker om et produkt er favoritt
-- Cacher favoritter i minnet for rask tilgang
+### Tekniske detaljer
 
-**3. `src/components/ShoppingMode.tsx`**
-- Etter at produktsøk er fullført for en vare, sjekker om brukeren har en favoritt som matcher vare-navnet
-- Hvis ja: finn favorittproduktet i søkeresultatene (match på EAN) og flytt det til index 0
-- Hvis favoritten ikke finnes i søkeresultatene (f.eks. utsolgt i denne butikken), vis en melding om at favoritten ikke er tilgjengelig
-- Vis et lite hjerte-ikon på favoritt-produktet i listen
-
-**4. `src/hooks/useFrequentItems.ts`**
-- Favoritter kan vektes opp i forslag-algoritmen: produkter som er favorittmarkert gir et signal om at brukeren handler denne typen vare ofte
-
-### Brukerflyt
-
-```text
-Produktdetaljer (ProductDetail)
-  ├─ [♡] Favorittknapp i header → toggle favoritt
-  └─ Toast: "Lagt til som favoritt for 'tomatsaus'"
-
-Handlemodus (ShoppingMode)
-  ├─ Bruker har "tomatsaus" i listen
-  ├─ Søk returnerer 5 produkter, Mutti Polpa er #3
-  ├─ System: Mutti Polpa er favoritt → flyttes til #1
-  ├─ Vises med ♥-ikon og "Din favoritt" badge
-  └─ Alternativer fortsatt tilgjengelige under
+**Edge function SQL-logikk:**
+```sql
+SELECT p.ean, p.name, p.brand, p.image_url, p.nova_class,
+       array_agg(DISTINCT c.name) as chains
+FROM products p
+JOIN offers o ON o.ean = p.ean
+JOIN chains c ON c.id = o.chain_id
+WHERE p.nova_class <= 2
+  AND p.name IS NOT NULL
+  -- optional: AND c.name = $storeFilter
+  -- optional: AND p.name ILIKE '%search%'
+GROUP BY p.ean, p.name, p.brand, p.image_url, p.nova_class
+ORDER BY p.nova_class ASC, p.name ASC
+LIMIT 20 OFFSET $offset
 ```
 
-### Matching-logikk for søketermer
+**Legg-til-liste dialog:** Enkel `AlertDialog` med liste over aktive handlelister + "Ny liste"-knapp. Bruker `useShoppingList` for å legge til varen.
 
-Når et produkt favorittmarkeres, utledes søketermer automatisk:
-- Produktnavn tokeniseres: "Mutti Polpa Finknust Tomat" → `['mutti', 'polpa', 'tomat', 'tomatsaus']`
-- Handleliste-kontekst legges til hvis tilgjengelig (f.eks. varen het "tomatsaus")
-- Ved søk i ShoppingMode: hvis vare-navnet (f.eks. "tomatsaus") overlapper med en favoritts `search_terms`, promoteres favoritten
-
-### Begrensninger
-- Favoritter gjelder per bruker og er butikk-uavhengige (EAN-basert)
-- Hvis favorittproduktet ikke finnes i butikken, vises vanlig rangering + info-melding
-- Maks 50 favoritter per bruker (UX-begrensning, ikke teknisk)
+**Favoritt:** Gjenbruker `useFavoriteProducts.toggleFavorite()` direkte på hvert produktkort.
 
