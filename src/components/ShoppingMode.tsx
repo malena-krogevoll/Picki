@@ -204,6 +204,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
   const { lists, updateItemStatus, completeList, cacheItemProducts, updateCachedSelectedIndex, addItem, removeItem } = useShoppingList(user?.id);
   const { profile } = useProfile(user?.id);
   const { findDiyAlternative } = useDiyAlternatives();
+  const { getFavoriteForQuery, isFavorite: isFavoriteEan } = useFavoriteProducts(user?.id);
   
   const [showStoreDialog, setShowStoreDialog] = useState(false);
   const [diyDialogOpen, setDiyDialogOpen] = useState(false);
