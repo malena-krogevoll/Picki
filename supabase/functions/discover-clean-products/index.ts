@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
           if (!existing.ingredients_raw && p.ingredients_raw) existing.ingredients_raw = p.ingredients_raw;
         }
       }
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 500));
     }
 
     console.log(`Discovered ${allDiscovered.size} new products (VDA+: ${vdaCount}, Kassalapp: ${kassalCount})`);
