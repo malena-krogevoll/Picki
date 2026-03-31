@@ -115,6 +115,7 @@ export default function ProductDetail() {
     novaScore: number | null;
   }>>([]);
   const [swapping, setSwapping] = useState(false);
+  const [showFirstFavoriteDialog, setShowFirstFavoriteDialog] = useState(false);
   const listItemName = searchParams.get('itemName');
   const isFav = ean ? isFavorite(ean) : false;
 
