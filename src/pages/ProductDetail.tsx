@@ -818,6 +818,20 @@ export default function ProductDetail() {
           </Card>
         )}
       </div>
+
+      <AlertDialog open={showFirstFavoriteDialog} onOpenChange={setShowFirstFavoriteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Favoritt lagt til ❤️</AlertDialogTitle>
+            <AlertDialogDescription>
+              Neste gang du handler denne varen, vil dette produktet automatisk vises som førstevalg i butikker der det er tilgjengelig.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowFirstFavoriteDialog(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
