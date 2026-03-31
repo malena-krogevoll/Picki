@@ -300,7 +300,7 @@ const Explore = () => {
                             )}
                           </div>
                           <Badge
-                            className="flex-shrink-0 bg-green-100 text-green-800 border-green-200 text-xs"
+                            className="flex-shrink-0 bg-primary/10 text-primary border-primary/20 text-xs"
                           >
                             NOVA {product.nova_class}
                           </Badge>
