@@ -29,7 +29,7 @@ interface CleanProduct {
   name: string;
   brand: string | null;
   image_url: string | null;
-  nova_class: number;
+  nova_class: number | null;
   chains: string[];
 }
 
