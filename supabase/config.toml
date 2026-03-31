@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.seed-kolonihagen]
 verify_jwt = false
+
+[functions.discover-clean-products]
+verify_jwt = false

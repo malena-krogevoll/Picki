@@ -299,7 +299,7 @@ const Explore = () => {
                               </p>
                             )}
                           </div>
-                          {product.nova_class && product.nova_class <= 2 && (
+                          {product.nova_class && (
                             <Badge
                               className="flex-shrink-0 bg-primary/10 text-primary border-primary/20 text-xs"
                             >
