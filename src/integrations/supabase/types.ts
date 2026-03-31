@@ -475,6 +475,39 @@ export type Database = {
           },
         ]
       }
+      user_favorite_products: {
+        Row: {
+          brand: string | null
+          created_at: string
+          ean: string
+          id: string
+          image_url: string | null
+          product_name: string
+          search_terms: string[]
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          ean: string
+          id?: string
+          image_url?: string | null
+          product_name: string
+          search_terms?: string[]
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          ean?: string
+          id?: string
+          image_url?: string | null
+          product_name?: string
+          search_terms?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_favorite_recipes: {
         Row: {
           created_at: string

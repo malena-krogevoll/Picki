@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Heart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Leaf, AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Package, HelpCircle, Home, Pencil, Store, ChefHat, List, LayoutList } from "lucide-react";
+import { useFavoriteProducts } from "@/hooks/useFavoriteProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useProfile } from "@/hooks/useProfile";
@@ -202,6 +204,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
   const { lists, updateItemStatus, completeList, cacheItemProducts, updateCachedSelectedIndex, addItem, removeItem } = useShoppingList(user?.id);
   const { profile } = useProfile(user?.id);
   const { findDiyAlternative } = useDiyAlternatives();
+  const { getFavoriteForQuery, isFavorite: isFavoriteEan } = useFavoriteProducts(user?.id);
   
   const [showStoreDialog, setShowStoreDialog] = useState(false);
   const [diyDialogOpen, setDiyDialogOpen] = useState(false);
@@ -479,9 +482,19 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                 profile?.preferences as UserPreferences | null
               );
               
-              cacheItemProducts(item.id, storeId, sortedProducts);
+              // Promote favorite product to top if matched
+              const favorite = getFavoriteForQuery(item.name);
+              let finalProducts = sortedProducts;
+              if (favorite) {
+                const favIdx = sortedProducts.findIndex(p => p.ean === favorite.ean);
+                if (favIdx > 0) {
+                  finalProducts = [sortedProducts[favIdx], ...sortedProducts.filter((_, i) => i !== favIdx)];
+                }
+              }
+              
+              cacheItemProducts(item.id, storeId, finalProducts);
               fetchedItemsRef.current.add(item.id);
-              return { itemId: item.id, products: sortedProducts };
+              return { itemId: item.id, products: finalProducts };
             } else {
               // Don't mark as fetched — empty results may be due to temporary API failure
               // so the item should be retried on next visit
@@ -1032,7 +1045,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                       {selectedProduct ? (
                         <div
                           className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
-                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}&itemId=${item.id}`)}
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}&itemId=${item.id}&itemName=${encodeURIComponent(item.name)}`)}
                         >
                           <div className="bg-white rounded-lg border border-border p-0.5 flex-shrink-0">
                             <img
@@ -1163,7 +1176,7 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                         )}
 
                         <div
-                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}&itemId=${item.id}`)}
+                          onClick={() => navigate(`/product/${selectedProduct.ean}?listId=${listId}&storeId=${storeId}&itemId=${item.id}&itemName=${encodeURIComponent(item.name)}`)}
                           data-has-ingredients={String(selectedProduct.hasIngredients)}
                           data-nova-score={String(selectedProduct.novaScore)}
                           data-nova-estimated={String(selectedProduct.novaIsEstimated)}
@@ -1187,11 +1200,15 @@ export const ShoppingMode = ({ storeId, listId, onEditList, onChangeStore }: Sho
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                {selectedProduct.hasIngredients && selectedProduct.novaScore !== null && selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
-                                {!selectedProduct.hasIngredients && <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                                <span className="text-xs font-medium text-muted-foreground truncate">
-                                  {getNovaLabel(selectedProduct.novaScore, selectedProduct.hasIngredients)}
-                                </span>
+                                {isFavoriteEan(selectedProduct.ean) && <Heart className="h-3.5 w-3.5 fill-red-500 text-red-500 flex-shrink-0" />}
+                                {isFavoriteEan(selectedProduct.ean) && <span className="text-xs font-medium text-red-500">Din favoritt</span>}
+                                {!isFavoriteEan(selectedProduct.ean) && selectedProduct.hasIngredients && selectedProduct.novaScore !== null && selectedProduct.novaScore <= 2 && <Leaf className="h-4 w-4 text-primary flex-shrink-0" />}
+                                {!isFavoriteEan(selectedProduct.ean) && !selectedProduct.hasIngredients && <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                                {!isFavoriteEan(selectedProduct.ean) && (
+                                  <span className="text-xs font-medium text-muted-foreground truncate">
+                                    {getNovaLabel(selectedProduct.novaScore, selectedProduct.hasIngredients)}
+                                  </span>
+                                )}
                               </div>
                               <p className="font-semibold text-foreground mb-1 truncate">
                                 {(() => { const c = getCountryFromEAN(selectedProduct.ean); return c ? <CountryFlag alpha2={c.alpha2} name={c.name} size="sm" className="mr-1" /> : null; })()}

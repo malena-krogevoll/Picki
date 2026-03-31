@@ -10,6 +10,7 @@ import { extractCountryOfOrigin, CountryInfo, getCountryFromEAN } from "@/utils/
 import { CountryFlag } from "@/components/CountryFlag";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { useFavoriteProducts } from "@/hooks/useFavoriteProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -95,6 +96,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
+  const { isFavorite, toggleFavorite } = useFavoriteProducts(user?.id);
   const searchParams = new URLSearchParams(window.location.search);
   const listId = searchParams.get('listId');
   const storeId = searchParams.get('storeId');
@@ -112,6 +114,22 @@ export default function ProductDetail() {
     novaScore: number | null;
   }>>([]);
   const [swapping, setSwapping] = useState(false);
+  const listItemName = searchParams.get('itemName');
+  const isFav = ean ? isFavorite(ean) : false;
+
+  const handleToggleFavorite = async () => {
+    if (!ean || !product) return;
+    const success = await toggleFavorite({
+      ean,
+      productName: `${product.brand || ''} ${product.name || ''}`.trim(),
+      brand: product.brand,
+      imageUrl: product.image,
+      listItemName: listItemName || undefined,
+    });
+    if (success) {
+      toast(isFav ? "Fjernet fra favoritter" : "Lagt til som favoritt ❤️");
+    }
+  };
 
   // Convert profile preferences to UserPreferences format
   const userPreferences: UserPreferences | null = profile?.preferences ? {
@@ -397,14 +415,25 @@ export default function ProductDetail() {
                 />
               </div>
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-foreground mb-2">
-                  {product.brand}
-                  {countryOfOrigin.length > 0 && (
-                    <span className="ml-2 inline-flex gap-1 align-middle">
-                      {countryOfOrigin.map((c, i) => <CountryFlag key={i} alpha2={c.alpha2} name={c.name} size="md" />)}
-                    </span>
-                  )}
-                </h1>
+                <div className="flex items-start justify-between gap-2">
+                  <h1 className="text-3xl font-bold text-foreground mb-2">
+                    {product.brand}
+                    {countryOfOrigin.length > 0 && (
+                      <span className="ml-2 inline-flex gap-1 align-middle">
+                        {countryOfOrigin.map((c, i) => <CountryFlag key={i} alpha2={c.alpha2} name={c.name} size="md" />)}
+                      </span>
+                    )}
+                  </h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleToggleFavorite}
+                    className="rounded-full h-10 w-10 flex-shrink-0"
+                    title={isFav ? "Fjern fra favoritter" : "Legg til som favoritt"}
+                  >
+                    <Heart className={`h-5 w-5 transition-colors ${isFav ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+                  </Button>
+                </div>
                 <p className="text-lg text-muted-foreground mb-4">{product.name}</p>
                 <div className="flex items-center gap-4">
                   <p className="text-2xl font-bold text-primary">
