@@ -63,24 +63,13 @@ async function vdaFetch(url: string, token: string): Promise<Response> {
 
 // ---- Broad search terms for product discovery ----
 const DISCOVERY_TERMS = [
-  // Basics
-  "melk", "smør", "ost", "egg", "yoghurt", "fløte", "rømme",
-  // Meat & fish
-  "kylling", "kjøttdeig", "laks", "torsk", "sei", "svin", "biff", "reker",
-  // Produce
-  "eple", "banan", "tomat", "agurk", "gulrot", "potet", "løk", "paprika", "avokado", "brokkoli",
-  // Grains
-  "ris", "pasta", "havregryn", "mel", "brød", "knekkebrød",
-  // Pantry
-  "olje", "eddik", "salt", "sukker", "honning", "nøtter", "mandler", "linser", "kikerter", "bønner",
-  // Dairy alternatives
-  "havredrikk", "soyamelk",
-  // Baby/kids
-  "barnemat", "grøt", "velling",
-  // Drinks
-  "juice", "kaffe", "te", "vann",
-  // Misc
-  "leverpostei", "kaviar", "syltetøy", "pesto", "tomatsaus",
+  "melk", "smør", "ost", "egg", "yoghurt",
+  "kylling", "kjøttdeig", "laks", "torsk",
+  "eple", "banan", "tomat", "gulrot", "potet",
+  "ris", "pasta", "havregryn", "brød",
+  "olje", "honning", "nøtter", "linser", "bønner",
+  "juice", "kaffe",
+  "barnemat", "grøt",
 ];
 
 interface DiscoveredProduct {
