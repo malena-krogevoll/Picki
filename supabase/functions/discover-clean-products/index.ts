@@ -244,9 +244,26 @@ Deno.serve(async (req) => {
 
     console.log(`Discovered ${allDiscovered.size} new products (VDA+: ${vdaCount}, Kassalapp: ${kassalCount})`);
 
-    // Fetch chains once for universal offers
-    const { data: chains } = await supabase.from("chains").select("id");
-    const chainIds = (chains || []).map((c: any) => c.id);
+    // Fetch chains for mapping store names to chain IDs
+    const { data: chains } = await supabase.from("chains").select("id, name");
+    const chainList = chains || [];
+
+    // Helper: find chain ID by store name (fuzzy match)
+    function findChainId(storeName: string): string | null {
+      const lower = storeName.toLowerCase();
+      for (const c of chainList) {
+        if (lower.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(lower)) {
+          return c.id;
+        }
+      }
+      // Common mappings
+      if (lower.includes("kiwi")) return chainList.find((c: any) => c.name.toLowerCase().includes("kiwi"))?.id || null;
+      if (lower.includes("rema")) return chainList.find((c: any) => c.name.toLowerCase().includes("rema"))?.id || null;
+      if (lower.includes("meny")) return chainList.find((c: any) => c.name.toLowerCase().includes("meny"))?.id || null;
+      if (lower.includes("spar") || lower.includes("eurospar")) return chainList.find((c: any) => c.name.toLowerCase().includes("spar"))?.id || null;
+      if (lower.includes("coop") || lower.includes("extra") || lower.includes("obs") || lower.includes("prix") || lower.includes("mega")) return chainList.find((c: any) => c.name.toLowerCase().includes("coop"))?.id || null;
+      return null;
+    }
 
     // Classify and store NOVA 1-2 products
     let nova1Count = 0;
@@ -291,18 +308,28 @@ Deno.serve(async (req) => {
           fetched_at: new Date().toISOString(),
         }, { onConflict: "ean,source", ignoreDuplicates: false });
 
-        // Create universal offers for all chains
-        if (chainIds.length > 0) {
-          const offerRows = chainIds.map((chainId: string) => ({
-            ean,
-            chain_id: chainId,
-            source: "DISCOVERY",
-            last_seen_at: new Date().toISOString(),
-          }));
-          await supabase.from("offers").upsert(offerRows, {
-            onConflict: "ean,chain_id",
-            ignoreDuplicates: true,
-          });
+        // Create offers only for chains where product was actually found
+        if (product.storeNames.length > 0) {
+          const offerRows: { ean: string; chain_id: string; source: string; last_seen_at: string }[] = [];
+          const seenChainIds = new Set<string>();
+          for (const storeName of product.storeNames) {
+            const chainId = findChainId(storeName);
+            if (chainId && !seenChainIds.has(chainId)) {
+              seenChainIds.add(chainId);
+              offerRows.push({
+                ean,
+                chain_id: chainId,
+                source: "DISCOVERY",
+                last_seen_at: new Date().toISOString(),
+              });
+            }
+          }
+          if (offerRows.length > 0) {
+            await supabase.from("offers").upsert(offerRows, {
+              onConflict: "ean,chain_id",
+              ignoreDuplicates: true,
+            });
+          }
         }
 
         if (result.nova_group === 1) nova1Count++;
