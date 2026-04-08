@@ -96,6 +96,8 @@ interface DiscoveredProduct {
   ingredients_raw: string | null;
   image_url: string | null;
   source: "EPD" | "KASSALAPP";
+  /** Store names where this product was found (from Kassalapp) */
+  storeNames: string[];
 }
 
 // ---- VDA+ search ----
