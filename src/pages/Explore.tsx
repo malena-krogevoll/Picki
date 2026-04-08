@@ -34,7 +34,6 @@ interface CleanProduct {
 }
 
 const categories = [
-  { id: "frukt-gront", emoji: "🍎", name: "Frukt og grønt" },
   { id: "meieri", emoji: "🥛", name: "Meieri" },
   { id: "palegg", emoji: "🧀", name: "Pålegg" },
   { id: "kjott", emoji: "🥩", name: "Kjøtt og ferskvare" },
