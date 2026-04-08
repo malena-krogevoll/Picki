@@ -233,6 +233,10 @@ Deno.serve(async (req) => {
           const existing = allDiscovered.get(p.ean)!;
           if (!existing.image_url && p.image_url) existing.image_url = p.image_url;
           if (!existing.ingredients_raw && p.ingredients_raw) existing.ingredients_raw = p.ingredients_raw;
+          // Merge store names
+          for (const s of p.storeNames) {
+            if (!existing.storeNames.includes(s)) existing.storeNames.push(s);
+          }
         }
       }
       await new Promise(r => setTimeout(r, 500));
