@@ -143,14 +143,25 @@ async function searchKassalapp(query: string): Promise<DiscoveredProduct[]> {
     if (!res.ok) { await res.text(); return []; }
     const data = await res.json();
     const products = data.data || [];
-    return products.map((p: any) => ({
-      ean: p.ean || "",
-      name: p.name || "",
-      brand: p.brand || null,
-      ingredients_raw: p.ingredients || null,
-      image_url: p.image || null,
-      source: "KASSALAPP" as const,
-    })).filter((p: DiscoveredProduct) => p.ean && p.name);
+    return products.map((p: any) => {
+      // Extract store names from Kassalapp's store array
+      const stores: string[] = [];
+      if (Array.isArray(p.store)) {
+        for (const s of p.store) {
+          const storeName = s.name || s.group?.name || "";
+          if (storeName && !stores.includes(storeName)) stores.push(storeName);
+        }
+      }
+      return {
+        ean: p.ean || "",
+        name: p.name || "",
+        brand: p.brand || null,
+        ingredients_raw: p.ingredients || null,
+        image_url: p.image || null,
+        source: "KASSALAPP" as const,
+        storeNames: stores,
+      };
+    }).filter((p: DiscoveredProduct) => p.ean && p.name);
   } catch (e) {
     console.warn(`Kassalapp search error for "${query}":`, e);
     return [];
