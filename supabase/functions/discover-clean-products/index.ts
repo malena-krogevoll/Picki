@@ -117,6 +117,7 @@ async function searchVda(query: string): Promise<DiscoveredProduct[]> {
       ingredients_raw: p.ingredientStatement || null,
       image_url: null,
       source: "EPD" as const,
+      storeNames: [],
     })).filter((p: DiscoveredProduct) => p.ean && p.name);
   } catch (e) {
     console.warn(`VDA+ search error for "${query}":`, e);
