@@ -63,13 +63,30 @@ async function vdaFetch(url: string, token: string): Promise<Response> {
 
 // ---- Broad search terms for product discovery ----
 const DISCOVERY_TERMS = [
-  "melk", "smør", "ost", "egg", "yoghurt",
-  "kylling", "kjøttdeig", "laks", "torsk",
-  "eple", "banan", "tomat", "gulrot", "potet",
-  "ris", "pasta", "havregryn", "brød",
-  "olje", "honning", "nøtter", "linser", "bønner",
-  "juice", "kaffe",
-  "barnemat", "grøt",
+  // Meieri
+  "melk", "smør", "ost", "egg", "yoghurt", "rømme", "fløte", "kremost",
+  // Kjøtt & fisk
+  "kylling", "kjøttdeig", "laks", "torsk", "svinekjøtt", "biff", "karbonadedeig",
+  // Frukt & grønt
+  "eple", "banan", "tomat", "gulrot", "potet", "brokkoli", "løk", "paprika",
+  // Tørrvarer
+  "ris", "pasta", "havregryn", "brød", "knekkebrød", "mel", "couscous", "bulgur",
+  // Pålegg
+  "leverpostei", "syltetøy", "honning", "hvitost", "brunost", "smøreost",
+  "peanøttsmør", "hummus", "makrell i tomat", "kaviar", "skinke pålegg",
+  "røkelaks", "spekeskinke", "salami",
+  // Sauser & krydder
+  "olje", "eddik", "sennep", "ketchup", "pesto", "tomatpuré",
+  // Hermetikk & belgfrukter
+  "linser", "bønner", "kikerter", "hermetiske tomater", "mais",
+  // Nøtter & frø
+  "nøtter", "mandler", "solsikkefrø", "gresskarfrø",
+  // Drikkevarer
+  "juice", "kaffe", "te",
+  // Barnemat
+  "barnemat", "barnegrøt",
+  // Fisk & sjømat
+  "reker", "sei", "makrell", "ørret", "tunfisk",
 ];
 
 interface DiscoveredProduct {
