@@ -31,23 +31,25 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: 'Du er en ekspert på norske matvarer. Din jobb er å foreslå VARIANTER eller TYPER av samme produkt. IKKE foreslå produkter som brukes sammen med varen. Svar BARE med en kommaseparert liste, ingen annen tekst.' },
-          { role: 'user', content: `Bruker skriver: "${query}". Gi 3-5 spesifikke VARIANTER eller TYPER av dette produktet UTEN merkenavn.
+          { role: 'system', content: 'Du er en søkeoptimaliserer for en norsk matdatabase. Din jobb er å foreslå korte, generiske søkeord (1-2 ord maks) som gir best treff i en produktdatabase. IKKE bruk adjektiver som "fersk", "stor", "med urter". IKKE bruk merkenavn. Svar BARE med en kommaseparert liste, ingen annen tekst.' },
+          { role: 'user', content: `Bruker skriver: "${query}". Gi 3-5 korte søkeord (1-2 ord) for å finne denne typen produkt og relaterte kategorier i en dagligvaredatabase.
 
-VIKTIG: Foreslå kun varianter av SAMME produktkategori, IKKE produkter som spises sammen med det.
+REGLER:
+- Maks 1-2 ord per forslag
+- Første forslag skal være det mest presise baseordet
+- Inkluder relaterte produktkategorier som ligner
+- ALDRI adjektiver som "fersk", "stor", "med urter", "med mindre fett"
+- ALDRI merkenavn
 
-Eksempler på RIKTIG:
-- "melk" → helmelk, lettmelk, skummet melk, laktosefri melk
-- "kylling" → kyllingfilet, kyllingvinger, kyllinglår, hel kylling, strimlet kylling
-- "smør" → meierismør, lettsmør, usaltet smør, smør med salt
-- "ost" → gulost, brunost, hvitost, kremost, mozzarella
-- "brød" → grovbrød, loff, rundstykker, ciabatta, pitabrød
+Eksempler:
+- "cottage" → cottage cheese, kesam, kremost
+- "melk" → helmelk, lettmelk, havremelk, soyamelk
+- "kylling" → kyllingfilet, kyllinglår, kyllingbryst
+- "smør" → smør, lettsmør, margarin
+- "ost" → gulost, brunost, hvitost, kremost
+- "brød" → grovbrød, loff, rundstykker, ciabatta
 
-Eksempler på FEIL (ikke gjør dette):
-- "smør" → brød, vaffel, kjeks (dette er ting man bruker smør PÅ, ikke typer smør)
-- "ost" → brødskive, kjeks (dette er ting man spiser ost MED)
-
-Svar KUN med kommaseparerte varianter av "${query}", ingen annen tekst.` }
+Svar KUN med kommaseparerte søkeord for "${query}", ingen annen tekst.` }
         ],
       }),
     });
