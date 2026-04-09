@@ -168,24 +168,134 @@ async function searchKassalapp(query: string): Promise<DiscoveredProduct[]> {
   }
 }
 
+// Backfill mode: classify product_sources EANs missing from products table
+async function handleBackfill(supabase: any): Promise<Response> {
+  try {
+    // Step 1: Get all EANs already in products table
+    const existingEans = new Set<string>();
+    let offset = 0;
+    while (true) {
+      const { data } = await supabase.from("products").select("ean").range(offset, offset + 999);
+      if (!data || data.length === 0) break;
+      for (const p of data) existingEans.add(p.ean);
+      if (data.length < 1000) break;
+      offset += 1000;
+    }
+
+    // Step 2: Get product_sources EANs NOT in products, paginated
+    const eanMap = new Map<string, any>();
+    offset = 0;
+    while (eanMap.size < 500) { // Process 500 per invocation
+      const { data: sources } = await supabase
+        .from("product_sources")
+        .select("ean, name, brand, image_url, ingredients_raw")
+        .range(offset, offset + 999);
+      if (!sources || sources.length === 0) break;
+      for (const s of sources) {
+        if (s.ean && !existingEans.has(s.ean) && !eanMap.has(s.ean)) {
+          eanMap.set(s.ean, s);
+        }
+      }
+      if (sources.length < 1000) break;
+      offset += 1000;
+    }
+
+    const missingEans = Array.from(eanMap.keys());
+    console.log(`Backfill: ${missingEans.length} EANs missing from products (${existingEans.size} already exist)`);
+
+    if (missingEans.length === 0) {
+      return new Response(JSON.stringify({ message: "All products already classified", total: existingEans.size }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Classify all missing products and batch upsert
+    const productsToUpsert: any[] = [];
+    let nova1 = 0, nova2 = 0;
+
+    for (const ean of missingEans) {
+      const source = eanMap.get(ean)!;
+      const result = classifyNova({
+        ingredients_text: source.ingredients_raw || "",
+        product_name: source.name || "",
+      });
+
+      productsToUpsert.push({
+        ean,
+        name: source.name,
+        brand: source.brand,
+        image_url: source.image_url,
+        ingredients_raw: source.ingredients_raw,
+        nova_class: result.nova_group,
+        nova_confidence: result.confidence,
+        nova_reason: result.reasoning,
+      });
+
+      if (result.nova_group === 1) nova1++;
+      if (result.nova_group === 2) nova2++;
+    }
+
+    // Batch upsert in chunks of 100
+    let classified = 0;
+    for (let i = 0; i < productsToUpsert.length; i += 100) {
+      const chunk = productsToUpsert.slice(i, i + 100);
+      const { error } = await supabase.from("products").upsert(chunk, {
+        onConflict: "ean",
+        ignoreDuplicates: false,
+      });
+      if (error) {
+        console.error(`Batch upsert error at offset ${i}:`, error);
+      } else {
+        classified += chunk.length;
+      }
+    }
+
+    const summary = {
+      mode: "backfill",
+      total_in_sources: eanMap.size + existingEans.size,
+      already_in_products: existingEans.size,
+      newly_classified: classified,
+      nova_1: nova1,
+      nova_2: nova2,
+    };
+
+    console.log("Backfill complete:", summary);
+    return new Response(JSON.stringify(summary), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Backfill error:", error);
+    return new Response(JSON.stringify({ error: "Backfill failed" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Require service_role for this admin job
   const authHeader = req.headers.get("Authorization") || "";
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // Verify caller is using service_role key
   if (!authHeader.includes(serviceKey)) {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    // Allow if called via pg_cron (which uses anon key in the HTTP call)
-    // For security, we still use service role client internally
   }
 
   const supabase = createClient(supabaseUrl, serviceKey);
+
+  // Check for backfill mode
+  let mode = "discover";
+  try {
+    const body = await req.json();
+    if (body?.mode === "backfill") mode = "backfill";
+  } catch { /* no body = default discover mode */ }
+
+  if (mode === "backfill") {
+    return await handleBackfill(supabase);
+  }
 
   try {
     // Get existing EANs to skip
