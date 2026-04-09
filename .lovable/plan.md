@@ -1,95 +1,55 @@
 
 
-## Utforsk renvarer
+## Analyse: Hvorfor databasen ikke utnyttes fullt
 
-En ny seksjon der brukere kan bla gjennom, søke og oppdage renvare-produkter (NOVA 1-2) kategorisert etter type, med butikktilgjengelighet tydelig vist.
+### Problem 1: 2,703 produkter i `product_sources` finnes ikke i `products`-tabellen
+- `product_sources` har 3,593 unike EAN-er, men `products` bare 890
+- Søket bruker `product_sources` kun som **fallback** (linje 1019-1032), og bare når Kassalapp-API gir < 10 resultater
+- Hvis Kassalapp returnerer 10+ treff, søkes aldri i databasen — selv om bedre produkter finnes der
 
-### Ny side: `/explore`
+### Problem 2: Synonym-ekspansjon avbrytes for tidlig
+- Linje 966: Hvis første søk gir 10+ resultater, hoppes synonymer over (`"Sufficient results from first query, skipping synonyms"`)
+- Søk etter "kremost" returnerer kanskje generiske produkter fra Kassalapp, men Snøfrisk og Philadelphia (som finnes i DB) blir aldri sjekket
 
-**Rute**: `src/pages/Explore.tsx`
+### Problem 3: DB-fallback søker bare på `name/brand ILIKE`
+- Funksjonen `searchDatabaseFallback` (linje 340-447) søker kun i `product_sources` — aldri i `products`-tabellen
+- Den bruker ikke synonym-mappingen som allerede eksisterer (200+ oppføringer)
+- Begrenset til 30 resultater
 
-Hovedstruktur:
-1. **Søkefelt** øverst for fri-tekst filtrering
-2. **Butikkfilter** (valgfritt) -- dropdown/chips med butikkjeder fra `StoreSelectorDialog`-listen
-3. **Kategorivisning** -- grid med kategorikort som barnemat, ferdigmat, pålegg, meieri, frukt og grønt etc.
-4. **Produktliste** -- når en kategori er valgt, vises produkter med bilde, navn, merke, NOVA-badge, og butikkjede-badges
+### Problem 4: `product_sources` → `products` pipeline er ufullstendig
+- Produkter som caches til `product_sources` under søk blir ikke automatisk klassifisert (NOVA) og lagt inn i `products`
+- `recompute-master-product` kjøres kun for de 10 øverste resultatene som bakgrunnsoppgave
 
-### Datahenting
+---
 
-Ny edge function `browse-clean-products`:
-- Henter fra `products`-tabellen filtrert på `nova_class <= 2`
-- Joiner med `offers` + `chains` for butikktilgjengelighet
-- Støtter kategori-filter (basert på nøkkelord-matching fra `storeLayoutSort.ts`-logikken) og butikk-filter
-- Støtter søketekst-filter
-- Paginering (20 produkter per side)
+## Foreslått plan
 
-### Produktkort i listen
+### 1. Alltid søk i databasen — ikke bare som fallback
+Endre `search-products` til å kjøre Kassalapp-søk og DB-søk **parallelt**. Merge resultatene og dedupliser på EAN. Dette sikrer at produkter vi allerede kjenner til alltid vurderes.
 
-Hvert kort viser:
-- Produktbilde (fra `products.image_url`)
-- Merke + produktnavn
-- NOVA-badge (1 eller 2)
-- Butikkjede-ikoner/badges (fra `offers` → `chains`)
-- Favoritt-hjerte (gjenbruker `useFavoriteProducts`)
-- "Legg til i handleliste"-knapp
+### 2. Utvid DB-søket med synonym-mapping
+Gjenbruk `searchSynonyms`-mappingen i `searchDatabaseFallback`. Når brukeren søker "kremost", søk også etter "snøfrisk", "philadelphia", "buko" osv. i databasen.
 
-### Handleliste-integrasjon
+### 3. Søk i både `product_sources` OG `products`-tabellen
+DB-fallback ignorerer `products`-tabellen. Søk i begge og kombiner for bredere dekning.
 
-Når brukeren trykker "Legg til", vises en enkel dialog:
-- Velg hvilken aktiv handleliste (eller opprett ny)
-- Varen legges til med produktnavn som `name`
+### 4. Fjern "skip synonyms if 10+ results"-logikken
+La synonym-søk alltid kjøre (opp til 2 varianter som i dag), uavhengig av antall resultater fra første søk. Bruk heller deduplicering for å holde ytelsen.
 
-Gjenbruker `useShoppingList.addItem()`.
+### 5. Bulk-klassifiser ukjente produkter
+Kjør `recompute-master-product` for product_sources-EAN-er som mangler i products-tabellen. Dette er en engangsjobb som fyller inn de 2,703 manglende produktene.
 
-### Kategorier
+---
 
-Definert som en statisk liste med emoji + norsk navn, bruker utvidede nøkkelord for å matche produkter:
-- 🍎 Frukt og grønt
-- 🥛 Meieri
-- 🧀 Pålegg
-- 🥩 Kjøtt og ferskvare
-- 🐟 Fisk og sjømat
-- 🍼 Barnemat
-- 🍽️ Ferdigmat
-- 🥫 Hermetikk
-- 🍝 Pasta, ris og korn
-- 🧂 Sauser og krydder
-- 🥤 Drikkevarer
-
-### Navigasjon
-
-- Ny knapp på Dashboard i grid-en ved siden av "Min kokebok" og "Oppskrifter"
-- Ikon: `Leaf` (renvare-konsept)
-- Tekst: "Utforsk renvarer"
-
-### Endringer per fil
+### Tekniske endringer
 
 | Fil | Endring |
 |-----|---------|
-| `supabase/functions/browse-clean-products/index.ts` | Ny edge function: henter NOVA ≤ 2 produkter med butikk-join, kategori/butikk/søk-filter, paginering |
-| `src/pages/Explore.tsx` | Ny side med kategorivisning, søk, butikkfilter, produktliste med favoritt + legg-til-liste |
-| `src/App.tsx` | Ny rute `/explore` |
-| `src/pages/Dashboard.tsx` | Ny knapp i grid: "Utforsk renvarer" → `/explore` |
+| `supabase/functions/search-products/index.ts` | (1) Kjør DB-søk parallelt med Kassalapp, ikke som fallback. (2) Bruk synonym-mapping i DB-søk. (3) Søk i `products`-tabellen i tillegg til `product_sources`. (4) Fjern early-exit på 10+ resultater for synonymer. |
+| `supabase/functions/discover-clean-products/index.ts` | Legg til en "backfill"-modus som klassifiserer eksisterende `product_sources` som mangler i `products` |
 
-### Tekniske detaljer
-
-**Edge function SQL-logikk:**
-```sql
-SELECT p.ean, p.name, p.brand, p.image_url, p.nova_class,
-       array_agg(DISTINCT c.name) as chains
-FROM products p
-JOIN offers o ON o.ean = p.ean
-JOIN chains c ON c.id = o.chain_id
-WHERE p.nova_class <= 2
-  AND p.name IS NOT NULL
-  -- optional: AND c.name = $storeFilter
-  -- optional: AND p.name ILIKE '%search%'
-GROUP BY p.ean, p.name, p.brand, p.image_url, p.nova_class
-ORDER BY p.nova_class ASC, p.name ASC
-LIMIT 20 OFFSET $offset
-```
-
-**Legg-til-liste dialog:** Enkel `AlertDialog` med liste over aktive handlelister + "Ny liste"-knapp. Bruker `useShoppingList` for å legge til varen.
-
-**Favoritt:** Gjenbruker `useFavoriteProducts.toggleFavorite()` direkte på hvert produktkort.
+### Forventet effekt
+- Søk etter "kremost" vil alltid finne Snøfrisk, Philadelphia, Castello, Coop Kremost osv. fra DB — selv om Kassalapp-API returnerer nok generiske treff
+- Alle 3,593 kjente produkter blir søkbare, ikke bare de 890 som er klassifisert
+- Synonym-ekspansjon fungerer også mot lokal database
 
