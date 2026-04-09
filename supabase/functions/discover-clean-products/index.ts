@@ -168,7 +168,92 @@ async function searchKassalapp(query: string): Promise<DiscoveredProduct[]> {
   }
 }
 
-Deno.serve(async (req) => {
+// Backfill mode: classify product_sources EANs missing from products table
+async function handleBackfill(supabase: any): Promise<Response> {
+  try {
+    // Find EANs in product_sources that are NOT in products
+    const { data: allSources } = await supabase
+      .from("product_sources")
+      .select("ean, name, brand, image_url, ingredients_raw")
+      .order("fetched_at", { ascending: false })
+      .limit(1000);
+
+    if (!allSources || allSources.length === 0) {
+      return new Response(JSON.stringify({ message: "No product_sources found" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get unique EANs
+    const eanMap = new Map<string, typeof allSources[0]>();
+    for (const s of allSources) {
+      if (s.ean && !eanMap.has(s.ean)) eanMap.set(s.ean, s);
+    }
+
+    // Check which already exist in products
+    const allEans = Array.from(eanMap.keys());
+    const { data: existingProducts } = await supabase
+      .from("products")
+      .select("ean")
+      .in("ean", allEans);
+    const existingEans = new Set((existingProducts || []).map((p: any) => p.ean));
+
+    const missingEans = allEans.filter(e => !existingEans.has(e));
+    console.log(`Backfill: ${missingEans.length} EANs in product_sources missing from products (of ${allEans.length} total)`);
+
+    let classified = 0;
+    let nova1 = 0;
+    let nova2 = 0;
+
+    for (const ean of missingEans) {
+      const source = eanMap.get(ean)!;
+      const result = classifyNova({
+        ingredients_text: source.ingredients_raw || "",
+        product_name: source.name || "",
+      });
+
+      // Store ALL classified products (not just NOVA 1-2) so they don't get re-processed
+      const { error } = await supabase.from("products").upsert({
+        ean,
+        name: source.name,
+        brand: source.brand,
+        image_url: source.image_url,
+        ingredients_raw: source.ingredients_raw,
+        nova_class: result.nova_group,
+        nova_confidence: result.confidence,
+        nova_reason: result.reasoning,
+      }, { onConflict: "ean", ignoreDuplicates: false });
+
+      if (!error) {
+        classified++;
+        if (result.nova_group === 1) nova1++;
+        if (result.nova_group === 2) nova2++;
+      }
+    }
+
+    const summary = {
+      mode: "backfill",
+      total_in_sources: allEans.length,
+      already_in_products: existingEans.size,
+      newly_classified: classified,
+      nova_1: nova1,
+      nova_2: nova2,
+    };
+
+    console.log("Backfill complete:", summary);
+    return new Response(JSON.stringify(summary), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Backfill error:", error);
+    return new Response(JSON.stringify({ error: "Backfill failed" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
+
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
