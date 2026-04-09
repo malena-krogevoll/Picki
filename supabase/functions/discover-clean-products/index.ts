@@ -171,40 +171,37 @@ async function searchKassalapp(query: string): Promise<DiscoveredProduct[]> {
 // Backfill mode: classify product_sources EANs missing from products table
 async function handleBackfill(supabase: any): Promise<Response> {
   try {
-    // Find EANs in product_sources that are NOT in products (batch of 200 for speed)
-    const { data: allSources } = await supabase
-      .from("product_sources")
-      .select("ean, name, brand, image_url, ingredients_raw")
-      .order("fetched_at", { ascending: false })
-      .limit(1000);
-
-    if (!allSources || allSources.length === 0) {
-      return new Response(JSON.stringify({ message: "No product_sources found" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Get unique EANs
-    const eanMap = new Map<string, typeof allSources[0]>();
-    for (const s of allSources) {
-      if (s.ean && !eanMap.has(s.ean)) eanMap.set(s.ean, s);
-    }
-
-    // Check which already exist in products (batch query)
-    const allEans = Array.from(eanMap.keys());
+    // Step 1: Get all EANs already in products table
     const existingEans = new Set<string>();
-    // Query in chunks of 200 to avoid URL length limits
-    for (let i = 0; i < allEans.length; i += 200) {
-      const chunk = allEans.slice(i, i + 200);
-      const { data: existing } = await supabase
-        .from("products")
-        .select("ean")
-        .in("ean", chunk);
-      for (const p of (existing || [])) existingEans.add(p.ean);
+    let offset = 0;
+    while (true) {
+      const { data } = await supabase.from("products").select("ean").range(offset, offset + 999);
+      if (!data || data.length === 0) break;
+      for (const p of data) existingEans.add(p.ean);
+      if (data.length < 1000) break;
+      offset += 1000;
     }
 
-    const missingEans = allEans.filter(e => !existingEans.has(e));
-    console.log(`Backfill: ${missingEans.length} EANs missing from products (of ${allEans.length} total)`);
+    // Step 2: Get product_sources EANs NOT in products, paginated
+    const eanMap = new Map<string, any>();
+    offset = 0;
+    while (eanMap.size < 500) { // Process 500 per invocation
+      const { data: sources } = await supabase
+        .from("product_sources")
+        .select("ean, name, brand, image_url, ingredients_raw")
+        .range(offset, offset + 999);
+      if (!sources || sources.length === 0) break;
+      for (const s of sources) {
+        if (s.ean && !existingEans.has(s.ean) && !eanMap.has(s.ean)) {
+          eanMap.set(s.ean, s);
+        }
+      }
+      if (sources.length < 1000) break;
+      offset += 1000;
+    }
+
+    const missingEans = Array.from(eanMap.keys());
+    console.log(`Backfill: ${missingEans.length} EANs missing from products (${existingEans.size} already exist)`);
 
     if (missingEans.length === 0) {
       return new Response(JSON.stringify({ message: "All products already classified", total: allEans.length }), {
