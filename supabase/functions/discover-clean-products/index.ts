@@ -173,19 +173,26 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Require service_role for this admin job
   const authHeader = req.headers.get("Authorization") || "";
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // Verify caller is using service_role key
   if (!authHeader.includes(serviceKey)) {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    // Allow if called via pg_cron (which uses anon key in the HTTP call)
-    // For security, we still use service role client internally
   }
 
   const supabase = createClient(supabaseUrl, serviceKey);
+
+  // Check for backfill mode
+  let mode = "discover";
+  try {
+    const body = await req.json();
+    if (body?.mode === "backfill") mode = "backfill";
+  } catch { /* no body = default discover mode */ }
+
+  if (mode === "backfill") {
+    return await handleBackfill(supabase);
+  }
 
   try {
     // Get existing EANs to skip
