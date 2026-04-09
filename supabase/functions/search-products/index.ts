@@ -990,14 +990,22 @@ serve(async (req) => {
       const searchQueries = expandSearchQuery(effectiveQuery);
       console.log(`Expanded search queries: ${searchQueries.join(", ")}`);
 
-      // Søk sekvensielt for å unngå rate limiting - stopp tidlig hvis gode resultater
+      // Run Kassalapp API search and DB search in PARALLEL
       const seenEANs = new Set<number>();
       let kassalappProducts: Product[] = [];
-      
+
+      // Start DB search immediately (runs in parallel with Kassalapp)
+      const dbSearchPromise = searchDatabaseProducts(
+        originalQuery, effectiveStoreCode, new Set(), userPreferences, intent
+      ).catch(err => {
+        console.warn("DB parallel search failed:", err);
+        return [] as ProductCandidate[];
+      });
+
+      // Kassalapp: search all synonym variants (no early exit)
       for (let i = 0; i < searchQueries.length; i++) {
         const queryResults = await searchKassalappAPI(searchQueries[i], effectiveStoreCode, kassalappApiKey);
         
-        // Legg til unike produkter
         for (const product of queryResults) {
           if (product.EAN && seenEANs.has(product.EAN)) continue;
           if (product.EAN) seenEANs.add(product.EAN);
@@ -1006,19 +1014,13 @@ serve(async (req) => {
         
         console.log(`Query "${searchQueries[i]}": ${queryResults.length} products (total unique: ${kassalappProducts.length})`);
         
-        // Smart stopp: Hvis første søk ga 10+ resultater, ikke kjør flere søk
-        if (i === 0 && kassalappProducts.length >= 10) {
-          console.log("Sufficient results from first query, skipping synonyms");
-          break;
-        }
-        
-        // Legg til delay mellom synonym-søk (500ms)
+        // Delay between synonym searches (500ms)
         if (i < searchQueries.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
-      console.log(`Combined search results: ${kassalappProducts.length} unique products`);
+      console.log(`Combined Kassalapp results: ${kassalappProducts.length} unique products`);
 
       // Hvis ingen resultater, prøv med stavekorrigering
       if (kassalappProducts.length === 0 && lovableApiKey) {
@@ -1038,7 +1040,6 @@ serve(async (req) => {
       console.log(`After food filter: ${kassalappProducts.length} products for store ${effectiveStoreCode}`);
 
       for (const product of kassalappProducts) {
-        // Use intent-based scoring if available, otherwise fall back to basic scoring
         const candidate = intent 
           ? processProductWithIntent(product, originalQuery, intent, userPreferences)
           : processProduct(product, originalQuery, userPreferences);
@@ -1048,7 +1049,6 @@ serve(async (req) => {
         }
       }
 
-      // Hvis få sterke treff, inkluder også svakere treff
       if (candidates.length < 5 && allCandidates.length > 0) {
         console.log("Few strong matches, including weaker matches");
         candidates = allCandidates.filter(c => c.score >= 20);
@@ -1059,19 +1059,15 @@ serve(async (req) => {
         candidates = allCandidates;
       }
 
-      // DB fallback: supplement with cached products if fewer than 10 results
-      if (candidates.length < 10) {
+      // Merge DB results (waited for parallel promise)
+      const dbCandidates = await dbSearchPromise;
+      if (dbCandidates.length > 0) {
+        // Deduplicate by EAN
         const existingEans = new Set(candidates.filter(c => c.product.EAN).map(c => c.product.EAN!));
-        try {
-          const dbCandidates = await searchDatabaseFallback(
-            originalQuery, effectiveStoreCode, existingEans, userPreferences, intent
-          );
-          if (dbCandidates.length > 0) {
-            candidates.push(...dbCandidates);
-            console.log(`Added ${dbCandidates.length} DB fallback results (total: ${candidates.length})`);
-          }
-        } catch (dbErr) {
-          console.warn("DB fallback search failed:", dbErr);
+        const newDbCandidates = dbCandidates.filter(c => !c.product.EAN || !existingEans.has(c.product.EAN));
+        if (newDbCandidates.length > 0) {
+          candidates.push(...newDbCandidates);
+          console.log(`Merged ${newDbCandidates.length} DB results (total: ${candidates.length})`);
         }
       }
     } catch (apiError) {
