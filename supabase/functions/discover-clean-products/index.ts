@@ -204,7 +204,7 @@ async function handleBackfill(supabase: any): Promise<Response> {
     console.log(`Backfill: ${missingEans.length} EANs missing from products (${existingEans.size} already exist)`);
 
     if (missingEans.length === 0) {
-      return new Response(JSON.stringify({ message: "All products already classified", total: allEans.length }), {
+      return new Response(JSON.stringify({ message: "All products already classified", total: existingEans.size }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
