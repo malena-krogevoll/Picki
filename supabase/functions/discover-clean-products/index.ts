@@ -171,7 +171,7 @@ async function searchKassalapp(query: string): Promise<DiscoveredProduct[]> {
 // Backfill mode: classify product_sources EANs missing from products table
 async function handleBackfill(supabase: any): Promise<Response> {
   try {
-    // Find EANs in product_sources that are NOT in products
+    // Find EANs in product_sources that are NOT in products (batch of 200 for speed)
     const { data: allSources } = await supabase
       .from("product_sources")
       .select("ean, name, brand, image_url, ingredients_raw")
@@ -190,20 +190,31 @@ async function handleBackfill(supabase: any): Promise<Response> {
       if (s.ean && !eanMap.has(s.ean)) eanMap.set(s.ean, s);
     }
 
-    // Check which already exist in products
+    // Check which already exist in products (batch query)
     const allEans = Array.from(eanMap.keys());
-    const { data: existingProducts } = await supabase
-      .from("products")
-      .select("ean")
-      .in("ean", allEans);
-    const existingEans = new Set((existingProducts || []).map((p: any) => p.ean));
+    const existingEans = new Set<string>();
+    // Query in chunks of 200 to avoid URL length limits
+    for (let i = 0; i < allEans.length; i += 200) {
+      const chunk = allEans.slice(i, i + 200);
+      const { data: existing } = await supabase
+        .from("products")
+        .select("ean")
+        .in("ean", chunk);
+      for (const p of (existing || [])) existingEans.add(p.ean);
+    }
 
     const missingEans = allEans.filter(e => !existingEans.has(e));
-    console.log(`Backfill: ${missingEans.length} EANs in product_sources missing from products (of ${allEans.length} total)`);
+    console.log(`Backfill: ${missingEans.length} EANs missing from products (of ${allEans.length} total)`);
 
-    let classified = 0;
-    let nova1 = 0;
-    let nova2 = 0;
+    if (missingEans.length === 0) {
+      return new Response(JSON.stringify({ message: "All products already classified", total: allEans.length }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Classify all missing products and batch upsert
+    const productsToUpsert: any[] = [];
+    let nova1 = 0, nova2 = 0;
 
     for (const ean of missingEans) {
       const source = eanMap.get(ean)!;
@@ -212,8 +223,7 @@ async function handleBackfill(supabase: any): Promise<Response> {
         product_name: source.name || "",
       });
 
-      // Store ALL classified products (not just NOVA 1-2) so they don't get re-processed
-      const { error } = await supabase.from("products").upsert({
+      productsToUpsert.push({
         ean,
         name: source.name,
         brand: source.brand,
@@ -222,12 +232,24 @@ async function handleBackfill(supabase: any): Promise<Response> {
         nova_class: result.nova_group,
         nova_confidence: result.confidence,
         nova_reason: result.reasoning,
-      }, { onConflict: "ean", ignoreDuplicates: false });
+      });
 
-      if (!error) {
-        classified++;
-        if (result.nova_group === 1) nova1++;
-        if (result.nova_group === 2) nova2++;
+      if (result.nova_group === 1) nova1++;
+      if (result.nova_group === 2) nova2++;
+    }
+
+    // Batch upsert in chunks of 100
+    let classified = 0;
+    for (let i = 0; i < productsToUpsert.length; i += 100) {
+      const chunk = productsToUpsert.slice(i, i + 100);
+      const { error } = await supabase.from("products").upsert(chunk, {
+        onConflict: "ean",
+        ignoreDuplicates: false,
+      });
+      if (error) {
+        console.error(`Batch upsert error at offset ${i}:`, error);
+      } else {
+        classified += chunk.length;
       }
     }
 
@@ -252,7 +274,6 @@ async function handleBackfill(supabase: any): Promise<Response> {
     });
   }
 }
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
