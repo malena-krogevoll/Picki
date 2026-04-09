@@ -336,8 +336,8 @@ async function expandUniversalOffers(candidates: ProductCandidate[]): Promise<vo
   }
 }
 
-// Search database for cached products as fallback
-async function searchDatabaseFallback(
+// Search database for cached products (now runs in parallel with API)
+async function searchDatabaseProducts(
   query: string,
   storeCode: string | undefined,
   existingEans: Set<number>,
@@ -345,24 +345,72 @@ async function searchDatabaseFallback(
   intent?: ItemIntent,
 ): Promise<ProductCandidate[]> {
   const queryLower = query.toLowerCase().trim();
-  
-  // Search product_sources by name (ilike)
-  const { data: cachedProducts, error } = await supabase
-    .from("product_sources")
-    .select("ean, name, brand, image_url, ingredients_raw, payload")
-    .or(`name.ilike.%${queryLower}%,brand.ilike.%${queryLower}%`)
-    .limit(30);
 
-  if (error || !cachedProducts || cachedProducts.length === 0) return [];
+  // Build list of search terms: original + synonyms
+  const searchTerms = [queryLower];
+  if (searchSynonyms[queryLower]) {
+    for (const syn of searchSynonyms[queryLower].slice(0, 5)) {
+      if (!searchTerms.includes(syn.toLowerCase())) searchTerms.push(syn.toLowerCase());
+    }
+  }
 
-  // Filter out products we already have from Kassalapp
-  const newProducts = cachedProducts.filter(p => !existingEans.has(Number(p.ean)));
+  // Build OR filter for all search terms across both name and brand
+  const orClauses = searchTerms.flatMap(t => [
+    `name.ilike.%${t}%`,
+    `brand.ilike.%${t}%`,
+  ]);
+  const orFilter = orClauses.join(",");
+
+  // Search product_sources AND products in parallel
+  const [sourcesResult, productsResult] = await Promise.all([
+    supabase
+      .from("product_sources")
+      .select("ean, name, brand, image_url, ingredients_raw, payload")
+      .or(orFilter)
+      .limit(50),
+    supabase
+      .from("products")
+      .select("ean, name, brand, image_url, ingredients_raw, nova_class")
+      .or(orFilter)
+      .limit(50),
+  ]);
+
+  // Merge results by EAN, preferring products table (has NOVA data)
+  const eanMap = new Map<string, {
+    ean: string; name: string | null; brand: string | null;
+    image_url: string | null; ingredients_raw: string | null;
+    nova_class?: number | null; payload?: any;
+  }>();
+
+  // Add product_sources first
+  for (const p of (sourcesResult.data || [])) {
+    if (!eanMap.has(p.ean)) {
+      eanMap.set(p.ean, { ...p, nova_class: null });
+    }
+  }
+
+  // Overlay with products table (better data, has NOVA)
+  for (const p of (productsResult.data || [])) {
+    const existing = eanMap.get(p.ean);
+    if (existing) {
+      // Merge: prefer non-null fields from products table
+      if (p.name) existing.name = p.name;
+      if (p.brand) existing.brand = p.brand;
+      if (p.image_url) existing.image_url = p.image_url;
+      if (p.ingredients_raw) existing.ingredients_raw = p.ingredients_raw;
+      existing.nova_class = p.nova_class;
+    } else {
+      eanMap.set(p.ean, { ...p, payload: null });
+    }
+  }
+
+  // Filter out already-known EANs
+  const newProducts = Array.from(eanMap.values()).filter(p => !existingEans.has(Number(p.ean)));
   if (newProducts.length === 0) return [];
 
   // If store filtering, check offers table
   let allowedEans: Set<string> | null = null;
   if (storeCode) {
-    // Map storeCode to chain names
     const chainNameMap: Record<string, string[]> = {
       MENY_NO: ["meny"], KIWI: ["kiwi"], REMA_1000: ["rema 1000", "rema"],
       COOP_MEGA: ["coop mega", "coop"], COOP_EXTRA: ["coop extra", "coop"],
@@ -370,9 +418,8 @@ async function searchDatabaseFallback(
       SPAR_NO: ["spar"], JOKER_NO: ["joker"], ODA_NO: ["oda"], BUNNPRIS: ["bunnpris"],
     };
     const chainNames = chainNameMap[storeCode] || [];
-    
+
     if (chainNames.length > 0) {
-      // Get chain IDs for this store
       const { data: chains } = await supabase
         .from("chains")
         .select("id")
@@ -381,7 +428,7 @@ async function searchDatabaseFallback(
       if (chains && chains.length > 0) {
         const chainIds = chains.map(c => c.id);
         const eans = newProducts.map(p => p.ean);
-        
+
         const { data: offers } = await supabase
           .from("offers")
           .select("ean")
@@ -395,7 +442,6 @@ async function searchDatabaseFallback(
 
   const candidates: ProductCandidate[] = [];
   for (const product of newProducts) {
-    // If store filter active and product not in store's offers, skip
     if (allowedEans && !allowedEans.has(product.ean)) continue;
 
     const payload = product.payload as any;
@@ -419,22 +465,20 @@ async function searchDatabaseFallback(
       ? processProductWithIntent(mappedProduct, query, intent, userPreferences)
       : processProduct(mappedProduct, query, userPreferences);
 
-    // Slight penalty for cached results vs fresh (reduced for quality brands)
+    // Slight penalty for cached results vs fresh
     const isKolonihagen = (product.brand || "").toLowerCase().includes("kolonihagen");
     if (isKolonihagen) {
-      // Kolonihagen products are known renvare — minimal DB penalty
       candidate.score *= 0.95;
-      // Boost for Rema 1000 users (store-exclusive)
       if (storeCode === "REMA_1000") {
-        candidate.score *= 1.25; // Strong boost for store-exclusive clean brand
+        candidate.score *= 1.25;
         if (userPreferences?.other_preferences?.organic) {
-          candidate.score *= 1.2; // Additional organic preference boost
+          candidate.score *= 1.2;
         }
       }
     } else {
-      candidate.score *= 0.85;
+      candidate.score *= 0.90; // Reduced penalty (was 0.85)
     }
-    
+
     candidate.matchReason += " (fra database)";
 
     if (candidate.score >= 20) {
@@ -442,7 +486,7 @@ async function searchDatabaseFallback(
     }
   }
 
-  console.log(`DB fallback: found ${candidates.length} additional products for "${query}"`);
+  console.log(`DB search: found ${candidates.length} products for "${query}" (searched ${searchTerms.length} terms across products + product_sources)`);
   return candidates;
 }
 interface SearchRequest {
