@@ -253,7 +253,7 @@ async function handleBackfill(supabase: any): Promise<Response> {
   }
 }
 
-
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
