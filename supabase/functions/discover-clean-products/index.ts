@@ -252,7 +252,7 @@ async function handleBackfill(supabase: any): Promise<Response> {
 
     const summary = {
       mode: "backfill",
-      total_in_sources: allEans.length,
+      total_in_sources: eanMap.size + existingEans.size,
       already_in_products: existingEans.size,
       newly_classified: classified,
       nova_1: nova1,
